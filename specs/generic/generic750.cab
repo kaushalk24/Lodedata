@@ -1,0 +1,134 @@
+{
+  "kind": "cables",
+  "name": "generic750",
+  "description": "hardline and drop cable",
+  "version": "1.0",
+  "rows": [
+    {
+      "id": "P3-412",
+      "description": "0.412\" semi-flexible hardline",
+      "part_number": "P3-412",
+      "atten": {
+        "F1": 1.72,
+        "F2": 0.46,
+        "R1": 0.4,
+        "R2": 0.15
+      },
+      "loop_res": 1.65,
+      "size": "0.412\"",
+      "vop": 87.0,
+      "price": 0.42,
+      "connector_price": 6.5,
+      "labor": 0.35,
+      "extra": {}
+    },
+    {
+      "id": "P3-500",
+      "description": "0.500\" semi-flexible hardline",
+      "part_number": "P3-500",
+      "atten": {
+        "F1": 1.42,
+        "F2": 0.38,
+        "R1": 0.33,
+        "R2": 0.13
+      },
+      "loop_res": 1.1,
+      "size": "0.500\"",
+      "vop": 87.0,
+      "price": 0.55,
+      "connector_price": 6.5,
+      "labor": 0.35,
+      "extra": {}
+    },
+    {
+      "id": "P3-625",
+      "description": "0.625\" semi-flexible hardline",
+      "part_number": "P3-625",
+      "atten": {
+        "F1": 1.14,
+        "F2": 0.3,
+        "R1": 0.26,
+        "R2": 0.1
+      },
+      "loop_res": 0.75,
+      "size": "0.625\"",
+      "vop": 87.0,
+      "price": 0.78,
+      "connector_price": 6.5,
+      "labor": 0.35,
+      "extra": {}
+    },
+    {
+      "id": "P3-750",
+      "description": "0.750\" semi-flexible hardline",
+      "part_number": "P3-750",
+      "atten": {
+        "F1": 0.95,
+        "F2": 0.25,
+        "R1": 0.22,
+        "R2": 0.09
+      },
+      "loop_res": 0.55,
+      "size": "0.750\"",
+      "vop": 87.0,
+      "price": 0.98,
+      "connector_price": 6.5,
+      "labor": 0.35,
+      "extra": {}
+    },
+    {
+      "id": "P3-875",
+      "description": "0.875\" semi-flexible hardline",
+      "part_number": "P3-875",
+      "atten": {
+        "F1": 0.83,
+        "F2": 0.22,
+        "R1": 0.19,
+        "R2": 0.08
+      },
+      "loop_res": 0.41,
+      "size": "0.875\"",
+      "vop": 87.0,
+      "price": 1.3,
+      "connector_price": 6.5,
+      "labor": 0.35,
+      "extra": {}
+    },
+    {
+      "id": "RG-6",
+      "description": "RG-6 subscriber drop",
+      "part_number": "RG-6",
+      "atten": {
+        "F1": 5.65,
+        "F2": 1.55,
+        "R1": 1.35,
+        "R2": 0.55
+      },
+      "loop_res": 15.0,
+      "size": "",
+      "vop": 87.0,
+      "price": 0.11,
+      "connector_price": 6.5,
+      "labor": 0.35,
+      "extra": {}
+    },
+    {
+      "id": "RG-11",
+      "description": "RG-11 long drop",
+      "part_number": "RG-11",
+      "atten": {
+        "F1": 3.65,
+        "F2": 1.0,
+        "R1": 0.87,
+        "R2": 0.35
+      },
+      "loop_res": 6.5,
+      "size": "",
+      "vop": 87.0,
+      "price": 0.26,
+      "connector_price": 6.5,
+      "labor": 0.35,
+      "extra": {}
+    }
+  ]
+}

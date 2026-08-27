@@ -1,0 +1,73 @@
+{
+  "kind": "performance",
+  "name": "generic750",
+  "description": "carrier/noise, CTB, CSO, cross-modulation, return C/N",
+  "version": "1.0",
+  "rows": [
+    {
+      "id": "CN",
+      "name": "Carrier / Noise",
+      "addition_factor": 10.0,
+      "derate": 1.0,
+      "objective": 49.0,
+      "from_noise_figure": true,
+      "noise_constant": 59.0,
+      "direction": "forward",
+      "enabled": true,
+      "extra": {},
+      "reference_level": null
+    },
+    {
+      "id": "CTB",
+      "name": "Composite Triple Beat",
+      "addition_factor": 20.0,
+      "derate": -2.0,
+      "objective": 53.0,
+      "from_noise_figure": false,
+      "noise_constant": 59.0,
+      "direction": "forward",
+      "enabled": true,
+      "extra": {},
+      "reference_level": null
+    },
+    {
+      "id": "CSO",
+      "name": "Composite Second Order",
+      "addition_factor": 15.0,
+      "derate": -1.0,
+      "objective": 53.0,
+      "from_noise_figure": false,
+      "noise_constant": 59.0,
+      "direction": "forward",
+      "enabled": true,
+      "extra": {},
+      "reference_level": null
+    },
+    {
+      "id": "XMOD",
+      "name": "Cross Modulation",
+      "addition_factor": 20.0,
+      "derate": -2.0,
+      "objective": 51.0,
+      "from_noise_figure": false,
+      "noise_constant": 59.0,
+      "direction": "forward",
+      "enabled": true,
+      "extra": {},
+      "reference_level": null
+    },
+    {
+      "id": "RCN",
+      "name": "Return Carrier / Noise",
+      "addition_factor": 10.0,
+      "derate": 1.0,
+      "objective": 43.0,
+      "from_noise_figure": true,
+      "noise_constant": 59.0,
+      "direction": "return",
+      "enabled": true,
+      "extra": {},
+      "reference_level": null
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "kind": "xspec",
+  "entries": [
+    {
+      "line": 0,
+      "name": "generic750",
+      "directory": "specs/generic",
+      "files": {}
+    }
+  ]
+}
