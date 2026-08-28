@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 from ..engine.autodesign import AutoDesigner
-from ..network import Network
+from ..network import Network, NetworkError
 from ..reports import REPORTS, write_workbook
 from ..specs import SPEC_KINDS, SpecError
 from ..workspace import Workspace
@@ -118,6 +118,52 @@ class Handler(BaseHTTPRequestHandler):
         with open(full, "rb") as fh:
             self._send(200, fh.read(), ctype or "application/octet-stream")
 
+    # -- structural edits --------------------------------------------
+    @staticmethod
+    def _apply_edit(network: Network, specs, op: str, args: dict) -> None:
+        """Apply one structural edit, in the model rather than the browser.
+
+        Keeping these in Python means the grid, the command line and any
+        script all go through the same, tested implementation.
+        """
+        if op == "insert_after":
+            network.insert_after(
+                args["location"], port=args.get("port", ""),
+                jumper=float(args.get("jumper", 0.0) or 0.0),
+                cable=args.get("cable", ""), **(args.get("fields") or {}))
+        elif op == "insert_before":
+            network.insert_before(
+                args["location"], jumper=float(args.get("jumper", 0.0) or 0.0),
+                out_port=args.get("out_port", "OUT"),
+                cable=args.get("cable", ""), **(args.get("fields") or {}))
+        elif op == "splice_out":
+            network.splice_out(args["location"])
+        elif op == "remove":
+            network.remove_location(args["location"])
+        elif op == "swap_ports":
+            network.swap_ports(args["location"], args["port_a"], args["port_b"])
+        elif op == "move_leg":
+            network.move_leg(args["span"], args["parent"], args["port"])
+        elif op == "name_leg":
+            network.name_leg(args["span"], args.get("name", ""))
+        elif op == "set_tap_value":
+            loc = network.locations.get(args["location"])
+            if loc is None:
+                raise NetworkError(f"unknown location {args['location']!r}")
+            current = specs.taps.by_id(loc.device)
+            ports = int(args.get("ports") or (current.ports if current else 4))
+            tsg = int(loc.tsg or specs.parameters.default_tsg)
+            tap = specs.taps.find_value(
+                float(args["value"]), ports, tsg,
+                self_terminating=(current.self_terminating if current else False))
+            if tap is None:
+                raise NetworkError(
+                    f"no tap of value {args['value']} in selection group {tsg}")
+            loc.kind = "tap"
+            loc.device = tap.id
+        else:
+            raise ApiError(f"unknown edit operation {op!r}", 400)
+
     # -- api -------------------------------------------------------------
     def _api(self, method: str, route: str, query: dict) -> None:
         ws = self.workspace
@@ -194,6 +240,27 @@ class Handler(BaseHTTPRequestHandler):
                 "analysis": analysis.to_dict(),
                 "stats": network.stats(),
                 "problems": network.validate(),
+                "legs": [leg.to_dict() for leg in network.legs()],
+            })
+            return
+
+        if head == "edit" and method == "POST":
+            body = self._body()
+            specs = ws.load_specs(body.get("spec", ""))
+            network = Network.from_dict(body["network"])
+            op = body.get("op", "")
+            args = body.get("args") or {}
+            try:
+                self._apply_edit(network, specs, op, args)
+            except NetworkError as exc:
+                raise ApiError(str(exc), 409) from exc
+            analysis = ws.analyse(specs, network)
+            self._json({
+                "network": network.to_dict(),
+                "analysis": analysis.to_dict(),
+                "stats": network.stats(),
+                "problems": network.validate(),
+                "legs": [leg.to_dict() for leg in network.legs()],
             })
             return
 

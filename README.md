@@ -73,20 +73,28 @@ Notes and Flags — as text, CSV, JSON or a real `.xlsx` workbook.
 
 ## Design Mode
 
-`lode serve` gives you the plant on a pan/zoom canvas, live properties, and the
-design chart underneath, all re-solving as you type. Colour follows the
-Parameters file's *Set Margin*: green in spec, amber inside the margin, red
-out of spec.
-
-The original was driven from the 10-key pad; the keys here keep that spirit:
+`lode serve` gives you the plant on a pan/zoom canvas and, underneath, the
+**design grid** — the surface you actually build in. Like the original, you
+work **one leg at a time** and type: footage, house count, tap value, straight
+down the run. Everything re-solves as you type. Colour follows the Parameters
+file's *Set Margin*: green in spec, amber inside the margin, red out of spec.
 
 | Key | Action |
 | --- | --- |
-| `+` / `−` | next higher / lower tap value at the cursor, and recalculate |
-| `T` `C` `E` | add a tap / coupler / end of line |
-| `A` | insert an amplifier ahead of the selection |
-| `↑` `↓` | walk the plant · `Del` remove |
-| `D` | auto design · `Ctrl`+`S` save |
+| *type a number* | starts editing the cell under the cursor |
+| `.` | commit and step to the next field — Ft › Units › Tap |
+| `Enter` | commit and drop to the next pole; **at the foot of a leg it adds the next pole** |
+| `+` / `−` | step the tap (or coupler, or active) at the cursor |
+| `Ins` / `Del` | insert a pole ahead of the cursor / splice one out, merging its footage |
+| `>` | design a leg that starts at this pole |
+| `<` or `U` | back up to the parent leg, cursor on its origin |
+| `S` | swap the legs on this device |
+| `N` | name the current leg |
+| `D` | auto design · `Ctrl`+`Z` undo · `Ctrl`+`S` save |
+
+A `0` in the footage column applies no cable loss, so a device can sit on the
+same pole as the one above it — which is how an amplifier gets hung on a tap's
+pole. The **Legs** panel lists every leg in the plant; click one to design it.
 
 ## Scripting
 

@@ -10,7 +10,14 @@ const S = {
   workspace: null, specName: '', netName: '', network: null,
   analysis: null, specs: null, sel: null, dirty: false, tab: 'design',
   specTab: 'taps', view: {x: 60, y: 60, k: 1}, pending: null,
+  // design grid
+  legs: [], legId: 'TRUNK', cur: {row: 0, col: 'ft'}, editing: null,
+  undo: [], redo: [], gridActive: true,
 };
+
+/** Columns the designer types into, in the order the period key walks them. */
+const ENTRY_COLS = ['ft', 'units', 'tap'];
+const UNDO_LIMIT = 80;
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, attrs, kids) => {
@@ -123,9 +130,98 @@ async function analyse(fit) {
     S.analysis = data.analysis;
     S.stats = data.stats;
     S.problems = data.problems;
+    if (data.legs) adoptLegs(data.legs);
     render(fit);
   } catch (err) {
     toast(err.message, 'error');
+  }
+}
+
+/* ------------------------------------------------------------------ legs */
+function adoptLegs(legs) {
+  S.legs = legs;
+  if (!legs.some((l) => l.id === S.legId)) {
+    // the leg we were on was merged away or renamed: fall back to the one
+    // holding the selection, else the trunk
+    const holding = S.sel && legs.find((l) => l.locations.includes(S.sel));
+    S.legId = holding ? holding.id : (legs[0] ? legs[0].id : 'TRUNK');
+    S.cur.row = 0;
+  }
+  const leg = currentLeg();
+  if (leg) S.cur.row = Math.min(S.cur.row, Math.max(0, leg.locations.length - 1));
+}
+
+const currentLeg = () =>
+  S.legs.find((l) => l.id === S.legId) || S.legs[0] || null;
+const legById = (id) => S.legs.find((l) => l.id === id) || null;
+const legChildren = (id) => S.legs.filter((l) => l.parent_leg === id);
+
+/** Legs that begin at a given location -- what the > key offers. */
+const legsFrom = (locId) => S.legs.filter((l) => l.origin === locId);
+
+function legPath(id) {
+  const chain = [];
+  let cursor = legById(id);
+  let guard = 0;
+  while (cursor && guard++ < 64) {
+    chain.unshift(cursor);
+    cursor = cursor.parent_leg ? legById(cursor.parent_leg) : null;
+  }
+  return chain;
+}
+
+function goLeg(id, row) {
+  S.legId = id;
+  S.cur = {row: row || 0, col: S.cur.col || 'ft'};
+  const leg = currentLeg();
+  if (leg && leg.locations.length) S.sel = leg.locations[S.cur.row] || null;
+  render();
+  focusGrid();
+}
+
+/* ------------------------------------------------------------------ undo */
+function snapshot() {
+  S.undo.push(JSON.stringify(S.network));
+  if (S.undo.length > UNDO_LIMIT) S.undo.shift();
+  S.redo.length = 0;
+}
+
+function undo() {
+  if (!S.undo.length) { toast('nothing to undo'); return; }
+  S.redo.push(JSON.stringify(S.network));
+  S.network = JSON.parse(S.undo.pop());
+  S.dirty = true;
+  analyse();
+}
+
+function redo() {
+  if (!S.redo.length) { toast('nothing to redo'); return; }
+  S.undo.push(JSON.stringify(S.network));
+  S.network = JSON.parse(S.redo.pop());
+  S.dirty = true;
+  analyse();
+}
+
+/** Run a structural edit in the Python model, which owns those rules. */
+async function edit(op, args, keepRow) {
+  snapshot();
+  try {
+    const data = await post('edit', {network: S.network, spec: S.specName,
+                                     op, args});
+    S.network = data.network;
+    S.analysis = data.analysis;
+    S.stats = data.stats;
+    S.problems = data.problems;
+    S.dirty = true;
+    if (data.legs) adoptLegs(data.legs);
+    if (keepRow !== undefined) S.cur.row = keepRow;
+    render();
+    focusGrid();
+    return true;
+  } catch (err) {
+    S.undo.pop();
+    toast(err.message, 'error');
+    return false;
   }
 }
 
@@ -263,13 +359,22 @@ function stepDevice(direction) {
   const index = list.findIndex((r) => r.id === loc.device);
   const next = list[Math.min(list.length - 1, Math.max(0, index + direction))];
   if (next && next.id !== loc.device) {
+    snapshot();
     loc.device = next.id;
+    S.dirty = true;
     scheduleAnalyse();
   }
 }
 
 function select(id) {
   S.sel = id;
+  const leg = S.legs.find((l) => l.locations.includes(id));
+  if (leg && (leg.id !== S.legId || S.tab === 'design')) {
+    S.legId = leg.id;
+    S.cur = {row: Math.max(0, leg.locations.indexOf(id)), col: S.cur.col || 'ft'};
+    if (S.tab === 'design') { renderProps(); renderCanvas(); renderTable();
+                              renderLegs(); return; }
+  }
   renderProps();
   renderCanvas();
   highlightRow();
@@ -612,7 +717,13 @@ function renderTabs() {
   for (const [key, name] of TABS) {
     nav.appendChild(el('button', {
       text: name, class: key === S.tab ? 'on' : '',
-      onclick: () => { S.tab = key; renderTabs(); renderTable(); },
+      onclick: () => {
+        S.tab = key;
+        S.gridActive = key === 'design';
+        renderTabs();
+        renderTable();
+        if (S.gridActive) setTimeout(focusGrid, 0);
+      },
     }));
   }
 }
@@ -645,7 +756,7 @@ function renderTable() {
   const host = $('table');
   host.textContent = '';
   if (S.tab === 'specs') return renderSpecEditor(host);
-  if (S.tab === 'design') return host.appendChild(designTable());
+  if (S.tab === 'design') return renderDesignPane(host);
   host.appendChild(el('div', {class: 'empty', text: 'loading...'}));
   post('report/' + S.tab + '?format=json',
        {network: S.network, spec: S.specName})
@@ -680,41 +791,509 @@ function idForLabel(label) {
   return hit ? hit.id : null;
 }
 
-function designTable() {
+/* =========================================================== design grid
+ * The Design Assistant is a keyboard instrument: you work one leg at a
+ * time, typing footage and house counts and tap values straight into a
+ * grid, using the period key to step between fields and Enter to move on
+ * to the next pole.  This is that grid.
+ * ==================================================================== */
+
+const gridRowIds = () => {
+  const leg = currentLeg();
+  return leg ? leg.locations : [];
+};
+
+function gridLoc(row) {
+  const ids = gridRowIds();
+  return ids[row] ? byId(ids[row]) : null;
+}
+
+function tapValueOf(loc) {
+  if (!loc || loc.kind !== 'tap') return null;
+  const tap = (S.specs.files.taps.rows || []).find((r) => r.id === loc.device);
+  return tap ? tap.value : null;
+}
+
+function cellValue(loc, col) {
+  if (!loc) return '';
+  if (col === 'loc') return loc.label || loc.id;
+  if (col === 'ft') {
+    const span = feedSpan(loc.id);
+    return span ? span.length : 0;
+  }
+  if (col === 'units') return loc.units || 0;
+  if (col === 'tap') {
+    if (loc.kind === 'tap') {
+      const value = tapValueOf(loc);
+      return value === null ? '?' : value;
+    }
+    return loc.device || '';
+  }
+  return '';
+}
+
+function renderDesignPane(host) {
+  const leg = currentLeg();
+  host.appendChild(crumbBar(leg));
+  const wrap = el('div', {id: 'grid-wrap', tabindex: '0'}, []);
+  if (!leg || !leg.locations.length) {
+    wrap.appendChild(el('div', {class: 'gridhint',
+      text: 'This leg is empty. Press Enter to add the first pole.'}));
+  } else {
+    wrap.appendChild(gridTable(leg));
+  }
+  wrap.addEventListener('mousedown', () => { S.gridActive = true; });
+  host.appendChild(wrap);
+  // a rebuild replaces every node, so re-seat the cursor and the focus
+  applyCursor();
+  if (S.gridActive) setTimeout(focusGrid, 0);
+}
+
+function crumbBar(leg) {
+  const bar = el('div', {id: 'crumbs'}, []);
+  const path = leg ? legPath(leg.id) : [];
+  path.forEach((entry, index) => {
+    const last = index === path.length - 1;
+    const origin = entry.origin ? byId(entry.origin) : null;
+    const name = entry.name || (origin
+      ? `${origin.label || origin.id} [${entry.port}]` : 'TRUNK');
+    bar.appendChild(el('span', {
+      class: last ? 'here' : 'crumb', text: name,
+      onclick: last ? null : () => goLeg(entry.id, 0),
+    }));
+    if (!last) bar.appendChild(el('span', {class: 'sep', text: '›'}));
+  });
+  if (leg) {
+    const feet = leg.locations.reduce((total, id) => {
+      const span = feedSpan(id);
+      return total + (span ? Number(span.length) || 0 : 0);
+    }, 0);
+    const units = leg.locations.reduce(
+      (total, id) => total + (byId(id).units || 0), 0);
+    bar.appendChild(el('span', {class: 'meta',
+      text: `— ${leg.locations.length} poles · ${Math.round(feet).toLocaleString()} ` +
+            `${S.specs.files.parameters.distance_units} · ${units} units`}));
+  }
+  bar.appendChild(el('span', {class: 'spacer', style: 'flex:1'}));
+  bar.appendChild(el('button', {class: 'mini', text: 'Up', title: 'back to the parent leg (<)',
+                                onclick: ascend}));
+  bar.appendChild(el('button', {class: 'mini', text: 'Into leg ›',
+                                title: 'design a leg that starts here (>)',
+                                onclick: descend}));
+  bar.appendChild(el('button', {class: 'mini', text: 'Swap legs',
+                                title: 'swap the legs on this device (S)',
+                                onclick: swapLegs}));
+  bar.appendChild(el('button', {class: 'mini', text: 'Name leg',
+                                onclick: nameLeg}));
+  return bar;
+}
+
+function gridTable(leg) {
   const solution = S.analysis.solution;
   const fwd = solution.forward_columns, rtn = solution.return_columns;
-  const columns = ['Loc', 'Type', 'Device', 'Cable', 'Length', 'Units',
+  const entry = [['loc', 'Loc'], ['ft', 'Ft'], ['units', 'Units'],
+                 ['tap', 'Tap']];
+  const readonly = ['Type', 'Cable',
     ...fwd.map((c) => 'In ' + label(c)),
     ...fwd.map((c) => 'Tap ' + label(c)),
     ...rtn.map((c) => 'Rtn ' + label(c)),
     'Pad', 'EQ', 'Status'];
-  const rows = solution.order.map((id) => {
-    const r = solution.results[id];
-    const row = {
-      __id: id, Loc: r.label, Type: r.kind, Device: r.device, Cable: r.cable,
-      Length: r.length || '', Units: r.units || '',
-      Pad: r.pad ?? '', EQ: r.eq ?? '', Status: r.status,
+
+  const head = el('tr', {}, [
+    ...entry.map(([, name]) => el('th', {text: name, class: 'txt'})),
+    ...readonly.map((name) => el('th', {
+      text: name,
+      class: ['Type', 'Cable', 'Status'].includes(name) ? 'txt' : '',
+    })),
+  ]);
+
+  const body = el('tbody', {}, leg.locations.map((id, row) => {
+    const loc = byId(id);
+    const res = solution.results[id] || {fwd_in: {}, fwd_tap: {}, rtn_tap: {},
+                                          flags: [], status: 'ok'};
+    const branches = legsFrom(id).length > 0;
+    const tr = el('tr', {
+      class: (id === S.sel ? 'sel ' : '') + (branches ? 'branch' : ''),
+    }, []);
+
+    entry.forEach(([col]) => {
+      const td = el('td', {
+        class: 'cell' + (col === 'loc' ? ' txt' : ''),
+        text: String(cellValue(loc, col)),
+        'data-row': row, 'data-col': col,
+        onmousedown: (event) => {
+          event.preventDefault();
+          if (S.editing) commitEdit().then(() => setCursor(row, col));
+          else setCursor(row, col);
+        },
+      });
+      tr.appendChild(td);
+    });
+
+    const flagFor = (column) => {
+      for (const flag of res.flags || []) {
+        if (!flag.column) continue;
+        const name = label(flag.column);
+        if (column === 'Tap ' + name || column === 'Rtn ' + name ||
+            column === 'In ' + name) return flag.severity;
+      }
+      return '';
+    };
+    const cells = {
+      Type: loc.kind, Cable: res.cable || '',
+      Pad: res.pad ?? '', EQ: res.eq ?? '', Status: res.status,
     };
     fwd.forEach((c) => {
-      row['In ' + label(c)] = r.fwd_in[c];
-      row['Tap ' + label(c)] = r.fwd_tap[c];
+      cells['In ' + label(c)] = res.fwd_in[c];
+      cells['Tap ' + label(c)] = res.fwd_tap[c];
     });
-    rtn.forEach((c) => { row['Rtn ' + label(c)] = r.rtn_tap[c]; });
-    return row;
-  });
-  const flagCells = (row, column) => {
-    if (!row.__id) return '';
-    const res = S.analysis.solution.results[row.__id];
-    for (const flag of res.flags || []) {
-      if (!flag.column) continue;
-      const name = label(flag.column);
-      if (column === 'Tap ' + name || column === 'Rtn ' + name ||
-          column === 'In ' + name) return flag.severity;
+    rtn.forEach((c) => { cells['Rtn ' + label(c)] = res.rtn_tap[c]; });
+    readonly.forEach((name) => {
+      const classes = [];
+      if (['Type', 'Cable', 'Status'].includes(name)) classes.push('txt');
+      if (name === 'Status' && cells[name]) classes.push(cells[name]);
+      const severity = flagFor(name);
+      if (severity) classes.push(severity);
+      tr.appendChild(el('td', {class: classes.join(' '),
+                              text: cellText(name, cells[name])}));
+    });
+    tr.addEventListener('click', () => { S.sel = id; renderProps(); renderCanvas(); });
+    return tr;
+  }));
+  return el('table', {}, [el('thead', {}, [head]), body]);
+}
+
+function focusGrid() {
+  const wrap = $('grid-wrap');
+  if (wrap && !S.editing) wrap.focus();
+  S.gridActive = true;
+}
+
+const cellNode = (row, col) =>
+  document.querySelector(`#grid-wrap td[data-row="${row}"][data-col="${col}"]`);
+
+/** Paint the cursor by touching two cells, not by rebuilding the grid.
+ *  Rebuilding mid-keystroke loses the focus and drops the next key. */
+function applyCursor() {
+  const previous = document.querySelector('#grid-wrap td.cell.cur');
+  if (previous) previous.classList.remove('cur');
+  const node = cellNode(S.cur.row, S.cur.col);
+  if (node) {
+    node.classList.add('cur');
+    if (node.scrollIntoView) node.scrollIntoView({block: 'nearest',
+                                                  inline: 'nearest'});
+  }
+  for (const tr of document.querySelectorAll('#grid-wrap tbody tr')) {
+    tr.classList.remove('sel');
+  }
+  const row = document.querySelector(`#grid-wrap td[data-row="${S.cur.row}"]`);
+  if (row && row.parentElement) row.parentElement.classList.add('sel');
+}
+
+function setCursor(row, col) {
+  const ids = gridRowIds();
+  S.cur = {row: Math.max(0, Math.min(ids.length - 1, row)), col: col || S.cur.col};
+  S.sel = ids[S.cur.row] || S.sel;
+  applyCursor();
+  focusGrid();
+  schedulePanels();
+}
+
+/** The properties panel and canvas can lag the cursor; the grid cannot. */
+function schedulePanels() {
+  clearTimeout(schedulePanels._t);
+  schedulePanels._t = setTimeout(() => {
+    renderProps();
+    renderCanvas();
+    renderLegs();
+  }, 90);
+}
+
+/* ---------------------------------------------------------- grid editing */
+function startEdit(seed) {
+  const loc = gridLoc(S.cur.row);
+  if (!loc || S.editing) return;
+  const td = cellNode(S.cur.row, S.cur.col);
+  if (!td) return;
+  const current = seed === undefined ? String(cellValue(loc, S.cur.col)) : seed;
+  const input = el('input', {value: current});
+  if (S.cur.col === 'loc') input.style.textAlign = 'left';
+  td.textContent = '';
+  td.appendChild(input);
+  S.editing = {node: input, td, row: S.cur.row, col: S.cur.col};
+  input.focus();
+  if (seed === undefined) input.select();
+  else input.setSelectionRange(current.length, current.length);
+}
+
+function closeEditor() {
+  if (!S.editing) return null;
+  const {node, td, row, col} = S.editing;
+  const value = node.value;
+  S.editing = null;
+  const loc = gridLoc(row);
+  td.textContent = loc ? String(cellValue(loc, col)) : '';
+  return {value, row, col, loc};
+}
+
+function cancelEdit() {
+  closeEditor();
+  focusGrid();
+}
+
+/** Write the typed value into the model. Returns false if it was rejected. */
+async function commitEdit() {
+  const closed = closeEditor();
+  if (!closed) return true;
+  const raw = String(closed.value).trim();
+  const {loc, col, row} = closed;
+  if (!loc) return true;
+
+  if (col === 'loc') {
+    if (raw !== (loc.label || '')) { snapshot(); loc.label = raw; markEdited(); }
+    return true;
+  }
+  if (raw === '') return true;
+  const value = Number(raw);
+  if (Number.isNaN(value)) { toast(`"${raw}" is not a number`, 'error'); return false; }
+
+  if (col === 'ft') {
+    const span = feedSpan(loc.id);
+    if (!span) { toast('the source has no feed footage'); return true; }
+    if (Number(span.length) !== value) {
+      snapshot();
+      span.length = value;
+      markEdited();
     }
-    return '';
-  };
-  return table(columns, rows, {
-    text: new Set(['Loc', 'Type', 'Device', 'Cable', 'Status']), flagCells});
+    return true;
+  }
+  if (col === 'units') {
+    if (loc.units !== value) { snapshot(); loc.units = value; markEdited(); }
+    return true;
+  }
+  if (col === 'tap') {
+    if (tapValueOf(loc) === value) return true;
+    // sizing the tap from the house count is the Parameters file's job
+    const ports = loc.tap_ports || portsForHomes(loc.units);
+    return edit('set_tap_value', {location: loc.id, value, ports}, row);
+  }
+  return true;
+}
+
+function portsForHomes(homes) {
+  const table = (S.specs.files.parameters.homes_to_ports || [])
+    .slice().sort((a, b) => a.homes_max - b.homes_max);
+  for (const row of table) if ((homes || 0) <= row.homes_max) return row.ports;
+  return table.length ? table[table.length - 1].ports : 4;
+}
+
+function markEdited() {
+  S.dirty = true;
+  // repaint just this cell now; the full re-solve lands a moment later
+  const loc = gridLoc(S.cur.row);
+  const td = cellNode(S.cur.row, S.cur.col);
+  if (loc && td && !S.editing) td.textContent = String(cellValue(loc, S.cur.col));
+  scheduleAnalyse();
+}
+
+function moveCell(dCol, dRow) {
+  const ids = gridRowIds();
+  let col = S.cur.col;
+  if (dCol) {
+    const index = ENTRY_COLS.indexOf(col);
+    const next = index < 0 ? 0 : index + dCol;
+    if (next >= ENTRY_COLS.length) { col = ENTRY_COLS[0]; dRow = dRow || 1; }
+    else if (next < 0) { col = ENTRY_COLS[ENTRY_COLS.length - 1]; dRow = dRow || -1; }
+    else col = ENTRY_COLS[next];
+  }
+  setCursor(S.cur.row + (dRow || 0), col);
+}
+
+/** Enter at the foot of a leg adds the next pole -- entry as you walk. */
+function appendPole() {
+  const ids = gridRowIds();
+  const tail = ids.length ? byId(ids[ids.length - 1]) : null;
+  if (!tail) { toast('nothing to build from'); return; }
+  if (childSpans(tail.id).length) {
+    toast('this leg ends at a branch — press > to design a leg');
+    return;
+  }
+  snapshot();
+  const params = S.specs.files.parameters;
+  const id = nextId('L');
+  locs().push({
+    id, label: String(ids.length + 1), kind: 'tap', device: defaultTap(),
+    units: 0, tsg: 0, tap_ports: 0, locked: false, pad: null, eq: null,
+    rtn_pad: null, rtn_eq: null, power_block: false, note: '',
+    x: (tail.x || 0) + 200, y: tail.y || 0,
+  });
+  S.network.spans.push({
+    id: nextId('S'), parent: tail.id, child: id,
+    cable: feedCableOf(tail) || params.default_cable || firstOf('cables'),
+    length: 0, port: freePort(tail), extra_loss: 0, connectors: 2,
+    label: '', leg_name: '',
+  });
+  S.sel = id;
+  S.cur = {row: ids.length, col: 'ft'};
+  S.dirty = true;
+  analyse().then(focusGrid);
+}
+
+function feedCableOf(loc) {
+  const span = feedSpan(loc.id);
+  return span ? span.cable : '';
+}
+
+/* ------------------------------------------------------- leg navigation */
+function descend() {
+  const loc = gridLoc(S.cur.row);
+  if (!loc) return;
+  const options = legsFrom(loc.id);
+  if (!options.length) {
+    toast(`${loc.label || loc.id} does not start a leg`);
+    return;
+  }
+  if (options.length === 1) { goLeg(options[0].id, 0); return; }
+  const choice = prompt(
+    `Design which leg of ${loc.label || loc.id}?\n` +
+    options.map((o, i) => `${i + 1}. ${o.port}${o.name ? '  ' + o.name : ''}`)
+      .join('\n'), '1');
+  const index = Number(choice) - 1;
+  if (options[index]) goLeg(options[index].id, 0);
+}
+
+/** "The navigate command will load the trunk line to which the feeder leg
+ *  is attached and place the cursor at the amplifier from which it
+ *  originates." */
+function ascend() {
+  const leg = currentLeg();
+  if (!leg || !leg.parent_leg) { toast('already on the trunk'); return; }
+  const parent = legById(leg.parent_leg);
+  if (!parent) return;
+  const row = Math.max(0, parent.locations.indexOf(leg.origin));
+  goLeg(parent.id, row);
+}
+
+async function swapLegs() {
+  const loc = gridLoc(S.cur.row);
+  if (!loc) return;
+  const ports = childSpans(loc.id).map((s) => s.port);
+  if (ports.length < 2) {
+    toast(`${loc.label || loc.id} has only one leg to swap`);
+    return;
+  }
+  let a = ports[0], b = ports[1];
+  if (ports.length > 2) {
+    const answer = prompt(
+      `Swap which two legs of ${loc.label || loc.id}?\n` +
+      `ports: ${ports.join(', ')}\nenter two, separated by a space`,
+      `${ports[0]} ${ports[1]}`);
+    if (!answer) return;
+    const parts = answer.trim().split(/\s+/);
+    if (parts.length !== 2 || !ports.includes(parts[0]) || !ports.includes(parts[1])) {
+      toast('give two port names from the list', 'error');
+      return;
+    }
+    [a, b] = parts;
+  }
+  if (await edit('swap_ports', {location: loc.id, port_a: a, port_b: b},
+                 S.cur.row)) {
+    toast(`swapped ${a} and ${b} on ${loc.label || loc.id}`);
+  }
+}
+
+async function nameLeg() {
+  const leg = currentLeg();
+  if (!leg || !leg.first_span) { toast('the trunk cannot be renamed'); return; }
+  const name = prompt('Name this leg:', leg.name || '');
+  if (name === null) return;
+  await edit('name_leg', {span: leg.first_span, name}, S.cur.row);
+}
+
+async function insertPole() {
+  const loc = gridLoc(S.cur.row);
+  if (!loc) return;
+  if (!feedSpan(loc.id)) { toast('nothing to insert ahead of the source'); return; }
+  await edit('insert_before', {
+    location: loc.id, jumper: 0,
+    fields: {kind: 'tap', device: defaultTap(), units: 0,
+             label: String(S.cur.row + 1), x: loc.x - 120, y: loc.y},
+  }, S.cur.row);
+}
+
+async function splicePole() {
+  const loc = gridLoc(S.cur.row);
+  if (!loc) return;
+  const ok = await edit('splice_out', {location: loc.id},
+                        Math.max(0, S.cur.row - 1));
+  if (ok) toast(`removed ${loc.label || loc.id}, footage merged`);
+}
+
+/* -------------------------------------------------------- the key board */
+function gridKey(event) {
+  const key = event.key;
+  const editing = !!S.editing;
+
+  if (event.ctrlKey || event.metaKey) {
+    if (key.toLowerCase() === 'z') {
+      event.preventDefault();
+      event.shiftKey ? redo() : undo();
+    } else if (key.toLowerCase() === 'y') { event.preventDefault(); redo(); }
+    else if (key.toLowerCase() === 's') { event.preventDefault(); save(); }
+    return;
+  }
+
+  // the period key is the Design Assistant's field separator
+  if (key === '.' && (editing || S.cur.col !== 'loc')) {
+    event.preventDefault();
+    commitEdit().then((ok) => { if (ok) moveCell(1, 0); });
+    return;
+  }
+  if (key === 'Tab') {
+    event.preventDefault();
+    commitEdit().then((ok) => { if (ok) moveCell(event.shiftKey ? -1 : 1, 0); });
+    return;
+  }
+  if (key === 'Enter') {
+    event.preventDefault();
+    commitEdit().then((ok) => {
+      if (!ok) return;
+      const last = S.cur.row >= gridRowIds().length - 1;
+      if (last) appendPole();
+      else { S.cur.col = ENTRY_COLS[0]; moveCell(0, 1); }
+    });
+    return;
+  }
+  if (key === 'Escape') { event.preventDefault(); cancelEdit(); return; }
+
+  if (editing) return;   // everything below is for the resting cursor
+
+  if (key === 'ArrowRight') { event.preventDefault(); moveCell(1, 0); return; }
+  if (key === 'ArrowLeft') { event.preventDefault(); moveCell(-1, 0); return; }
+  if (key === 'ArrowDown') { event.preventDefault(); moveCell(0, 1); return; }
+  if (key === 'ArrowUp') { event.preventDefault(); moveCell(0, -1); return; }
+  if (key === 'Insert') { event.preventDefault(); insertPole(); return; }
+  if (key === 'Delete' || key === 'Backspace') {
+    event.preventDefault(); splicePole(); return;
+  }
+  if (key === '+' || key === '=') { event.preventDefault(); stepDevice(1); return; }
+  if (key === '-' || key === '_') { event.preventDefault(); stepDevice(-1); return; }
+  if (key === '>' || (key === 'ArrowRight' && event.altKey)) {
+    event.preventDefault(); descend(); return;
+  }
+  if (key === '<') { event.preventDefault(); ascend(); return; }
+  if (key === 'F2') { event.preventDefault(); startEdit(); return; }
+
+  // typing a value starts editing that cell
+  if (/^[0-9]$/.test(key)) { event.preventDefault(); startEdit(key); return; }
+  if (key.length === 1 && /[a-zA-Z]/.test(key)) {
+    const lower = key.toLowerCase();
+    if (lower === 's') { event.preventDefault(); swapLegs(); return; }
+    if (lower === 'n') { event.preventDefault(); nameLeg(); return; }
+    if (lower === 'd') { event.preventDefault(); runDesign('full'); return; }
+    if (lower === 'u') { event.preventDefault(); ascend(); return; }
+    if (S.cur.col === 'loc') { event.preventDefault(); startEdit(key); }
+  }
 }
 
 function highlightRow() {
@@ -822,6 +1401,34 @@ async function saveSpec(kind) {
   } catch (err) { toast(err.message, 'error'); }
 }
 
+const KEY_HELP = [
+  'DESIGN GRID — entry works the way the Design Assistant does.',
+  '',
+  '  type a number     start typing in the cell under the cursor',
+  '  .                 commit and step to the next field (Ft › Units › Tap)',
+  '  Enter             commit and drop to the next pole;',
+  '                    at the foot of a leg it adds the next pole',
+  '  Tab / Shift+Tab   step fields without wrapping to a new pole',
+  '  F2                edit the current cell',
+  '  Esc               abandon the edit',
+  '',
+  '  + / -             step the tap (or coupler, or active) at the cursor',
+  '  Insert            insert a pole ahead of the cursor',
+  '  Delete            splice the pole out, merging its footage',
+  '',
+  '  >                 design a leg that starts at this pole',
+  '  <  or  U          back up to the parent leg, at its origin',
+  '  S                 swap the legs on this device',
+  '  N                 name the current leg',
+  '',
+  '  D                 run the automatic design tools',
+  '  Ctrl+Z / Ctrl+Y   undo / redo',
+  '  Ctrl+S            save',
+  '',
+  'A 0 in the footage column applies no cable loss, so a device can sit on',
+  'the same pole as the one above it.',
+].join('\n');
+
 /* ------------------------------------------------------------- actions */
 async function runDesign(action) {
   try {
@@ -882,6 +1489,42 @@ function render(fit) {
   renderTable();
   renderStatus();
   renderLegend();
+  renderLegs();
+}
+
+function renderLegs() {
+  const host = $('legs');
+  if (!host) return;
+  host.textContent = '';
+  if (!S.legs.length) {
+    host.appendChild(el('div', {class: 'gridhint', text: 'no legs yet'}));
+    return;
+  }
+  const depth = (leg) => legPath(leg.id).length - 1;
+  const ordered = [];
+  const walk = (parent) => {
+    for (const leg of S.legs.filter((l) => l.parent_leg === parent)) {
+      ordered.push(leg);
+      walk(leg.id);
+    }
+  };
+  walk('');
+  for (const leg of ordered) {
+    const origin = leg.origin ? byId(leg.origin) : null;
+    const name = leg.name || (origin
+      ? `${origin.label || origin.id} [${leg.port}]` : 'TRUNK');
+    const bad = leg.locations.some(
+      (id) => (S.analysis.solution.results[id] || {}).status === 'error');
+    const row = el('div', {
+      class: 'leg' + (leg.id === S.legId ? ' on' : ''),
+      onclick: () => goLeg(leg.id, 0),
+    }, [
+      el('span', {class: 'dp', text: '·'.repeat(Math.max(0, depth(leg))) }),
+      el('span', {class: 'nm' + (bad ? ' error' : ''), text: name}),
+      el('span', {class: 'ct', text: `${leg.locations.length}`}),
+    ]);
+    host.appendChild(row);
+  }
 }
 
 function renderLegend() {
@@ -934,6 +1577,13 @@ function wire() {
   $('btn-save').addEventListener('click', save);
   $('btn-xlsx').addEventListener('click', () => download('report/all?format=xlsx'));
   $('btn-fit').addEventListener('click', fitView);
+  const help = $('btn-help');
+  if (help) help.addEventListener('click', () => alert(KEY_HELP));
+
+  for (const selector of ['#plant', '#side', '#tabs']) {
+    const node = document.querySelector(selector);
+    if (node) node.addEventListener('mousedown', () => { S.gridActive = false; });
+  }
 
   const svg = $('plant');
   let dragging = null;
@@ -965,10 +1615,24 @@ function wire() {
   }, {passive: false});
 
   window.addEventListener('keydown', (event) => {
+    // The design grid is a keyboard instrument of its own.  It claims the
+    // keyboard by state rather than by DOM focus, because re-solving the
+    // network rebuilds the table and focus would be lost mid-keystroke --
+    // which used to drop digits and let arrow keys jump to another leg.
+    if (S.tab === 'design' && S.gridActive &&
+        !(event.target.closest && event.target.closest('#side, #tabs, .bar'))) {
+      gridKey(event);
+      return;
+    }
     const tag = (event.target.tagName || '').toLowerCase();
     if (['input', 'textarea', 'select'].includes(tag)) return;
     if (event.ctrlKey || event.metaKey) {
-      if (event.key.toLowerCase() === 's') { event.preventDefault(); save(); }
+      const lower = event.key.toLowerCase();
+      if (lower === 's') { event.preventDefault(); save(); }
+      else if (lower === 'z') {
+        event.preventDefault();
+        event.shiftKey ? redo() : undo();
+      } else if (lower === 'y') { event.preventDefault(); redo(); }
       return;
     }
     const key = event.key;

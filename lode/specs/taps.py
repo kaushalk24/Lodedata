@@ -98,3 +98,31 @@ class TapsSpec(SpecFile):
 
     def port_counts(self, tsg: int) -> list[int]:
         return sorted({r.ports for r in self.rows if int(r.tsg) == int(tsg)})
+
+    def find_value(self, value: float, ports: int, tsg: int = 1,
+                   self_terminating: bool | None = None) -> Tap | None:
+        """The tap of a given *value* -- what a designer actually types.
+
+        Designers work in tap values ("put a 17 there"), not part numbers.
+        Falls back to the nearest stocked value in the group, and to any port
+        count in the group if that exact one is not carried.
+        """
+        group = self.group(tsg, ports)
+        if self_terminating is not None:
+            filtered = [t for t in group if t.self_terminating == self_terminating]
+            group = filtered or group
+        if not group:
+            group = self.group(tsg)
+            if self_terminating is not None:
+                filtered = [t for t in group
+                            if t.self_terminating == self_terminating]
+                group = filtered or group
+        if not group:
+            return None
+        return min(group, key=lambda t: (abs(t.value - float(value)),
+                                         abs(t.ports - ports)))
+
+    def values(self, tsg: int = 1, ports: int | None = None) -> list[float]:
+        """The stocked tap values in a group, ascending."""
+        rows = self.group(tsg, ports)
+        return sorted({t.value for t in rows})

@@ -115,7 +115,39 @@ class Span:
     #: number of connector pairs, costed by the parameters' connector loss
     connectors: int = 2
     label: str = ""
+    #: name of the leg this span begins, when it begins one ("MAPLE ST", "FL1")
+    leg_name: str = ""
     extra: dict = field(default_factory=dict)
+
+
+@dataclass
+class Leg:
+    """One linear run of the plant, the unit Design Mode works in."""
+
+    id: str = ""
+    #: designer's name for the leg ("MAPLE ST", "FL1")
+    name: str = ""
+    #: the branching device this leg hangs off ("" for the trunk)
+    origin: str = ""
+    #: which port of that device
+    port: str = ""
+    #: the leg containing the origin
+    parent_leg: str = ""
+    #: the span that begins this leg
+    first_span: str = ""
+    #: ordered location ids
+    locations: list = field(default_factory=list)
+
+    def display(self) -> str:
+        return self.name or (f"{self.port}" if self.port else "TRUNK")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id, "name": self.name, "origin": self.origin,
+            "port": self.port, "parent_leg": self.parent_leg,
+            "first_span": self.first_span, "locations": self.locations,
+            "display": self.display(),
+        }
 
 
 @dataclass
@@ -268,28 +300,185 @@ class Network:
                 return ident
         return None
 
-    def legs(self) -> list[list[str]]:
-        """Break the tree into runs of locations between branch points."""
-        out: list[list[str]] = []
+    def legs(self) -> list["Leg"]:
+        """Index the plant as a set of legs.
+
+        A **leg** is one linear run: it starts at an output port of a
+        branching device and continues until the line ends or the next
+        branch point is reached.  A run continues straight through an
+        in-line amplifier -- a designer walking a street does not start a
+        new leg at every line extender -- so legs are delimited where the
+        plant actually branches.
+
+        Naming a span also starts a leg there, even where nothing branches.
+        That is what naming is for: it lets a designer split a long run into
+        the legs they actually think in ("MAPLE ST", then "OAK AVE" beyond
+        the amplifier) rather than being held to the topology alone.
+
+        This is the unit the Design Assistant works in: you design a trunk
+        line or a feeder leg at a time and "move to" the others.
+        """
+        out: list[Leg] = []
         start = self.source_id
         if not start:
             return out
-        pending = [start]
+
+        pending = [(Leg(id="TRUNK", name="", origin="", port="",
+                        parent_leg=""), start)]
+        seen: set[str] = set()
         while pending:
-            head = pending.pop(0)
-            run = [head]
+            leg, head = pending.pop(0)
+            if head in seen:
+                continue
+            seen.add(head)
+            chain = [head]
             cursor = head
             while True:
                 kids = self.children(cursor)
-                if len(kids) == 1 and not self.locations[kids[0].child].is_active:
-                    cursor = kids[0].child
-                    run.append(cursor)
-                    continue
-                for kid in kids:
-                    pending.append(kid.child)
-                break
-            out.append(run)
+                if len(kids) != 1 or kids[0].leg_name:
+                    break
+                cursor = kids[0].child
+                if cursor in seen:
+                    break
+                seen.add(cursor)
+                chain.append(cursor)
+            leg.locations = chain
+            out.append(leg)
+            # only the tail of a chain can branch: every interior location
+            # has exactly one child by construction
+            tail = chain[-1]
+            for span in self.children(tail):
+                pending.append((
+                    Leg(id=f"{tail}:{span.port}", name=span.leg_name,
+                        origin=tail, port=span.port, parent_leg=leg.id,
+                        first_span=span.id),
+                    span.child,
+                ))
         return out
+
+    def leg_index(self) -> dict:
+        return {leg.id: leg for leg in self.legs()}
+
+    def leg_of(self, loc_id: str) -> "Leg | None":
+        for leg in self.legs():
+            if loc_id in leg.locations:
+                return leg
+        return None
+
+    # ------------------------------------------------------------------
+    # structural editing
+    # ------------------------------------------------------------------
+    def insert_after(self, loc_id: str, port: str = "", jumper: float = 0.0,
+                     cable: str = "", **kwargs) -> Location:
+        """Insert a new location immediately after *loc_id*.
+
+        If something already hangs on *port*, the new location is spliced
+        into that span: the existing child keeps its footage and the new
+        location is fed by a jumper, which is how a device is added to a run
+        without moving every pole below it.
+        """
+        existing = None
+        for span in self.children(loc_id):
+            if not port or span.port == port:
+                existing = span
+                break
+        if existing is not None:
+            return self.insert_before(existing.child, jumper=jumper,
+                                      cable=cable, **kwargs)
+        loc = self.add_location(**kwargs)
+        self.add_span(loc_id, loc.id, cable=cable, length=jumper,
+                      port=port or self._default_port(loc_id))
+        return loc
+
+    def _default_port(self, loc_id: str) -> str:
+        used = {s.port for s in self.children(loc_id)}
+        loc = self.locations[loc_id]
+        if loc.is_active:
+            return "OUT" if "OUT" not in used else f"OUT{len(used) + 1}"
+        return "THRU" if "THRU" not in used else f"TAP{len(used)}"
+
+    def splice_out(self, loc_id: str) -> None:
+        """Remove one location and heal the run around it.
+
+        The location's single child is reconnected to its parent and the two
+        footages are added together, so deleting a pole from the middle of a
+        leg leaves the geography of the rest of the leg untouched.  A
+        location with more than one child cannot be spliced -- use
+        :meth:`remove_location`.
+        """
+        feed = self.feed_span(loc_id)
+        kids = self.children(loc_id)
+        if feed is None:
+            raise NetworkError("the source cannot be spliced out")
+        if len(kids) > 1:
+            raise NetworkError(
+                f"{self.locations[loc_id].display()!r} branches into "
+                f"{len(kids)} legs; delete it instead of splicing it"
+            )
+        if kids:
+            child = kids[0]
+            child.parent = feed.parent
+            child.port = feed.port
+            child.length = (child.length or 0) + (feed.length or 0)
+            if not child.leg_name:
+                child.leg_name = feed.leg_name
+        del self.spans[feed.id]
+        del self.locations[loc_id]
+
+    def swap_ports(self, loc_id: str, port_a: str, port_b: str) -> None:
+        """Swap the legs hanging on two ports of one device.
+
+        Moving a leg from the tap leg of a coupler to its through leg (or
+        between an amplifier's outputs) is a routine balancing move: it
+        changes which branch gets the stronger signal without redrawing
+        anything.
+        """
+        if loc_id not in self.locations:
+            raise NetworkError(f"unknown location {loc_id!r}")
+        spans = {s.port: s for s in self.children(loc_id)}
+        a, b = spans.get(port_a), spans.get(port_b)
+        if a is None and b is None:
+            raise NetworkError(
+                f"neither {port_a!r} nor {port_b!r} feeds anything"
+            )
+        if a is not None:
+            a.port = port_b
+        if b is not None:
+            b.port = port_a
+
+    def move_leg(self, span_id: str, new_parent: str, new_port: str) -> None:
+        """Re-hang a whole leg on a different device or port."""
+        span = self.spans.get(span_id)
+        if span is None:
+            raise NetworkError(f"unknown span {span_id!r}")
+        if new_parent not in self.locations:
+            raise NetworkError(f"unknown location {new_parent!r}")
+        if new_parent == span.child or new_parent in self._descendants(span.child):
+            raise NetworkError("a leg cannot be moved beneath itself")
+        for other in self.children(new_parent):
+            if other.port == new_port and other.id != span_id:
+                raise NetworkError(
+                    f"port {new_port} of "
+                    f"{self.locations[new_parent].display()} is already fed"
+                )
+        span.parent = new_parent
+        span.port = new_port
+
+    def _descendants(self, loc_id: str) -> set:
+        out = set()
+        stack = [loc_id]
+        while stack:
+            current = stack.pop()
+            for span in self.children(current):
+                out.add(span.child)
+                stack.append(span.child)
+        return out
+
+    def name_leg(self, span_id: str, name: str) -> None:
+        span = self.spans.get(span_id)
+        if span is None:
+            raise NetworkError(f"unknown span {span_id!r}")
+        span.leg_name = name
 
     # ------------------------------------------------------------------
     # validation and statistics
@@ -380,7 +569,7 @@ class Network:
                     "id": s.id, "parent": s.parent, "child": s.child,
                     "cable": s.cable, "length": s.length, "port": s.port,
                     "extra_loss": s.extra_loss, "connectors": s.connectors,
-                    "label": s.label, "extra": s.extra,
+                    "label": s.label, "leg_name": s.leg_name, "extra": s.extra,
                 }
                 for s in self.spans.values()
             ],

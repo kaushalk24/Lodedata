@@ -223,21 +223,79 @@ per-location extra load.
 > "The Design and Active Entry mode is where all actual design work is done.
 > The Design mode/menu contains many powerful design optimization tools."
 
+This is the part that is easiest to get wrong, and the part that decides
+whether the tool is usable. Three things define it.
+
+### It is typed, not clicked
+
 The original is famously fast because it is **10-key driven**: "all actual
 design work … is done using the 10-key pad on the keyboard to maximize
 efficiency", with NUM LOCK remapped to ESC and the screen menus arranged so
-commands fall under the numeric keypad. The `+` and `-` keys step through
-equipment in place: "pressing the + key will change it to the next higher
-value tap or two-way coupler and recalculate signal levels, or if used in a
-tap column where there is no tap present, it will select a tap to put there."
+commands fall under the numeric keypad.
 
-OpenLode keeps the spirit rather than the letter — a browser canvas with the
-same immediacy, `+`/`-` stepping equipment and recalculating, single letters
-for insertions, arrow keys walking the plant. Sticky notes ("entry of a text
-note at any node in the network") are kept as-is.
+The entry loop is a grid of columns, and **the period key is the field
+separator**: you "type the values and then press the period (.) key to move
+the cursor into the next column (such as the house count column)". You start
+a run at zero — "a 0 distance in the footage column means no cable loss has
+been applied" — and then walk the street: footage, house count, tap value,
+next pole.
 
-**Tap Selection Groups** let a design draw from different tap families in
-different places: "a 1–99 value to specify the group to be used for tap
+The `+` and `-` keys step equipment in place: "pressing the + key will change
+it to the next higher value tap or two-way coupler and recalculate signal
+levels, or if used in a tap column where there is no tap present, it will
+select a tap to put there."
+
+One semantic detail matters for reading the screen at all: "the signal levels
+displayed are the levels after the footage that is on the same line, but
+before any equipment." A row's level is what arrives at that pole, not what
+leaves it.
+
+### It is scoped to one leg
+
+You do not look at the whole plant at once; you design a trunk line or a
+feeder leg. The **Amplifier Definition Window** "allows you to specify a name
+for the amplifier at the cursor location and assign the feeder legs that begin
+from that amp/LE as well as move to, rename, or delete these feeder legs", and
+navigation runs the other way too: "when invoked from a feeder leg, the
+navigate command will load the trunk line to which the feeder leg is attached
+and place the cursor at the amplifier from which it originates."
+
+### Legs can be rearranged
+
+Legs are not fixed to the port they were drawn on: they can be moved, renamed
+and swapped between the ports of a device. On a directional coupler that is a
+real engineering decision — which street gets the low-loss through leg.
+
+### How OpenLode reproduces it
+
+The browser front end is a **leg-scoped design grid**, not a whole-network
+table. Four columns are typed into (Loc, Ft, Units, Tap) and the rest is the
+calculated answer. The period key steps fields; `Enter` drops to the next pole
+and, at the foot of a leg, creates it. Tap values are typed as values (`17`),
+with the port count coming from the house count through the Parameters file's
+Homes / Number of Ports table. `>` and `<` move into and back out of legs,
+landing the cursor on the originating device exactly as the navigate command
+does; `S` swaps legs; `N` names one.
+
+Naming is given slightly more power here than in the original: a named span
+*starts* a leg even where the plant does not branch, so a long run can be
+split into the legs a designer actually thinks in. Clearing the name merges
+it back.
+
+Two implementation notes that turned out to matter more than expected:
+
+* **Deleting a pole splices rather than removes.** The pole's footage is added
+  to the span below it, so removing a pole from the middle of a leg leaves the
+  geography of everything below untouched. Anything else would silently move
+  every pole on the street.
+* **The grid owns the keyboard by state, not by DOM focus.** Re-solving the
+  network rebuilds the table, and a focus-based scheme drops the keystroke
+  that lands during the rebuild — which showed up as swallowed digits and
+  arrow keys jumping to another leg.
+
+Sticky notes ("entry of a text note at any node in the network") are kept
+as-is. **Tap Selection Groups** let a design draw from different tap families
+in different places: "a 1–99 value to specify the group to be used for tap
 selection as defined in the Tap specs", created in the original by leaving a
 blank line between groups. OpenLode makes the group an explicit `tsg` field —
 the same idea without the fragile blank-line encoding.
@@ -264,6 +322,7 @@ real `.xlsx` workbook written with nothing but the standard library.
 | Macros recording keystrokes | Python API + CLI | scripting a documented model beats replaying keystrokes |
 | Windows desktop application | Python package, CLI and local web app | runs anywhere Python 3.10+ runs, with no dependencies |
 | Manual amplifier placement | `auto_actives` places them | the manual's own advice — "since you are out of signal, the most logical step is to place an amplifier" — made automatic |
+| Legs fixed by topology | a named span also starts a leg | lets a designer split a long run into the legs they think in |
 
 ## Sources
 

@@ -26,30 +26,81 @@ lode serve                    # the browser front end
 
 ## Design Mode in the browser
 
-`lode serve` opens a three-panel window: the plant on a pan/zoom canvas, the
-properties of whatever is selected, and the design chart underneath. Every
-edit re-solves the whole network immediately.
+`lode serve` opens a four-part window: the plant on a pan/zoom canvas, the
+properties of whatever is selected, the **legs** of the plant, and the
+**design grid** underneath. Every edit re-solves the whole network
+immediately.
 
 **Colour** follows the Parameters file's *Set Margin*: green in spec, amber
 out of spec by less than the margin, red by more.
 
-**Keys** — the original was driven from the 10-key pad; these are the modern
-equivalent:
+### The design grid
+
+The grid is where designs get built, and it works the way the original does:
+one leg at a time, typed rather than clicked.
+
+The four left-hand columns are yours to type into — **Loc**, **Ft**,
+**Units**, **Tap**. Everything right of them is the answer: levels, plug-ins
+and status, recalculated as you go.
+
+Walk a street like this:
+
+1. put the cursor on the first pole and type its footage;
+2. press `.` — the period is the field separator, as in the original — and the
+   cursor steps to **Units**; type the house count;
+3. press `.` again and type the **tap value** (`17`, not a part number: the
+   port count comes from the house count via the Parameters file's Homes /
+   Number of Ports table);
+4. press `Enter`. The cursor drops to the next pole — and if you were on the
+   last one, a new pole is added and you simply keep typing.
+
+A `0` in the footage column applies no cable loss, which is how a device gets
+hung on the same pole as the one above it.
 
 | Key | Action |
 | --- | --- |
-| `+` / `−` | next higher / lower tap value (or coupler, or active) at the cursor, and recalculate |
-| `T` | add a tap after the selection |
-| `C` | add a coupler after the selection |
-| `E` | end the line |
-| `A` | insert an amplifier ahead of the selection |
-| `↑` `↓` | walk the plant in design order |
-| `Del` | remove the selection and everything below it |
+| *any digit* | starts editing the cell under the cursor |
+| `.` | commit, step to the next field (wraps to the next pole) |
+| `Tab` / `Shift`+`Tab` | step fields without wrapping |
+| `Enter` | commit, next pole; at the foot of a leg, add the next pole |
+| `F2` | edit the current cell · `Esc` abandon the edit |
+| `←` `→` `↑` `↓` | move the cursor |
+| `+` / `−` | step the tap, coupler or active at the cursor |
+| `Ins` | insert a pole ahead of the cursor |
+| `Del` | splice the pole out, merging its footage into the span below |
+| `>` | design a leg that starts at this pole |
+| `<` or `U` | back up to the parent leg, cursor on its origin |
+| `S` | swap the legs on this device |
+| `N` | name the current leg |
 | `D` | run the automatic design tools |
-| `F` | fit the plant to the window |
+| `Ctrl`+`Z` / `Ctrl`+`Y` | undo / redo |
 | `Ctrl`+`S` | save |
 
-**Tabs** below the canvas: the live design chart, then the Actives, Tap
+### Legs
+
+A **leg** is one linear run: it starts at an output port of a branching device
+and continues until the line ends or the plant branches again. A run carries
+straight on through an in-line amplifier — you do not start a new leg at every
+line extender.
+
+The breadcrumb above the grid shows where you are (`TRUNK › SP1 [TAP1]`) with
+the leg's pole count, footage and unit count; the **Legs** panel on the right
+lists every leg, and clicking one opens it. `>` steps into a leg from the pole
+it starts at, and `<` comes back up with the cursor on the device it hangs
+from.
+
+**Naming** a leg (`N`) does two things: it labels the leg everywhere it
+appears, and it *starts* a leg at that span even where the plant does not
+branch — so a long run can be split into the legs you actually think in
+("MAPLE ST", then "OAK AVE" past the amplifier). Clearing the name merges the
+run back together.
+
+**Swapping** legs (`S`) exchanges the two branches hanging on a device. On a
+directional coupler that is a real balancing move: it decides which street
+gets the low-loss through leg and which gets the tap leg, without redrawing
+anything.
+
+**Tabs** below the canvas: the design grid, then the Actives, Tap
 Distribution, Performance, Powering, BOM and Flags reports, and an editable
 view of all seven spec files.
 
