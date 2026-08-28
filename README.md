@@ -17,9 +17,19 @@ Pure Python 3.10+, **no third-party dependencies**, browser front end included.
 
 ## Quick start
 
+**Windows:** double-click **`Start OpenLode.bat`**.
+**macOS / Linux:** double-click **`start-openlode.command`**.
+
+Your browser opens at `http://127.0.0.1:8765`. Leave the black window open
+while you work; closing it stops the app.
+
+From a terminal instead — note you must be **in the project folder**, the one
+containing `lode`, or Python reports `No module named lode`:
+
 ```bash
-python3 -m lode init      # creates specs/, networks/, reports/ and a worked example
+cd path/to/Lodedata
 python3 -m lode serve     # open the browser front end
+python3 -m lode init      # only for a NEW workspace somewhere else
 ```
 
 or drive it from the command line:

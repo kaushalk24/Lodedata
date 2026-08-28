@@ -1,9 +1,40 @@
 # User guide
 
-## Install
+## Install and open
 
 Nothing to install beyond Python 3.10 or newer — the package uses only the
 standard library.
+
+The easiest way in is the launcher that ships with the project:
+
+* **Windows** — double-click `Start OpenLode.bat`
+* **macOS / Linux** — double-click `start-openlode.command`
+
+Either one starts the app and opens your browser. Leave the window it opens
+alone while you work; closing it (or Ctrl+C) stops the app.
+
+### "No module named lode"
+
+`python -m lode` runs a package in the **current folder**, so it only works
+when you are inside the project folder — the one that contains `lode`,
+`specs` and `networks`. Running it from `C:\Users\you>` or `~` gives:
+
+```
+python.exe: No module named lode
+```
+
+`cd` into the project folder first, or just use the launcher, which does that
+for you. To find the folder on Windows:
+
+```
+dir /s /b /ad %USERPROFILE%\lode
+```
+
+and on macOS or Linux:
+
+```
+find ~ -type d -name lode 2>/dev/null
+```
 
 ```bash
 git clone <this repo> && cd Lodedata
