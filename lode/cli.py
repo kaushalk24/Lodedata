@@ -1,6 +1,8 @@
 """Command line front end.
 
     lode init                     create a starter workspace here
+    lode import <files>           read a Lode Data binary library (.par .cbl
+                                  .cpr .tap .atv) into a named spec set
     lode specs [name]             summarise and validate a spec set
     lode calc <network>           solve and print the design chart
     lode design <network>         run the automatic design tools and save
@@ -41,6 +43,46 @@ def cmd_init(args) -> int:
     for line in created:
         print(f"  {line}")
     print("\nnext:  lode calc example    or    lode serve")
+    return 0
+
+
+def cmd_import(args) -> int:
+    """Read a Lode Data binary library into a workspace spec set."""
+    from .importers import import_set
+
+    workspace = _workspace(args)
+    workspace.ensure()
+    paths = []
+    for entry in args.paths:
+        if os.path.isdir(entry):
+            paths.extend(os.path.join(entry, f) for f in sorted(os.listdir(entry)))
+        else:
+            paths.append(entry)
+    paths = [p for p in paths
+             if os.path.splitext(p)[1].lower() in
+             (".par", ".cbl", ".cpr", ".tap", ".atv", ".prc")]
+    if not paths:
+        print("lode: no Lode Data spec files (.par .cbl .cpr .tap .atv) found",
+              file=sys.stderr)
+        return 2
+
+    name = args.name or os.path.splitext(os.path.basename(paths[0]))[0]
+    spec_set, importer = import_set(paths, name=name)
+    print(importer.report_text(limit=args.rows))
+
+    warnings = spec_set.validate()
+    target = os.path.join(workspace.spec_root, name)
+    if not args.dry_run:
+        spec_set.save_dir(target)
+        print(f"\nwrote {target}")
+    print(f"\n{len(spec_set.cables)} cables, {len(spec_set.taps)} taps, "
+          f"{len(spec_set.couplers)} couplers, {len(spec_set.actives)} actives")
+    if warnings:
+        print(f"{len(warnings)} cross-file warning(s); first few:")
+        for warning in warnings[:8]:
+            print(f"  - {warning}")
+    print("\nCHECK THE IMPORT REPORT against your Lode Data spec printout "
+          "before designing against this set.")
     return 0
 
 
@@ -163,6 +205,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("init", help="create a starter workspace")
     p.set_defaults(func=cmd_init)
+
+    p = sub.add_parser("import", help="read Lode Data binary spec files")
+    p.add_argument("paths", nargs="+",
+                   help="spec files or a directory holding them")
+    p.add_argument("--name", default="", help="name for the imported set")
+    p.add_argument("--rows", type=int, default=12,
+                   help="records to show per file in the report (0 = all)")
+    p.add_argument("-n", "--dry-run", action="store_true",
+                   help="report without writing the spec set")
+    p.set_defaults(func=cmd_import)
 
     p = sub.add_parser("specs", help="summarise and validate a spec set")
     p.set_defaults(func=cmd_specs)

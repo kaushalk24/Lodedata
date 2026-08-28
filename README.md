@@ -35,6 +35,21 @@ python3 -m lode report all example --xlsx reports/example.xlsx
 
 `pip install -e .` gives you a `lode` command; everything above works either way.
 
+## Your own equipment library
+
+Real libraries are Lode Data binary files and differ region to region.
+OpenLode reads them directly:
+
+```bash
+lode import /path/to/library --name KERMIT750
+```
+
+or press **Import specs** in the browser. Every import prints a report of what
+was read and what was rejected — check it against your Lode Data spec printout
+before designing. See
+**[Importing a Lode Data equipment library](docs/importing-lodedata-specs.md)**
+for the decoded format and the current limits.
+
 ## What it does
 
 **Seven spec files, as in the original.** PARAMETERS, TAPS, ACTIVES, COUPLERS
@@ -129,7 +144,7 @@ lode/
 specs/generic/   the equipment library as loadable spec files
 networks/        designs (.dsn)
 docs/            analysis, spec reference, user guide
-tests/           74 tests, standard library only
+tests/           114 tests, standard library only
 ```
 
 ## Documentation
@@ -142,6 +157,8 @@ tests/           74 tests, standard library only
   every file.
 - **[User guide](docs/user-guide.md)** — workflows, keys, your own equipment,
   scripting, powering studies.
+- **[Importing a Lode Data equipment library](docs/importing-lodedata-specs.md)**
+  — the binary format, decoded and verified, and what is not read yet.
 
 ## Tests
 
@@ -149,7 +166,8 @@ tests/           74 tests, standard library only
 python3 -m unittest discover -s tests -t .
 ```
 
-The engine tests check against hand calculations and against the worked
+The importer is tested against synthesised fixtures in the real binary
+format. The engine tests check against hand calculations and against the worked
 examples in Lode Data's public manual — the 16.50 dB module input giving a
 19.50 dB housing minimum, `C/N[1] = 59 + 11 − 9 = 61`, the 10 log / 20 log
 addition rules, and the ±1 / ∓2 derate conventions.

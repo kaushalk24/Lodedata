@@ -1480,6 +1480,46 @@ function download(path) {
   form.remove();
 }
 
+/** Load a Lode Data binary library (.par .cbl .cpr .tap .atv) straight in. */
+async function importSpecs(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const suggested = files[0].name.replace(/\.[^.]+$/, '');
+  const name = prompt(
+    'Name for this spec set (regions usually differ, so give it the ' +
+    'system name):', suggested);
+  if (!name) return;
+  toast(`reading ${files.length} spec file(s)...`);
+  try {
+    const payload = [];
+    for (const file of files) {
+      const buffer = await file.arrayBuffer();
+      let binary = '';
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode.apply(
+          null, bytes.subarray(i, i + 0x8000));
+      }
+      payload.push({name: file.name, data: btoa(binary)});
+    }
+    const data = await post('import', {name, files: payload});
+    S.workspace.spec_sets = data.spec_sets;
+    fill($('spec-set'), data.spec_sets);
+    $('spec-set').value = data.name;
+    S.specName = data.name;
+    await loadSpecs();
+    await analyse(true);
+    const counts = data.summary.counts;
+    toast(`imported ${counts.cables} cables, ${counts.taps} taps, ` +
+          `${counts.couplers} couplers, ${counts.actives} actives`);
+    alert('IMPORT REPORT — check this against your Lode Data spec printout '
+          + 'before designing.\n\n' + data.report);
+  } catch (err) {
+    toast(err.message, 'error');
+    alert('Import failed: ' + err.message);
+  }
+}
+
 /* --------------------------------------------------------------- render */
 function render(fit) {
   renderTabs();
@@ -1577,6 +1617,11 @@ function wire() {
   $('btn-save').addEventListener('click', save);
   $('btn-xlsx').addEventListener('click', () => download('report/all?format=xlsx'));
   $('btn-fit').addEventListener('click', fitView);
+  const importBtn = $('btn-import'), importInput = $('import-files');
+  if (importBtn && importInput) {
+    importBtn.addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', () => importSpecs(importInput.files));
+  }
   const help = $('btn-help');
   if (help) help.addEventListener('click', () => alert(KEY_HELP));
 

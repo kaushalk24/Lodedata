@@ -8,10 +8,12 @@ are only touched when the designer saves.
 
 from __future__ import annotations
 
+import base64
 import json
 import mimetypes
 import os
 import posixpath
+import re
 import threading
 import traceback
 import webbrowser
@@ -242,6 +244,52 @@ class Handler(BaseHTTPRequestHandler):
                 "problems": network.validate(),
                 "legs": [leg.to_dict() for leg in network.legs()],
             })
+            return
+
+        if head == "import" and method == "POST":
+            body = self._body()
+            files = body.get("files") or []
+            if not files:
+                raise ApiError("no spec files were sent", 400)
+            name = (body.get("name") or "imported").strip() or "imported"
+            name = re.sub(r"[^A-Za-z0-9_.-]+", "-", name)
+            staging = os.path.join(ws.spec_root, f".incoming-{name}")
+            os.makedirs(staging, exist_ok=True)
+            written = []
+            try:
+                for entry in files:
+                    filename = os.path.basename(entry.get("name") or "")
+                    if not filename:
+                        continue
+                    raw = base64.b64decode(entry.get("data") or "")
+                    path = os.path.join(staging, filename)
+                    with open(path, "wb") as fh:
+                        fh.write(raw)
+                    written.append(path)
+                from ..importers import import_set
+
+                spec_set, importer = import_set(written, name=name)
+                target = os.path.join(ws.spec_root, name)
+                spec_set.save_dir(target)
+                ws.load_specs(name, reload=True)
+                self._json({
+                    "name": name,
+                    "saved": target,
+                    "report": importer.report_text(limit=6),
+                    "summary": spec_set.summary(),
+                    "warnings": spec_set.validate()[:40],
+                    "spec_sets": ws.spec_sets(),
+                })
+            finally:
+                for path in written:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+                try:
+                    os.rmdir(staging)
+                except OSError:
+                    pass
             return
 
         if head == "edit" and method == "POST":
