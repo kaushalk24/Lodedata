@@ -119,8 +119,11 @@ def cmd_import_design(args) -> int:
 
 def cmd_inspect_network(args) -> int:
     """Deobfuscate a Lode Data .ntw file and report what is in it."""
-    from .importers import compare, read_network
+    from .importers import compare, profile, read_network
 
+    if args.profile:
+        print(profile(args.paths))
+        return 0
     if len(args.paths) > 1:
         print("keystream comparison")
         print(compare(args.paths))
@@ -276,6 +279,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("paths", nargs="+")
     p.add_argument("--dump", type=int, default=0, metavar="N",
                    help="hex-dump the N largest data clusters")
+    p.add_argument("--profile", action="store_true",
+                   help="test whether the payload is a fixed-record table")
     p.set_defaults(func=cmd_inspect_network)
 
     p = sub.add_parser("specs", help="summarise and validate a spec set")

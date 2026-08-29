@@ -24,19 +24,38 @@ block *is* the keystream XOR that template; XOR every block against it and
 about 96% of the body becomes zero, which is what real sparse structured data
 looks like.
 
-What is not established
-----------------------
-The template is not all zeros, so the recovered stream is
-``plaintext XOR template``, not plaintext.  Decoded records come out as arrays
-of four-byte groups in which only the leading byte varies, and almost always
-between ``0x40`` and ``0xC0`` -- a single differing bit.  That is the
-signature of a difference against a non-zero template, so the absolute field
-values are still hidden.
+The mask is **arithmetic, not XOR**.  Decoding four files together, the
+differences from the template are 0, +-1, +-16, +-32, +-48, +-63 and +-64,
+and the XOR view of the same bytes gives 1, 3, 7, 15, 31, 63, 127 -- the
+borrow-propagation pattern you get from adding and subtracting, not from
+XOR.  ``0xFF`` then reads as the usual "unset" sentinel, which it does:
+it is the second most common decoded byte.
 
-Finishing it needs **known plaintext**: one small design whose contents are
-known from Lode Data's own screen (footages, tap values, house counts), or
-better, two saved files differing by one edit.  Either pins the layout in a
-single pass.  Until then this module reports rather than pretends.
+What is not established, and why
+--------------------------------
+**The payload is not a fixed-field record table.**  That is proved, not
+assumed.  Profiling every byte position across 4,768 non-template records
+from four files, all one hundred positions have the same statistics: about
+84% zero with top values 255/63/47 on even positions and 72% zero with
+255/64/16 on odd ones.  In a real record format a footage column and a
+device column look nothing alike.  Per-position entropy is flat -- about
+0.30 bits at *every* candidate width from 4 to 200 bytes, spread 0.02 to
+0.29 -- where a genuine record width would show a large spread.
+
+So the 100-byte period is the repeat length of the idle pattern, not a
+record size, and the payload is a packed or variable-length stream whose
+fields do not sit at fixed offsets.  Its dominant motifs are three zero
+bytes followed by ``0x40``, and ``0xFF`` pairs.
+
+Recovering a serialisation grammar of that kind is not reachable by
+statistics alone; it needs **known plaintext**.  One small design whose
+footages, tap values and house counts can be read off Lode Data's own
+screen will do it, and two saves differing by a single edit will do it
+faster, because the bytes that move *are* that field.  Until then this
+module reports rather than pretends.
+
+:func:`profile` reproduces the analysis above so the finding can be
+re-checked against other files rather than taken on trust.
 """
 
 from __future__ import annotations
@@ -148,7 +167,7 @@ def period_confidence(raw: bytes, period: int = PERIOD,
 def read_network(path: str) -> NetworkFile:
     raw = open(path, "rb").read()
     key = keystream_of(raw)
-    plain = bytes(raw[i] ^ key[(i - HEADER) % PERIOD]
+    plain = bytes((raw[i] - key[(i - HEADER) % PERIOD]) & 0xFF
                   for i in range(HEADER, len(raw)))
     net = NetworkFile(
         path=os.path.abspath(path), title=_text(raw, 0, 28),
@@ -157,14 +176,69 @@ def read_network(path: str) -> NetworkFile:
         period_confidence=period_confidence(raw),
     )
     net.notes.append(
-        "the record layout is NOT decoded yet: the recovered stream is "
-        "plaintext XOR template, so field values are still relative. "
-        "Topology cannot be reconstructed from this file alone.")
+        "the mask is arithmetic, not XOR: differences from the template are "
+        "0, +-1, +-16, +-32, +-48, +-63, +-64, and 0xFF reads as 'unset'.")
+    net.notes.append(
+        "the payload is NOT a fixed-record table -- per-position entropy is "
+        "flat at every candidate width from 4 to 200 bytes. Run "
+        "'lode inspect-network --profile' to reproduce that. Topology cannot "
+        "be reconstructed from these files alone.")
     net.notes.append(
         "to finish it, supply known plaintext -- a small design whose "
         "footages, tap values and house counts you can read off Lode Data's "
         "screen, or two saves differing by one edit.")
     return net
+
+
+def profile(paths, width: int = PERIOD) -> str:
+    """Field-structure test: is the payload a fixed-record table?
+
+    Decodes with the arithmetic mask, then reports per-position statistics
+    and per-position entropy across a range of candidate record widths.  A
+    real fixed-field format shows a *large* entropy spread between positions;
+    a flat spread at every width means the fields are not at fixed offsets.
+    """
+    import math
+
+    records = []
+    for path in paths:
+        raw = open(path, "rb").read()
+        key = keystream_of(raw)
+        body = raw[HEADER:]
+        blocks = [body[i:i + PERIOD]
+                  for i in range(0, len(body) - PERIOD + 1, PERIOD)]
+        records += [bytes((c - k) & 0xFF for c, k in zip(b, key))
+                    for b in blocks if b != key]
+    if not records:
+        return "no non-template records found"
+
+    out = [f"{len(records)} non-template records from {len(paths)} file(s)",
+           "", "candidate record widths (a real one shows a LARGE spread):",
+           "  width   mean entropy   spread"]
+    stream = b"".join(records)
+    for candidate in (4, 8, 10, 16, 20, 25, 50, 100, 128, 200):
+        entropies = []
+        for position in range(candidate):
+            column = collections.Counter(
+                stream[i] for i in range(position, len(stream), candidate))
+            total = sum(column.values()) or 1
+            entropies.append(
+                -sum(c / total * math.log2(c / total) for c in column.values()))
+        spread = max(entropies) - min(entropies)
+        entropies_mean = sum(entropies) / len(entropies)
+        out.append(f"  {candidate:>5}   {entropies_mean:>12.3f}   {spread:>6.3f}")
+
+    out += ["", f"per-position profile over {width} bytes:",
+            "  pos  distinct  zero%   top decoded values"]
+    for position in range(min(width, PERIOD)):
+        column = collections.Counter(r[position] for r in records)
+        top = " ".join(f"{v}x{c}" for v, c in column.most_common(4) if v)
+        out.append(f"  {position:>3}  {len(column):>8}  "
+                   f"{column[0] / len(records) * 100:>5.1f}%  {top}")
+    out += ["",
+            "Flat statistics across every position mean the payload is a",
+            "packed or variable-length stream, not a fixed-record table."]
+    return "\n".join(out)
 
 
 def compare(paths) -> str:

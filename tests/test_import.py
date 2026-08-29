@@ -210,7 +210,8 @@ class TestNetworkContainer(unittest.TestCase):
         body = bytearray()
         for index in range(400):
             plain = records.get(index, template)
-            body += bytes(a ^ b for a, b in zip(plain, self.KEY))
+            # the real files use an arithmetic mask, not XOR
+            body += bytes((a + b) & 0xFF for a, b in zip(plain, self.KEY))
         return bytes(header) + bytes(body)
 
     def _write(self, data, tmp):
@@ -265,9 +266,21 @@ class TestNetworkContainer(unittest.TestCase):
             path = self._write(self._build({3: bytes([1] * 100)}), tmp)
             net = read_network(path)
         joined = " ".join(net.notes).lower()
-        self.assertIn("not decoded yet", joined)
+        self.assertIn("not a fixed-record table", joined)
         self.assertIn("known plaintext", joined)
-        self.assertIn("NOT decoded", net.summary())
+        self.assertIn("arithmetic, not xor", joined)
+        self.assertIn("NOT a fixed-record", net.summary())
+
+    def test_profile_reports_the_structure_test(self):
+        from lode.importers import profile
+
+        marker = bytes([7] * 30 + [0] * 70)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(self._build({4: marker, 40: marker}), tmp)
+            text = profile([path])
+        self.assertIn("candidate record widths", text)
+        self.assertIn("per-position profile", text)
+        self.assertIn("non-template records", text)
 
     def test_compare_reports_a_shared_keystream(self):
         from lode.importers import compare

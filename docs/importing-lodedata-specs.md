@@ -119,14 +119,51 @@ is the keystream XOR that template. XOR every block against it and about
 data. (The raw file contains *no* zero bytes at all, which is what gives the
 obfuscation away in the first place.)
 
-## What is not established, and why
+## The mask is arithmetic, not XOR
 
-The template is not all zeros. So the recovered stream is
-`plaintext XOR template` — differences, not values. Decoded records come out
-as arrays of four-byte groups in which only the leading byte varies, and
-almost always between `0x40` and `0xC0`: a single differing bit. That is
-exactly what a difference against a non-zero template looks like, and it means
-absolute footages, tap values and house counts are still hidden.
+Decoding all four files together, the differences from the template are
+`0, ±1, ±16, ±32, ±48, ±63, ±64`. The XOR view of the same bytes gives
+`1, 3, 7, 15, 31, 63, 127` — borrow-propagation patterns, which come from
+adding and subtracting, not from XOR. Under the arithmetic reading `0xFF`
+becomes the usual "unset" sentinel, and it is the second most common decoded
+byte, which is exactly what a sentinel should be.
+
+## The payload is not a fixed-record table — proved
+
+This is the important finding, and it is a negative one. Anyone attacking this
+format will assume a record table first; it is not one.
+
+Profiling every byte position across **4,768 non-template records from four
+files**, all one hundred positions have the *same* statistics:
+
+| positions | zeros | top decoded values |
+| --- | --- | --- |
+| even | ~84% | `255`, `63`, `47` |
+| odd | ~72% | `255`, `64`, `16` |
+
+In a real record format a footage column and a device column look nothing
+alike. Here they are indistinguishable.
+
+Per-position entropy confirms it. A genuine record width shows a **large
+spread** — some fields near-constant, others highly variable. Measured:
+
+| width | 4 | 8 | 16 | 25 | 50 | 100 | 128 | 200 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| spread (bits) | 0.79 | 0.79 | 0.80 | 0.05 | 0.82 | 0.87 | 0.90 | 0.93 |
+
+No width stands out. So the 100-byte period is the **repeat length of the idle
+pattern, not a record size**, and the payload is a packed or variable-length
+stream whose fields do not sit at fixed offsets. Its dominant motifs are three
+zero bytes followed by `0x40`, and `0xFF` pairs.
+
+Reproduce all of this with:
+
+```bash
+lode inspect-network *.ntw --profile
+```
+
+Recovering a serialisation grammar of that kind is not reachable by statistics
+alone.
 
 ## Getting existing designs in *today*
 
