@@ -109,6 +109,11 @@ class ParametersSpec(SpecFile):
     default_tsg: int = 1
     #: prefer the highest tap value that still meets the minimum port output
     tap_selection: str = "highest_value"
+    #: "Maximum LE Cascade" -- how many line extenders may follow one another
+    #: before the design is flagged (0 disables the check)
+    max_le_cascade: int = 3
+    #: flag a tap whose ports cannot serve the units at that location
+    check_tap_ports: bool = True
 
     # -- page 5: powering ------------------------------------------------
     powering: PoweringDefaults = field(default_factory=PoweringDefaults)

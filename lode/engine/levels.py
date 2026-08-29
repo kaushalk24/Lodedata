@@ -561,6 +561,32 @@ class LevelEngine:
         params = self.params
         margin = params.set_margin
 
+        # -- tap sizing and termination, as the Design Assistant tests them --
+        if loc.kind == "tap":
+            tap = self.specs.taps.by_id(loc.device)
+            children = self.network.children(loc.id)
+            if tap is not None:
+                if params.check_tap_ports and loc.units > tap.ports:
+                    self._flag(sol, res, Flag(
+                        ERROR, "not-enough-taps", loc.id, loc.display(), "",
+                        f"tap {loc.display()}: {loc.units} unit(s) on a "
+                        f"{tap.ports}-port tap -- {loc.units - tap.ports} "
+                        f"drop(s) cannot be served",
+                        value=loc.units, limit=tap.ports))
+                # "Invalid terminating tap used"
+                if tap.self_terminating and children:
+                    self._flag(sol, res, Flag(
+                        ERROR, "invalid-terminating-tap", loc.id, loc.display(),
+                        "",
+                        f"tap {loc.display()}: {tap.id} is self-terminating "
+                        f"but the line continues past it",
+                        value=len(children)))
+                elif not tap.self_terminating and not children:
+                    self._flag(sol, res, Flag(
+                        WARN, "unterminated", loc.id, loc.display(), "",
+                        f"tap {loc.display()}: end of line on a through tap -- "
+                        f"a terminator or a self-terminating tap is needed"))
+
         # forward crossover -- flagged only where the limit is first crossed,
         # which is where an in-line equalizer belongs
         if len(params.forward_columns) >= 2 and res.fwd_in:
@@ -617,6 +643,32 @@ class LevelEngine:
                         f"drive at {params.label(col)}, above the {high:.1f} dBmV "
                         f"maximum",
                         value=value, limit=high))
+
+        # "LE X/N before/M after" -- the maximum line extender cascade
+        if loc.kind == "active" and params.max_le_cascade:
+            device = self.device_of(loc)
+            if device is not None and device.category == "line_extender":
+                run = 0
+                for ident in reversed(self.network.path_to(loc.id)):
+                    other = self.network.locations[ident]
+                    if not other.is_active:
+                        continue
+                    spec = self.specs.actives.by_id(other.device)
+                    if spec is None or spec.category != "line_extender":
+                        break
+                    run += 1
+                if run > params.max_le_cascade:
+                    self._flag(sol, res, Flag(
+                        ERROR, "le-cascade", loc.id, loc.display(), "",
+                        f"{loc.display()}: {run} line extenders in cascade, "
+                        f"above the maximum of {params.max_le_cascade}",
+                        value=run, limit=params.max_le_cascade))
+
+        # "Unused LE placed" -- an amplifier that feeds nothing
+        if loc.kind == "active" and not self.network.children(loc.id):
+            self._flag(sol, res, Flag(
+                WARN, "unused-active", loc.id, loc.display(), "",
+                f"{loc.display()}: amplifier placed but nothing is fed from it"))
 
         if loc.kind == "active" and res.fwd_in:
             device = self.device_of(loc)

@@ -117,13 +117,16 @@ class TestFlagging(unittest.TestCase):
         specs.parameters.tap_window = 4.0
         net, src, tap = simple_run()
 
+        def window_flags(solution):
+            return [f for f in solution[tap.id].flags if f.code == "tap-level"]
+
         specs.parameters.enforce_tap_window = False
         sol = LevelEngine(specs, net).solve()   # tap port sits at 25.05 dBmV
-        self.assertEqual(sol[tap.id].status, OK)
+        self.assertEqual(window_flags(sol), [])
 
         specs.parameters.enforce_tap_window = True
         sol = LevelEngine(specs, net).solve()   # now above the 20 dBmV ceiling
-        self.assertEqual(sol[tap.id].status, ERROR)
+        self.assertEqual([f.severity for f in window_flags(sol)], [ERROR])
 
     def test_crossover_is_flagged_once_where_it_is_crossed(self):
         specs = generic750()
@@ -171,3 +174,75 @@ class TestTopology(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDesignTestErrors(unittest.TestCase):
+    """The Design Assistant's own test errors, from its help index."""
+
+    def setUp(self):
+        self.specs = generic750()
+
+    def _run(self, count=3, device="T4-17", units=2):
+        net = Network(name="tests")
+        cursor = net.add_location(kind="source", label="ND1", device="ND-750").id
+        port, ids = "OUT1", []
+        for index in range(1, count + 1):
+            loc = net.add_location(kind="tap", label=str(index), device=device,
+                                   units=units)
+            net.add_span(cursor, loc.id, cable="P3-500", length=200, port=port)
+            ids.append(loc.id)
+            cursor, port = loc.id, "THRU"
+        return net, ids
+
+    def _codes(self, net):
+        return {f.code for f in LevelEngine(self.specs, net).solve().flags}
+
+    def test_not_enough_taps(self):
+        """"Not enough drops" -- more units than the tap has ports."""
+        net, ids = self._run(count=1, device="T4-17", units=6)
+        self.assertIn("not-enough-taps", self._codes(net))
+        net, ids = self._run(count=1, device="T8-17", units=6)
+        self.assertNotIn("not-enough-taps", self._codes(net))
+
+    def test_invalid_terminating_tap(self):
+        """A self-terminating tap cannot have plant beyond it."""
+        net, ids = self._run(count=2)
+        net.locations[ids[0]].device = "T4-17T"
+        self.assertIn("invalid-terminating-tap", self._codes(net))
+
+    def test_end_of_line_wants_a_terminator(self):
+        net, ids = self._run(count=2)
+        self.assertIn("unterminated", self._codes(net))
+        net.locations[ids[-1]].device = "T4-17T"
+        self.assertNotIn("unterminated", self._codes(net))
+
+    def test_line_extender_cascade_limit(self):
+        """"LE X/N before/M after" -- the maximum LE cascade."""
+        self.specs.parameters.max_le_cascade = 2
+        net = Network(name="cascade")
+        cursor = net.add_location(kind="source", label="ND1",
+                                  device="ND-750").id
+        port = "OUT1"
+        for index in range(4):
+            amp = net.add_location(kind="active", label=f"LE{index + 1}",
+                                   device="LE-750")
+            net.add_span(cursor, amp.id, cable="P3-500", length=10, port=port)
+            cursor, port = amp.id, "OUT"
+        tail = net.add_location(kind="tap", label="T", device="T4-17T", units=2)
+        net.add_span(cursor, tail.id, cable="P3-500", length=100, port=port)
+        codes = self._codes(net)
+        self.assertIn("le-cascade", codes)
+        self.specs.parameters.max_le_cascade = 0      # 0 disables the check
+        self.assertNotIn("le-cascade", self._codes(net))
+
+    def test_unused_amplifier(self):
+        """"Unused LE placed" -- an amplifier feeding nothing."""
+        net, ids = self._run(count=1)
+        amp = net.add_location(kind="active", label="LE9", device="LE-750")
+        net.add_span(ids[0], amp.id, cable="P3-500", length=50, port="THRU")
+        self.assertIn("unused-active", self._codes(net))
+
+    def test_port_check_can_be_switched_off(self):
+        self.specs.parameters.check_tap_ports = False
+        net, ids = self._run(count=1, device="T4-17", units=9)
+        self.assertNotIn("not-enough-taps", self._codes(net))

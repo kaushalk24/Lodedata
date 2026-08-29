@@ -300,6 +300,33 @@ selection as defined in the Tap specs", created in the original by leaving a
 blank line between groups. OpenLode makes the group an explicit `tsg` field —
 the same idea without the fragile blank-line encoding.
 
+## 4b. Design-test errors
+
+The help file's index names every error the Design Assistant's **Test**
+command can raise. That list is effectively its rule book, so OpenLode
+implements it:
+
+| Design Assistant error | OpenLode flag |
+| --- | --- |
+| Tapout(h) / Tapout(l) below min | `tap-level` |
+| Tapout(rh) / Tapout(rl) above max | `return-tap-level` |
+| High / Low input of xxx to LE | `housing-input`, `under-driven`, `over-driven` |
+| Rh / Rl output of xxx from LE | `return-short` |
+| Fslope / Rslope too low to equalize | `equalization` |
+| Crossover above max | `crossover` |
+| Not enough taps / Not enough drops | `not-enough-taps` |
+| Invalid terminating tap used | `invalid-terminating-tap` |
+| Nonexistent tap used | `missing-tap` |
+| LE X/N before/M after (LE cascade violation) | `le-cascade` |
+| Unused LE placed | `unused-active` |
+| Performance errors | `performance` |
+| Branch does not begin anywhere / contains no nodes / not fed by a coupler | `Network.validate()` |
+
+Two carry new parameters: `max_le_cascade` (how many line extenders may
+follow one another, 0 to disable) and `check_tap_ports` (flag a tap whose
+ports cannot serve the units at that location). An end of line on a through
+tap is flagged as well, since it needs a terminator or a self-terminating tap.
+
 ## 5. Reports
 
 The original offers nine miscellaneous reports — Macro Summary, Active,
