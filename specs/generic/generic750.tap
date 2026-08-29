@@ -1,0 +1,1346 @@
+{
+  "kind": "taps",
+  "name": "generic750",
+  "description": "single tap selection group, 2/4/8 port",
+  "version": "1.0",
+  "rows": [
+    {
+      "id": "T2-4",
+      "description": "2-port 4 dB tap",
+      "part_number": "TAP204",
+      "tsg": 1,
+      "value": 4.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 4.5,
+        "F2": 3.5,
+        "R1": 3.3,
+        "R2": 3.0
+      },
+      "insertion_loss": {
+        "F1": 2.9,
+        "F2": 1.3,
+        "R1": 1.2,
+        "R2": 0.9
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-8",
+      "description": "2-port 8 dB tap",
+      "part_number": "TAP208",
+      "tsg": 1,
+      "value": 8.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 8.5,
+        "F2": 7.5,
+        "R1": 7.3,
+        "R2": 7.0
+      },
+      "insertion_loss": {
+        "F1": 1.4,
+        "F2": 0.6,
+        "R1": 0.6,
+        "R2": 0.4
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-11",
+      "description": "2-port 11 dB tap",
+      "part_number": "TAP211",
+      "tsg": 1,
+      "value": 11.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 11.5,
+        "F2": 10.5,
+        "R1": 10.3,
+        "R2": 10.0
+      },
+      "insertion_loss": {
+        "F1": 1.0,
+        "F2": 0.5,
+        "R1": 0.4,
+        "R2": 0.3
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-14",
+      "description": "2-port 14 dB tap",
+      "part_number": "TAP214",
+      "tsg": 1,
+      "value": 14.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 14.5,
+        "F2": 13.5,
+        "R1": 13.3,
+        "R2": 13.0
+      },
+      "insertion_loss": {
+        "F1": 0.8,
+        "F2": 0.4,
+        "R1": 0.3,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-17",
+      "description": "2-port 17 dB tap",
+      "part_number": "TAP217",
+      "tsg": 1,
+      "value": 17.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 17.5,
+        "F2": 16.5,
+        "R1": 16.3,
+        "R2": 16.0
+      },
+      "insertion_loss": {
+        "F1": 0.7,
+        "F2": 0.3,
+        "R1": 0.3,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-20",
+      "description": "2-port 20 dB tap",
+      "part_number": "TAP220",
+      "tsg": 1,
+      "value": 20.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 20.5,
+        "F2": 19.5,
+        "R1": 19.3,
+        "R2": 19.0
+      },
+      "insertion_loss": {
+        "F1": 0.6,
+        "F2": 0.3,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-23",
+      "description": "2-port 23 dB tap",
+      "part_number": "TAP223",
+      "tsg": 1,
+      "value": 23.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 23.5,
+        "F2": 22.5,
+        "R1": 22.3,
+        "R2": 22.0
+      },
+      "insertion_loss": {
+        "F1": 0.6,
+        "F2": 0.3,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-26",
+      "description": "2-port 26 dB tap",
+      "part_number": "TAP226",
+      "tsg": 1,
+      "value": 26.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 26.5,
+        "F2": 25.5,
+        "R1": 25.3,
+        "R2": 25.0
+      },
+      "insertion_loss": {
+        "F1": 0.5,
+        "F2": 0.2,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-29",
+      "description": "2-port 29 dB tap",
+      "part_number": "TAP229",
+      "tsg": 1,
+      "value": 29.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 29.5,
+        "F2": 28.5,
+        "R1": 28.3,
+        "R2": 28.0
+      },
+      "insertion_loss": {
+        "F1": 0.5,
+        "F2": 0.2,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-32",
+      "description": "2-port 32 dB tap",
+      "part_number": "TAP232",
+      "tsg": 1,
+      "value": 32.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 32.5,
+        "F2": 31.5,
+        "R1": 31.3,
+        "R2": 31.0
+      },
+      "insertion_loss": {
+        "F1": 0.4,
+        "F2": 0.2,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-35",
+      "description": "2-port 35 dB tap",
+      "part_number": "TAP235",
+      "tsg": 1,
+      "value": 35.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 35.5,
+        "F2": 34.5,
+        "R1": 34.3,
+        "R2": 34.0
+      },
+      "insertion_loss": {
+        "F1": 0.4,
+        "F2": 0.2,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-4",
+      "description": "4-port 4 dB tap",
+      "part_number": "TAP404",
+      "tsg": 1,
+      "value": 4.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 4.5,
+        "F2": 3.5,
+        "R1": 3.3,
+        "R2": 3.0
+      },
+      "insertion_loss": {
+        "F1": 3.6,
+        "F2": 1.6,
+        "R1": 1.4,
+        "R2": 1.1
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-8",
+      "description": "4-port 8 dB tap",
+      "part_number": "TAP408",
+      "tsg": 1,
+      "value": 8.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 8.5,
+        "F2": 7.5,
+        "R1": 7.3,
+        "R2": 7.0
+      },
+      "insertion_loss": {
+        "F1": 1.8,
+        "F2": 0.8,
+        "R1": 0.7,
+        "R2": 0.5
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-11",
+      "description": "4-port 11 dB tap",
+      "part_number": "TAP411",
+      "tsg": 1,
+      "value": 11.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 11.5,
+        "F2": 10.5,
+        "R1": 10.3,
+        "R2": 10.0
+      },
+      "insertion_loss": {
+        "F1": 1.3,
+        "F2": 0.6,
+        "R1": 0.5,
+        "R2": 0.4
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-14",
+      "description": "4-port 14 dB tap",
+      "part_number": "TAP414",
+      "tsg": 1,
+      "value": 14.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 14.5,
+        "F2": 13.5,
+        "R1": 13.3,
+        "R2": 13.0
+      },
+      "insertion_loss": {
+        "F1": 1.0,
+        "F2": 0.5,
+        "R1": 0.4,
+        "R2": 0.3
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-17",
+      "description": "4-port 17 dB tap",
+      "part_number": "TAP417",
+      "tsg": 1,
+      "value": 17.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 17.5,
+        "F2": 16.5,
+        "R1": 16.3,
+        "R2": 16.0
+      },
+      "insertion_loss": {
+        "F1": 0.9,
+        "F2": 0.4,
+        "R1": 0.4,
+        "R2": 0.3
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-20",
+      "description": "4-port 20 dB tap",
+      "part_number": "TAP420",
+      "tsg": 1,
+      "value": 20.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 20.5,
+        "F2": 19.5,
+        "R1": 19.3,
+        "R2": 19.0
+      },
+      "insertion_loss": {
+        "F1": 0.8,
+        "F2": 0.4,
+        "R1": 0.3,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-23",
+      "description": "4-port 23 dB tap",
+      "part_number": "TAP423",
+      "tsg": 1,
+      "value": 23.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 23.5,
+        "F2": 22.5,
+        "R1": 22.3,
+        "R2": 22.0
+      },
+      "insertion_loss": {
+        "F1": 0.7,
+        "F2": 0.3,
+        "R1": 0.3,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-26",
+      "description": "4-port 26 dB tap",
+      "part_number": "TAP426",
+      "tsg": 1,
+      "value": 26.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 26.5,
+        "F2": 25.5,
+        "R1": 25.3,
+        "R2": 25.0
+      },
+      "insertion_loss": {
+        "F1": 0.6,
+        "F2": 0.3,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-29",
+      "description": "4-port 29 dB tap",
+      "part_number": "TAP429",
+      "tsg": 1,
+      "value": 29.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 29.5,
+        "F2": 28.5,
+        "R1": 28.3,
+        "R2": 28.0
+      },
+      "insertion_loss": {
+        "F1": 0.6,
+        "F2": 0.3,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-32",
+      "description": "4-port 32 dB tap",
+      "part_number": "TAP432",
+      "tsg": 1,
+      "value": 32.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 32.5,
+        "F2": 31.5,
+        "R1": 31.3,
+        "R2": 31.0
+      },
+      "insertion_loss": {
+        "F1": 0.5,
+        "F2": 0.2,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-8",
+      "description": "8-port 8 dB tap",
+      "part_number": "TAP808",
+      "tsg": 1,
+      "value": 8.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 8.5,
+        "F2": 7.5,
+        "R1": 7.3,
+        "R2": 7.0
+      },
+      "insertion_loss": {
+        "F1": 2.6,
+        "F2": 1.2,
+        "R1": 1.0,
+        "R2": 0.8
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-11",
+      "description": "8-port 11 dB tap",
+      "part_number": "TAP811",
+      "tsg": 1,
+      "value": 11.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 11.5,
+        "F2": 10.5,
+        "R1": 10.3,
+        "R2": 10.0
+      },
+      "insertion_loss": {
+        "F1": 1.9,
+        "F2": 0.9,
+        "R1": 0.8,
+        "R2": 0.6
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-14",
+      "description": "8-port 14 dB tap",
+      "part_number": "TAP814",
+      "tsg": 1,
+      "value": 14.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 14.5,
+        "F2": 13.5,
+        "R1": 13.3,
+        "R2": 13.0
+      },
+      "insertion_loss": {
+        "F1": 1.4,
+        "F2": 0.6,
+        "R1": 0.6,
+        "R2": 0.4
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-17",
+      "description": "8-port 17 dB tap",
+      "part_number": "TAP817",
+      "tsg": 1,
+      "value": 17.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 17.5,
+        "F2": 16.5,
+        "R1": 16.3,
+        "R2": 16.0
+      },
+      "insertion_loss": {
+        "F1": 1.3,
+        "F2": 0.6,
+        "R1": 0.5,
+        "R2": 0.4
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-20",
+      "description": "8-port 20 dB tap",
+      "part_number": "TAP820",
+      "tsg": 1,
+      "value": 20.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 20.5,
+        "F2": 19.5,
+        "R1": 19.3,
+        "R2": 19.0
+      },
+      "insertion_loss": {
+        "F1": 1.2,
+        "F2": 0.5,
+        "R1": 0.5,
+        "R2": 0.4
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-23",
+      "description": "8-port 23 dB tap",
+      "part_number": "TAP823",
+      "tsg": 1,
+      "value": 23.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 23.5,
+        "F2": 22.5,
+        "R1": 22.3,
+        "R2": 22.0
+      },
+      "insertion_loss": {
+        "F1": 1.0,
+        "F2": 0.5,
+        "R1": 0.4,
+        "R2": 0.3
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-26",
+      "description": "8-port 26 dB tap",
+      "part_number": "TAP826",
+      "tsg": 1,
+      "value": 26.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 26.5,
+        "F2": 25.5,
+        "R1": 25.3,
+        "R2": 25.0
+      },
+      "insertion_loss": {
+        "F1": 0.9,
+        "F2": 0.4,
+        "R1": 0.4,
+        "R2": 0.3
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-29",
+      "description": "8-port 29 dB tap",
+      "part_number": "TAP829",
+      "tsg": 1,
+      "value": 29.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 29.5,
+        "F2": 28.5,
+        "R1": 28.3,
+        "R2": 28.0
+      },
+      "insertion_loss": {
+        "F1": 0.9,
+        "F2": 0.4,
+        "R1": 0.4,
+        "R2": 0.3
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-32",
+      "description": "8-port 32 dB tap",
+      "part_number": "TAP832",
+      "tsg": 1,
+      "value": 32.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 32.5,
+        "F2": 31.5,
+        "R1": 31.3,
+        "R2": 31.0
+      },
+      "insertion_loss": {
+        "F1": 0.7,
+        "F2": 0.3,
+        "R1": 0.3,
+        "R2": 0.2
+      },
+      "self_terminating": false,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": true,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-8T",
+      "description": "2-port 8 dB self-terminating tap",
+      "part_number": "TAP208T",
+      "tsg": 1,
+      "value": 8.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 8.5,
+        "F2": 7.5,
+        "R1": 7.3,
+        "R2": 7.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-11T",
+      "description": "2-port 11 dB self-terminating tap",
+      "part_number": "TAP211T",
+      "tsg": 1,
+      "value": 11.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 11.5,
+        "F2": 10.5,
+        "R1": 10.3,
+        "R2": 10.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-14T",
+      "description": "2-port 14 dB self-terminating tap",
+      "part_number": "TAP214T",
+      "tsg": 1,
+      "value": 14.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 14.5,
+        "F2": 13.5,
+        "R1": 13.3,
+        "R2": 13.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-17T",
+      "description": "2-port 17 dB self-terminating tap",
+      "part_number": "TAP217T",
+      "tsg": 1,
+      "value": 17.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 17.5,
+        "F2": 16.5,
+        "R1": 16.3,
+        "R2": 16.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-20T",
+      "description": "2-port 20 dB self-terminating tap",
+      "part_number": "TAP220T",
+      "tsg": 1,
+      "value": 20.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 20.5,
+        "F2": 19.5,
+        "R1": 19.3,
+        "R2": 19.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-23T",
+      "description": "2-port 23 dB self-terminating tap",
+      "part_number": "TAP223T",
+      "tsg": 1,
+      "value": 23.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 23.5,
+        "F2": 22.5,
+        "R1": 22.3,
+        "R2": 22.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-26T",
+      "description": "2-port 26 dB self-terminating tap",
+      "part_number": "TAP226T",
+      "tsg": 1,
+      "value": 26.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 26.5,
+        "F2": 25.5,
+        "R1": 25.3,
+        "R2": 25.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T2-29T",
+      "description": "2-port 29 dB self-terminating tap",
+      "part_number": "TAP229T",
+      "tsg": 1,
+      "value": 29.0,
+      "ports": 2,
+      "tap_loss": {
+        "F1": 29.5,
+        "F2": 28.5,
+        "R1": 28.3,
+        "R2": 28.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 21.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-8T",
+      "description": "4-port 8 dB self-terminating tap",
+      "part_number": "TAP408T",
+      "tsg": 1,
+      "value": 8.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 8.5,
+        "F2": 7.5,
+        "R1": 7.3,
+        "R2": 7.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-11T",
+      "description": "4-port 11 dB self-terminating tap",
+      "part_number": "TAP411T",
+      "tsg": 1,
+      "value": 11.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 11.5,
+        "F2": 10.5,
+        "R1": 10.3,
+        "R2": 10.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-14T",
+      "description": "4-port 14 dB self-terminating tap",
+      "part_number": "TAP414T",
+      "tsg": 1,
+      "value": 14.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 14.5,
+        "F2": 13.5,
+        "R1": 13.3,
+        "R2": 13.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-17T",
+      "description": "4-port 17 dB self-terminating tap",
+      "part_number": "TAP417T",
+      "tsg": 1,
+      "value": 17.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 17.5,
+        "F2": 16.5,
+        "R1": 16.3,
+        "R2": 16.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-20T",
+      "description": "4-port 20 dB self-terminating tap",
+      "part_number": "TAP420T",
+      "tsg": 1,
+      "value": 20.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 20.5,
+        "F2": 19.5,
+        "R1": 19.3,
+        "R2": 19.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-23T",
+      "description": "4-port 23 dB self-terminating tap",
+      "part_number": "TAP423T",
+      "tsg": 1,
+      "value": 23.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 23.5,
+        "F2": 22.5,
+        "R1": 22.3,
+        "R2": 22.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-26T",
+      "description": "4-port 26 dB self-terminating tap",
+      "part_number": "TAP426T",
+      "tsg": 1,
+      "value": 26.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 26.5,
+        "F2": 25.5,
+        "R1": 25.3,
+        "R2": 25.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T4-29T",
+      "description": "4-port 29 dB self-terminating tap",
+      "part_number": "TAP429T",
+      "tsg": 1,
+      "value": 29.0,
+      "ports": 4,
+      "tap_loss": {
+        "F1": 29.5,
+        "F2": 28.5,
+        "R1": 28.3,
+        "R2": 28.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 24.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-8T",
+      "description": "8-port 8 dB self-terminating tap",
+      "part_number": "TAP808T",
+      "tsg": 1,
+      "value": 8.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 8.5,
+        "F2": 7.5,
+        "R1": 7.3,
+        "R2": 7.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-11T",
+      "description": "8-port 11 dB self-terminating tap",
+      "part_number": "TAP811T",
+      "tsg": 1,
+      "value": 11.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 11.5,
+        "F2": 10.5,
+        "R1": 10.3,
+        "R2": 10.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-14T",
+      "description": "8-port 14 dB self-terminating tap",
+      "part_number": "TAP814T",
+      "tsg": 1,
+      "value": 14.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 14.5,
+        "F2": 13.5,
+        "R1": 13.3,
+        "R2": 13.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-17T",
+      "description": "8-port 17 dB self-terminating tap",
+      "part_number": "TAP817T",
+      "tsg": 1,
+      "value": 17.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 17.5,
+        "F2": 16.5,
+        "R1": 16.3,
+        "R2": 16.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-20T",
+      "description": "8-port 20 dB self-terminating tap",
+      "part_number": "TAP820T",
+      "tsg": 1,
+      "value": 20.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 20.5,
+        "F2": 19.5,
+        "R1": 19.3,
+        "R2": 19.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-23T",
+      "description": "8-port 23 dB self-terminating tap",
+      "part_number": "TAP823T",
+      "tsg": 1,
+      "value": 23.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 23.5,
+        "F2": 22.5,
+        "R1": 22.3,
+        "R2": 22.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-26T",
+      "description": "8-port 26 dB self-terminating tap",
+      "part_number": "TAP826T",
+      "tsg": 1,
+      "value": 26.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 26.5,
+        "F2": 25.5,
+        "R1": 25.3,
+        "R2": 25.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    },
+    {
+      "id": "T8-29T",
+      "description": "8-port 29 dB self-terminating tap",
+      "part_number": "TAP829T",
+      "tsg": 1,
+      "value": 29.0,
+      "ports": 8,
+      "tap_loss": {
+        "F1": 29.5,
+        "F2": 28.5,
+        "R1": 28.3,
+        "R2": 28.0
+      },
+      "insertion_loss": {},
+      "self_terminating": true,
+      "max_amps": 15.0,
+      "resistance": 0.06,
+      "power_passing": false,
+      "price": 30.0,
+      "labor": 12.0,
+      "extra": {}
+    }
+  ]
+}

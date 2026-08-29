@@ -1,0 +1,89 @@
+{
+  "kind": "parameters",
+  "name": "generic750",
+  "description": "750 MHz forward / 42 MHz return, feet, dBmV",
+  "version": "1.0",
+  "distance_units": "feet",
+  "signal_display": "dBmV",
+  "system_name": "Generic 750 MHz System",
+  "frequencies": [
+    {
+      "id": "F1",
+      "label": "750",
+      "mhz": 750.0,
+      "enabled": true
+    },
+    {
+      "id": "F2",
+      "label": "55",
+      "mhz": 55.0,
+      "enabled": true
+    },
+    {
+      "id": "R1",
+      "label": "42",
+      "mhz": 42.0,
+      "enabled": true
+    },
+    {
+      "id": "R2",
+      "label": "5",
+      "mhz": 5.0,
+      "enabled": true
+    }
+  ],
+  "fwd_eq_high": "F1",
+  "fwd_eq_low": "F2",
+  "rtn_eq_high": "R1",
+  "rtn_eq_low": "R2",
+  "min_tap_output": {
+    "F1": 16.0,
+    "F2": 12.0
+  },
+  "tap_window": 10.0,
+  "enforce_tap_window": false,
+  "max_return_tap_input": {
+    "R1": 40.0,
+    "R2": 40.0
+  },
+  "return_window": 12.0,
+  "set_margin": 1.0,
+  "max_crossover": 3.0,
+  "allow_over_equalization": true,
+  "default_housing_offset": 3.0,
+  "homes_to_ports": [
+    {
+      "homes_max": 1,
+      "ports": 2
+    },
+    {
+      "homes_max": 2,
+      "ports": 2
+    },
+    {
+      "homes_max": 4,
+      "ports": 4
+    },
+    {
+      "homes_max": 99,
+      "ports": 8
+    }
+  ],
+  "default_tsg": 1,
+  "tap_selection": "highest_value",
+  "powering": {
+    "supply_voltage": 90.0,
+    "supply_max_amps": 15.0,
+    "min_device_voltage": 42.0,
+    "voltage_margin": 3.0,
+    "interpolation": "linear",
+    "penetration_pct": 100.0
+  },
+  "default_cable": "P3-500",
+  "default_trunk_cable": "P3-750",
+  "default_active": "LE-750",
+  "default_coupler": "SP2",
+  "cable_loss_factor": 1.0,
+  "connector_loss": 0.0,
+  "extra": {}
+}

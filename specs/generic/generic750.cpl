@@ -1,0 +1,227 @@
+{
+  "kind": "couplers",
+  "name": "generic750",
+  "description": "splitters, directional couplers, passives",
+  "version": "1.0",
+  "rows": [
+    {
+      "id": "SP2",
+      "description": "2-way splitter",
+      "part_number": "SP2",
+      "kind": "splitter",
+      "thru_loss": {
+        "F1": 3.9,
+        "F2": 3.5,
+        "R1": 3.4,
+        "R2": 3.3
+      },
+      "tap_legs": 1,
+      "tap_loss": {
+        "F1": 3.9,
+        "F2": 3.5,
+        "R1": 3.4,
+        "R2": 3.3
+      },
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 24.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "SP3",
+      "description": "3-way splitter (balanced leg + thru)",
+      "part_number": "SP3",
+      "kind": "splitter",
+      "thru_loss": {
+        "F1": 3.9,
+        "F2": 3.5,
+        "R1": 3.4,
+        "R2": 3.3
+      },
+      "tap_legs": 2,
+      "tap_loss": {
+        "F1": 7.4,
+        "F2": 7.0,
+        "R1": 6.9,
+        "R2": 6.8
+      },
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 29.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "SP4",
+      "description": "4-way splitter",
+      "part_number": "SP4",
+      "kind": "splitter",
+      "thru_loss": {
+        "F1": 7.6,
+        "F2": 7.1,
+        "R1": 7.0,
+        "R2": 6.9
+      },
+      "tap_legs": 3,
+      "tap_loss": {
+        "F1": 7.6,
+        "F2": 7.1,
+        "R1": 7.0,
+        "R2": 6.9
+      },
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 32.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "DC9",
+      "description": "9 dB directional coupler",
+      "part_number": "DC9",
+      "kind": "dc",
+      "thru_loss": {
+        "F1": 1.6,
+        "F2": 1.2,
+        "R1": 1.1,
+        "R2": 1.0
+      },
+      "tap_legs": 1,
+      "tap_loss": {
+        "F1": 9.6,
+        "F2": 9.0,
+        "R1": 8.8,
+        "R2": 8.6
+      },
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 26.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "DC12",
+      "description": "12 dB directional coupler",
+      "part_number": "DC12",
+      "kind": "dc",
+      "thru_loss": {
+        "F1": 1.1,
+        "F2": 0.8,
+        "R1": 0.7,
+        "R2": 0.6
+      },
+      "tap_legs": 1,
+      "tap_loss": {
+        "F1": 12.6,
+        "F2": 12.0,
+        "R1": 11.8,
+        "R2": 11.6
+      },
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 26.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "DC16",
+      "description": "16 dB directional coupler",
+      "part_number": "DC16",
+      "kind": "dc",
+      "thru_loss": {
+        "F1": 0.8,
+        "F2": 0.5,
+        "R1": 0.5,
+        "R2": 0.4
+      },
+      "tap_legs": 1,
+      "tap_loss": {
+        "F1": 16.6,
+        "F2": 16.0,
+        "R1": 15.8,
+        "R2": 15.6
+      },
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 26.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "PI",
+      "description": "power inserter",
+      "part_number": "PI",
+      "kind": "power_inserter",
+      "thru_loss": {
+        "F1": 0.6,
+        "F2": 0.3,
+        "R1": 0.3,
+        "R2": 0.2
+      },
+      "tap_legs": 0,
+      "tap_loss": {},
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 41.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "SPL",
+      "description": "splice / in-line connector",
+      "part_number": "SPL",
+      "kind": "passive",
+      "thru_loss": {
+        "F1": 0.2,
+        "F2": 0.1,
+        "R1": 0.1,
+        "R2": 0.1
+      },
+      "tap_legs": 0,
+      "tap_loss": {},
+      "max_amps": 15.0,
+      "resistance": 0.05,
+      "power_passing": true,
+      "power_block": false,
+      "price": 7.0,
+      "labor": 9.0,
+      "extra": {}
+    },
+    {
+      "id": "PB",
+      "description": "AC power block",
+      "part_number": "PB",
+      "kind": "passive",
+      "thru_loss": {
+        "F1": 0.4,
+        "F2": 0.2,
+        "R1": 0.2,
+        "R2": 0.2
+      },
+      "tap_legs": 0,
+      "tap_loss": {},
+      "max_amps": 15.0,
+      "resistance": 0.0,
+      "power_passing": false,
+      "power_block": true,
+      "price": 19.0,
+      "labor": 9.0,
+      "extra": {}
+    }
+  ]
+}

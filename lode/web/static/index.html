@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenLode Design Assistant</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13' fill='%234da3ff'%3E%E2%97%88%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand">
+    <span class="logo">◈</span>
+    <span>OpenLode <b>Design Assistant</b></span>
+  </div>
+  <label class="field">Specs
+    <select id="spec-set"></select>
+  </label>
+  <label class="field">Network
+    <select id="network-name"></select>
+  </label>
+  <div class="spacer"></div>
+  <div class="tools">
+    <button id="btn-design" title="Size taps, place amplifiers and balance (D)">Auto Design</button>
+    <button id="btn-taps" title="Select tap values only">Taps</button>
+    <button id="btn-amps" title="Place amplifiers where the line runs out of signal">Place Amps</button>
+    <button id="btn-save" title="Save the network (Ctrl+S)">Save</button>
+    <button id="btn-xlsx" title="Export every report to an Excel workbook">Export</button>
+    <button id="btn-import" title="Load a Lode Data spec library (.par .cbl .cpr .tap .atv)">Import specs</button>
+    <input id="import-files" type="file" multiple hidden
+           accept=".par,.cbl,.cpr,.tap,.atv,.prc,.PAR,.CBL,.CPR,.TAP,.ATV,.PRC">
+  </div>
+</header>
+
+<main>
+  <section id="canvas-pane">
+    <div class="pane-head">
+      <span>Plant</span>
+      <span class="hint">drag to pan &middot; scroll to zoom &middot; click to select</span>
+      <span class="spacer"></span>
+      <button class="mini" id="btn-fit">Fit</button>
+    </div>
+    <svg id="plant" tabindex="0"></svg>
+    <div id="legend"></div>
+  </section>
+
+  <section id="side">
+    <div class="pane-head"><span>Properties</span><span class="spacer"></span>
+      <span class="hint" id="sel-id"></span></div>
+    <div id="props" class="scroll"></div>
+    <div class="pane-head"><span>Legs</span><span class="spacer"></span>
+      <span class="hint">click to design</span></div>
+    <div id="legs" class="scroll legs"></div>
+    <div class="pane-head"><span>Keys</span><span class="spacer"></span>
+      <button class="mini" id="btn-help">?</button></div>
+    <div class="keys">
+      <div>type a number &middot; <kbd>.</kbd> next field &middot; <kbd>↵</kbd> next pole</div>
+      <div><kbd>+</kbd><kbd>−</kbd> step tap &middot; <kbd>Ins</kbd> insert &middot; <kbd>Del</kbd> splice</div>
+      <div><kbd>&gt;</kbd> into leg &middot; <kbd>&lt;</kbd> back up &middot; <kbd>S</kbd> swap legs</div>
+      <div><kbd>D</kbd> auto design &middot; <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</div>
+    </div>
+  </section>
+
+  <section id="table-pane">
+    <nav id="tabs"></nav>
+    <div id="table" class="scroll"></div>
+  </section>
+</main>
+
+<footer class="bar status">
+  <span id="stats"></span>
+  <span class="spacer"></span>
+  <span id="verdict"></span>
+  <span id="toast"></span>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>
