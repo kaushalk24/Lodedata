@@ -128,7 +128,39 @@ almost always between `0x40` and `0xC0`: a single differing bit. That is
 exactly what a difference against a non-zero template looks like, and it means
 absolute footages, tap values and house counts are still hidden.
 
-## What would finish it
+## Getting existing designs in *today*
+
+The Design Assistant prints any network, and a printed **design chart**
+carries everything needed to rebuild the plant: location, the footage of the
+span feeding it, house count and device. Reading the report is more reliable
+than an inferred byte layout, because it reads the same numbers the designer
+sees on screen.
+
+Export the design chart from Lode Data (CSV, tab-separated or plain text),
+then:
+
+```bash
+lode -s KERMIT750 import-design MYPLANT.csv --name myplant
+```
+
+Columns are matched **by name, not position** — `Ft`, `Footage`, `Distance`,
+`Span` and `Length` are all understood as footage, and likewise for the rest —
+so column order and extra columns do not matter. A bare tap value (`17`
+rather than `T4-17`) is resolved through the spec set using the house count
+and the Homes / Number of Ports table.
+
+**Branches.** If the export has a `Leg`/`Branch` column, and a `From`/`Parent`
+naming where each leg attaches, the topology is rebuilt exactly. Without one
+the chart is read as a single run and the importer says so rather than
+inventing branches. OpenLode's own design chart now exports both columns, so
+a chart exported from OpenLode and read back is lossless — verified by a test
+that re-solves the rebuilt plant and requires every tap level to match to
+three decimals.
+
+What the chart does not carry: power supplies, and manual pad/equalizer
+overrides. Add those after import.
+
+## What would finish the binary format
 
 **Known plaintext.** Either of these pins the layout in one pass:
 

@@ -58,9 +58,11 @@ or press **Import specs** in the browser. Every import prints a report of what
 was read and what was rejected — check it against your Lode Data spec printout
 before designing.
 
-Design files (`.ntw`) are obfuscated; `lode inspect-network` unwraps the
-container and reports what is inside, but topology import is not finished yet
-and says so rather than guessing. See
+Existing **designs** come in through Lode Data's own report export —
+`lode import-design MYPLANT.csv` rebuilds the plant, branches and all, from a
+printed design chart. (The binary `.ntw` format is obfuscated;
+`lode inspect-network` unwraps the container, but the record layout is not
+decoded yet and the tool says so rather than guessing.) See
 **[Importing a Lode Data equipment library](docs/importing-lodedata-specs.md)**
 for the decoded format and the current limits.
 

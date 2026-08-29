@@ -9,6 +9,7 @@ import struct
 import tempfile
 import unittest
 
+from lode.library import generic750
 from lode.importers.lodedata import (DB, OHM, ImportReport, _plausible,
                                      _ports_and_value, detect_kind, import_set,
                                      is_plugin, read_cables, read_taps)
@@ -280,3 +281,109 @@ class TestNetworkContainer(unittest.TestCase):
                 fh.write(self._build({9: bytes([6] * 100)}))
             text = compare([a, b])
         self.assertIn("share one keystream: True", text)
+
+
+class TestDesignChartImport(unittest.TestCase):
+    """Rebuilding a plant from an exported report, since .ntw is not decoded."""
+
+    def _chart(self, text, specs=None):
+        from lode.importers import read_design_chart
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "chart.csv")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(text)
+            return read_design_chart(path, name="t", specs=specs)
+
+    def test_a_simple_run_rebuilds(self):
+        net, report = self._chart(
+            "Loc,Type,Device,Cable,Length,Units\n"
+            "ND1,source,ND-750,,0,0\n"
+            "1,tap,T4-17,P3-500,250,3\n"
+            "2,tap,T4-14,P3-500,300,4\n")
+        self.assertEqual(len(net.locations), 3)
+        self.assertEqual(net.stats()["footage"], 550.0)
+        self.assertEqual(report.rows_used, 3)
+        self.assertEqual(net.validate(), [])
+
+    def test_column_names_are_matched_not_positions(self):
+        """Lode Data's exporter names columns its own way."""
+        net, report = self._chart(
+            "Footage;House Count;Location;Equipment\n"
+            "0;0;ND1;ND-750\n"
+            "250;3;A1;T4-17\n")
+        self.assertEqual(report.columns["footage"], "Footage")
+        self.assertEqual(report.columns["units"], "House Count")
+        self.assertEqual(len(net.locations), 2)
+        self.assertEqual(net.locations[net.ordered()[1].id].units, 3)
+
+    def test_tab_separated_is_read(self):
+        net, _ = self._chart("Loc\tLength\tUnits\tDevice\n"
+                             "ND1\t0\t0\tND-750\nA1\t400\t2\tT4-20\n")
+        self.assertEqual(len(net.locations), 2)
+        self.assertEqual(net.feed_span(net.ordered()[1].id).length, 400.0)
+
+    def test_legs_rebuild_the_branches(self):
+        net, report = self._chart(
+            "Loc,Leg,From,Type,Device,Cable,Length,Units\n"
+            "ND1,TRUNK,,source,ND-750,,0,0\n"
+            "SP1,TRUNK,,coupler,SP2,P3-500,200,0\n"
+            "A1,SP1-THRU,SP1,tap,T4-17,P3-500,150,2\n"
+            "A2,SP1-THRU,,tap,T4-14,P3-500,150,2\n"
+            "B1,SP1-TAP1,SP1,tap,T4-17,P3-500,180,3\n")
+        self.assertEqual(len(net.locations), 5)
+        self.assertEqual(net.validate(), [])
+        legs = {l.display(): len(l.locations) for l in net.legs()}
+        self.assertEqual(len(legs), 3, legs)
+        by_label = {l.label: l.id for l in net.locations.values()}
+        self.assertEqual(net.parent_of(by_label["B1"]), by_label["SP1"])
+        self.assertEqual(net.parent_of(by_label["A2"]), by_label["A1"])
+
+    def test_a_flat_chart_says_so_rather_than_inventing_branches(self):
+        net, report = self._chart(
+            "Loc,Device,Length,Units\nND1,ND-750,0,0\nA1,T4-17,250,2\n")
+        self.assertTrue(any("no leg or branch column" in n for n in report.notes))
+
+    def test_a_bare_tap_value_resolves_through_the_spec_set(self):
+        """Designers print tap values, not part numbers."""
+        specs = generic750()
+        net, _ = self._chart(
+            "Loc,Type,Device,Length,Units\n"
+            "ND1,source,ND-750,0,0\n"
+            "A1,tap,17,250,3\n", specs=specs)
+        tap = net.ordered()[1]
+        self.assertEqual(tap.device, "T4-17")
+
+    def test_an_unrecognisable_file_is_reported_not_guessed(self):
+        net, report = self._chart("this is not a design chart\njust prose\n")
+        self.assertEqual(len(net.locations), 0)
+        self.assertTrue(any("no recognisable heading" in n for n in report.notes))
+
+    def test_round_trip_through_our_own_export_is_lossless(self):
+        from lode.engine.levels import LevelEngine
+        from lode.examples import build_example_network
+        from lode.reports import ReportBuilder
+
+        specs = generic750()
+        original = build_example_network()
+        from lode.engine.autodesign import AutoDesigner
+        AutoDesigner(specs, original).full_design()
+        solution = LevelEngine(specs, original).solve()
+        chart = ReportBuilder(specs, original, solution).design_chart()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "chart.csv")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(chart.to_csv())
+            from lode.importers import read_design_chart
+            rebuilt, _ = read_design_chart(path, name="rt", specs=specs)
+
+        self.assertEqual(len(rebuilt.locations), len(original.locations))
+        self.assertEqual(rebuilt.stats()["footage"], original.stats()["footage"])
+        self.assertEqual(rebuilt.stats()["units"], original.stats()["units"])
+        # and it must solve to the same levels, not merely look similar
+        after = LevelEngine(specs, rebuilt).solve()
+        before = {r.label: round(r.fwd_tap.get("F1", 0), 3)
+                  for r in solution.taps()}
+        now = {r.label: round(r.fwd_tap.get("F1", 0), 3) for r in after.taps()}
+        self.assertEqual(before, now)

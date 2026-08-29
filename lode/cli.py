@@ -3,6 +3,8 @@
     lode init                     create a starter workspace here
     lode import <files>           read a Lode Data binary library (.par .cbl
                                   .cpr .tap .atv) into a named spec set
+    lode import-design <chart.csv>  rebuild a network from an exported
+                                  Lode Data design chart
     lode inspect-network <f.ntw>  deobfuscate a Lode Data design file
     lode specs [name]             summarise and validate a spec set
     lode calc <network>           solve and print the design chart
@@ -84,6 +86,34 @@ def cmd_import(args) -> int:
             print(f"  - {warning}")
     print("\nCHECK THE IMPORT REPORT against your Lode Data spec printout "
           "before designing against this set.")
+    return 0
+
+
+def cmd_import_design(args) -> int:
+    """Rebuild a network from an exported Lode Data design chart."""
+    from .importers import read_design_chart
+
+    workspace = _workspace(args)
+    workspace.ensure()
+    try:
+        specs = workspace.load_specs(args.specs)
+    except Exception:
+        specs = None
+    name = args.name or os.path.splitext(os.path.basename(args.path))[0]
+    network, report = read_design_chart(args.path, name=name, specs=specs)
+    print(report.to_text())
+    if not network.locations:
+        print("\nnothing was imported", file=sys.stderr)
+        return 2
+    print(f"\n{network.stats()}")
+    if specs is not None:
+        analysis = workspace.analyse(specs, network)
+        errors = [f for f in analysis.all_flags if f.severity == "error"]
+        print(f"solves with {len(errors)} error(s), "
+              f"{len(analysis.all_flags) - len(errors)} warning(s)")
+    if not args.dry_run:
+        path = workspace.save_network(network, name)
+        print(f"\nsaved {path}")
     return 0
 
 
@@ -233,6 +263,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-n", "--dry-run", action="store_true",
                    help="report without writing the spec set")
     p.set_defaults(func=cmd_import)
+
+    p = sub.add_parser("import-design",
+                       help="rebuild a network from an exported design chart")
+    p.add_argument("path", help="CSV, TSV or text export of a design chart")
+    p.add_argument("--name", default="", help="name for the imported network")
+    p.add_argument("-n", "--dry-run", action="store_true")
+    p.set_defaults(func=cmd_import_design)
 
     p = sub.add_parser("inspect-network",
                        help="deobfuscate and report on a Lode Data .ntw file")

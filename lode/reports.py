@@ -249,16 +249,33 @@ class ReportBuilder:
         params = self.params
         fwd = params.forward_columns
         rtn = params.return_columns
-        columns = ["Loc", "Type", "Device", "Cable", "Length", "Units"]
+        columns = ["Loc", "Leg", "From", "Type", "Device", "Cable", "Length",
+                   "Units"]
         columns += [f"In {params.label(c)}" for c in fwd]
         columns += [f"Tap {params.label(c)}" for c in fwd]
         columns += [f"Rtn {params.label(c)}" for c in rtn]
         columns += ["Pad", "EQ", "Status"]
+        # the leg each row belongs to, and where that leg hangs from, so an
+        # exported chart carries the topology and can be read back in
+        leg_of, leg_from = {}, {}
+        for leg in self.network.legs():
+            origin = self.network.locations.get(leg.origin)
+            name = leg.name or (
+                f"{origin.display()}-{leg.port}" if origin else "TRUNK")
+            for index, loc_id in enumerate(leg.locations):
+                leg_of[loc_id] = name
+                # only the first row of a leg names where the leg attaches
+                leg_from[loc_id] = (origin.display()
+                                    if origin and index == 0 else "")
+
         rows = []
         for loc_id in self.solution.order:
             res = self.solution.results[loc_id]
             row = {
-                "Loc": res.label, "Type": res.kind, "Device": res.device,
+                "Loc": res.label,
+                "Leg": leg_of.get(loc_id, ""),
+                "From": leg_from.get(loc_id, ""),
+                "Type": res.kind, "Device": res.device,
                 "Cable": res.cable, "Length": res.length or "",
                 "Units": res.units or "",
                 "Pad": res.pad if res.pad is not None else "",
