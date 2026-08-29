@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 import math
 import zipfile
 from dataclasses import dataclass, field
@@ -437,21 +438,43 @@ class ReportBuilder:
 
     # ------------------------------------------------------------------
     def bill_of_materials(self, exclude_zero: bool = True) -> Report:
-        """Counts and costs every part in the design."""
+        """Counts and costs every part in the design.
+
+        Laid out the way the Design Assistant's own bill of materials is --
+        equipment type, the **Lode line number** (the row the part occupies in
+        its spec file), part number, then aerial, underground and total -- so
+        the two can be compared line for line.  Aerial and underground are
+        told apart by the ``AER`` / ``UG`` convention in the part name, which
+        is how the spec files themselves carry it.
+        """
         items: dict[tuple, dict] = {}
 
+        def placement(name: str) -> str:
+            upper = f"{name}".upper()
+            if re.search(r"\bUG\b|UNDERGROUND|\bU\b$", upper):
+                return "UG"
+            if re.search(r"\bAER\b|AERIAL|\bA\b$", upper):
+                return "Ae"
+            return "Ae"
+
         def add(category: str, ident: str, description: str, part: str,
-                quantity: float, unit: str, material: float, labor: float):
+                quantity: float, unit: str, material: float, labor: float,
+                line: object = "", place: str = "Ae"):
             key = (category, ident)
             entry = items.setdefault(key, {
-                "Category": category, "Item": ident, "Part": part,
-                "Description": description, "Unit": unit, "Quantity": 0.0,
+                "Category": category, "Line #": line, "Item": ident,
+                "Part": part, "Description": description, "Unit": unit,
+                "Ae": 0.0, "UG": 0.0, "Quantity": 0.0,
                 "Material": 0.0, "Labor": 0.0, "Total": 0.0,
             })
+            entry[place] = entry.get(place, 0.0) + quantity
             entry["Quantity"] += quantity
             entry["Material"] += material * quantity
             entry["Labor"] += labor * quantity
             entry["Total"] = entry["Material"] + entry["Labor"]
+
+        def lode_line(device) -> object:
+            return (device.extra or {}).get("lode_line", "")
 
         def priced(ident: str, part: str, fallback_material: float,
                    fallback_labor: float) -> tuple[float, float]:
@@ -467,21 +490,24 @@ class ReportBuilder:
                     material, labor = priced(tap.id, tap.part_number,
                                              tap.price, tap.labor)
                     add("Taps", tap.id, tap.description, tap.part_number,
-                        1, "each", material, labor)
+                        1, "each", material, labor, lode_line(tap),
+                        placement(tap.id))
             elif loc.kind == "coupler":
                 cpl = self.specs.couplers.by_id(loc.device)
                 if cpl:
                     material, labor = priced(cpl.id, cpl.part_number,
                                              cpl.price, cpl.labor)
                     add("Passives", cpl.id, cpl.description, cpl.part_number,
-                        1, "each", material, labor)
+                        1, "each", material, labor, lode_line(cpl),
+                        placement(cpl.id))
             elif loc.kind in ("active", "source"):
                 act = self.specs.actives.by_id(loc.device)
                 if act:
                     material, labor = priced(act.id, act.part_number,
                                              act.price, act.labor)
                     add("Actives", act.id, act.description, act.part_number,
-                        1, "each", material, labor)
+                        1, "each", material, labor, lode_line(act),
+                        placement(act.id))
                     res = self.solution.get(loc.id)
                     if res is not None and res.pad is not None:
                         add("Plug-ins", f"PAD-{res.pad:g}",
@@ -509,7 +535,8 @@ class ReportBuilder:
             material, labor = priced(cable.id, cable.part_number,
                                      cable.price, cable.labor)
             add("Cable", cable.id, cable.description, cable.part_number,
-                span.length, self.params.distance_units, material, labor)
+                span.length, self.params.distance_units, material, labor,
+                lode_line(cable), placement(cable.id))
             if span.connectors:
                 add("Connectors", f"CONN-{cable.id}",
                     f"connectors for {cable.id}", "", span.connectors, "each",
@@ -520,13 +547,19 @@ class ReportBuilder:
         rows.sort(key=lambda r: (r["Category"], r["Item"]))
         material_total = sum(r["Material"] for r in rows)
         labor_total = sum(r["Labor"] for r in rows)
+        homes = sum(l.units for l in self.network.locations.values())
+        strand = sum(s.length for s in self.network.spans.values())
         return Report(
             title="Bill of Materials",
-            columns=["Category", "Item", "Part", "Description", "Quantity",
-                     "Unit", "Material", "Labor", "Total"],
+            columns=["Category", "Line #", "Item", "Part", "Description",
+                     "Ae", "UG", "Quantity", "Unit", "Material", "Labor",
+                     "Total"],
             rows=rows, meta=self._meta(),
-            digits={"Quantity": 0, "Material": 2, "Labor": 2, "Total": 2},
+            digits={"Quantity": 0, "Ae": 0, "UG": 0, "Material": 2,
+                    "Labor": 2, "Total": 2},
             summary=[
+                f"housecount {homes}",
+                f"strand/trench {strand:,.0f} {self.params.distance_units}",
                 f"material {material_total:,.2f}",
                 f"labor    {labor_total:,.2f}",
                 f"total    {material_total + labor_total:,.2f}",

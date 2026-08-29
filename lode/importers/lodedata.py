@@ -269,7 +269,7 @@ def read_cables(path: str) -> tuple[CablesSpec, ImportReport]:
         rows.append(Cable(
             id=ident, description=name, part_number=_text(rec, 114, 15),
             atten=atten, loop_res=loop / OHM,
-            extra={"connector": _text(rec, 129, 16), "record": index},
+            extra={"connector": _text(rec, 129, 16), "lode_line": index},
         ))
         report.rows.append(
             f"{ident:<18} " +
@@ -334,7 +334,7 @@ def read_couplers(path: str) -> tuple[CouplersSpec, ImportReport]:
         rows.append(Coupler(
             id=ident, description=name, part_number=_text(rec, 19, 14),
             kind=kind, thru_loss=thru, tap_legs=legs, tap_loss=tapl,
-            extra={"value": abs(value) / DB, "record": index - 1},
+            extra={"value": abs(value) / DB, "lode_line": index - 1},
         ))
         report.rows.append(
             f"{ident:<18} {kind:<9} thru " +
@@ -380,6 +380,8 @@ def is_plugin(name: str) -> bool:
 
 
 PORT_PATTERNS = (
+    # RMT2002-RF-23 / RMT2004-RF-23 / RMT2008-RF-23 -- ports in the 4th digit
+    re.compile(r"20(?:0?)([248])\D+(\d{2})"),
     re.compile(r"(?:^|[^0-9])2([248])(\d{2})(?:[^0-9]|$)"),   # MMT2830, MGTS-2824
     re.compile(r"-([248])(\d{2})(?:[^0-9]|$)"),               # AN-WIFI-824
     re.compile(r"21([248])\d.*?-(\d{2})"),                    # RMT2128-RF-26
@@ -400,59 +402,64 @@ def read_taps(path: str, primary: str = "F1") -> tuple[TapsSpec, ImportReport]:
     report = ImportReport(source=path, kind="taps", title=title,
                           licence=licence, user=user)
 
+    # FF FF FF FF separates records.  The loss blocks sit at a fixed offset
+    # from the start of the record -- the byte after a separator -- not from
+    # the part number, whose position varies by region: KERMIT750 puts the
+    # name at +7, WVBeck750 at +0, and both put tap loss at +25 and through
+    # loss at +65.
+    TAP_AT, THRU_AT = 25, 65
     marks = [m.start() for m in re.finditer(rb"\xff\xff\xff\xff", data)
              if m.start() > HEADER]
-    report.records_scanned = len(marks)
+    starts = []
+    if marks:
+        first = marks[0]
+        stride = min((b - a for a, b in zip(marks, marks[1:])), default=112)
+        if first - stride >= HEADER:
+            starts.append(first - stride + 4)
+        starts += [m + 4 for m in marks]
+    report.records_scanned = len(starts)
+
     rows, seen, plugins, lossless, unreadable = [], set(), [], [], []
     group, last_group_at = 1, -10 ** 9
     unknown_ports = 0
 
-    for position, mark in enumerate(marks):
-        end = marks[position + 1] if position + 1 < len(marks) else len(data)
-        rec = data[mark:end]
-        name = ""
+    for position, start in enumerate(starts):
+        end = starts[position + 1] - 4 if position + 1 < len(starts) else len(data)
+        rec = data[start:end]
+        if len(rec) < THRU_AT + 8:
+            continue
         found = re.search(rb"[A-Za-z][A-Za-z0-9\-.\\/ ]{3,24}\x00", rec)
-        if found:
-            name = found.group()[:-1].strip().decode("latin1", "replace")
+        if not found:
+            continue
+        name = found.group()[:-1].strip().decode("latin1", "replace")
         if not name:
             continue
-        # Both blocks are ten int32 slots, forty bytes apart, measured from
-        # the start of the part number.  Some families carry an extra
-        # six-byte field ahead of the block (the 112 vs 118 byte records),
-        # so the alternate offset is tried before giving up.
-        base = found.start()
-        tap_loss = _slots(rec, base + 18)
-        thru_loss = _slots(rec, base + 58)
-        if not (tap_loss.get(primary) and _plausible(tap_loss, 0.5, 60.0)):
-            alt_tap = _slots(rec, base + 24)
-            if alt_tap.get(primary) and _plausible(alt_tap, 0.5, 60.0):
-                tap_loss, thru_loss = alt_tap, _slots(rec, base + 64)
+
+        tap_loss = _slots(rec, TAP_AT)
+        thru_loss = _slots(rec, THRU_AT)
         if not _nonempty(tap_loss):
-            continue
-        if not _plausible(tap_loss, 0.5, 60.0) or \
-                (thru_loss and not _plausible(thru_loss, 0.0, 25.0)):
-            unreadable.append(name)
-            continue
-        # a tap with no port loss at the design frequency is not a tap; it
-        # would be selected in preference to every real one
-        if not tap_loss.get(primary):
-            lossless.append(name)
             continue
 
         if is_plugin(name):
             plugins.append(name)
             continue
+        if not tap_loss.get(primary):
+            lossless.append(name)
+            continue
+        if not _plausible(tap_loss, 0.5, 60.0) or \
+                (thru_loss and not _plausible(thru_loss, 0.0, 25.0)):
+            unreadable.append(name)
+            continue
 
         ports, value = _ports_and_value(name)
         if value is None:
-            value = round(_peak(tap_loss))
+            value = round(tap_loss[primary])
         if ports is None:
             ports = 4
             unknown_ports += 1
-        # a blank gap between families starts a new tap selection group
-        if mark - last_group_at > 3000 and rows:
+        if start - last_group_at > 3000 and rows:
             group += 1
-        last_group_at = mark
+        last_group_at = start
 
         ident = _unique(name, seen)
         rows.append(Tap(
@@ -460,7 +467,7 @@ def read_taps(path: str, primary: str = "F1") -> tuple[TapsSpec, ImportReport]:
             value=float(value), ports=int(ports),
             tap_loss=tap_loss, insertion_loss=thru_loss,
             self_terminating=not _nonempty(thru_loss),
-            extra={"record": position},
+            extra={"lode_line": position},
         ))
         report.rows.append(
             f"{ident:<22} tsg{group} {ports}p {value:>4.0f}dB  tap " +
@@ -574,7 +581,7 @@ def read_actives(path: str, columns=("F1", "F2")) -> tuple[ActivesSpec, ImportRe
             return_capable=any(c.startswith("R") for c in design_out),
             rtn_gain={}, rtn_design_output={}, rtn_module_input={},
             va_pairs=[[60, 1.0], [90, 0.7]], max_amps=15.0,
-            extra={"record_at": position},
+            extra={"lode_line": position},
         ))
         report.rows.append(
             f"{ident:<22} {category:<13} in " +

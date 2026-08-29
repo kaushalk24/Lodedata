@@ -71,6 +71,30 @@ Be explicit about this before trusting a study:
   (`MMT2830` → 8-port 30 dB). Unrecognised patterns default to 4 ports and are
   listed in the report.
 
+## Record layout: anchored on the record, not the name
+
+Tap records are separated by `FF FF FF FF`, and the loss blocks sit at a
+**fixed offset from the start of the record** — the byte after a separator —
+not from the part number. The part number's position varies by region:
+KERMIT750 puts it at +7, WVBeck750 at +0. Both put tap loss at **+25** and
+through loss at **+65**, forty bytes apart like every other file.
+
+Anchoring on the name worked for one region and silently imported *zero* taps
+for the other. Anchoring on the record works for both.
+
+## Cross-checked against a real Lode BOM
+
+The `Line #` in a Lode Data bill of materials is the row a part occupies in
+its spec file, and OpenLode now carries the same number through import into
+its own BOM, which is laid out the same way — equipment type, line number,
+part number, aerial, underground, total, with housecount and strand/trench in
+the summary.
+
+Checked against a real `AL004_LODE BOM` export: line 0 is the 500 aerial
+cable and line 1 the 500 underground, lines 4 and 5 the 625 pair. An import of
+that operator's library reproduces the same numbering, so the two bills can be
+compared line for line.
+
 ## What gets rejected, and why
 
 Three guards stop a bad record becoming a bad design:
