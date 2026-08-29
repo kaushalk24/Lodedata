@@ -56,7 +56,11 @@ lode import /path/to/library --name KERMIT750
 
 or press **Import specs** in the browser. Every import prints a report of what
 was read and what was rejected — check it against your Lode Data spec printout
-before designing. See
+before designing.
+
+Design files (`.ntw`) are obfuscated; `lode inspect-network` unwraps the
+container and reports what is inside, but topology import is not finished yet
+and says so rather than guessing. See
 **[Importing a Lode Data equipment library](docs/importing-lodedata-specs.md)**
 for the decoded format and the current limits.
 

@@ -3,6 +3,7 @@
     lode init                     create a starter workspace here
     lode import <files>           read a Lode Data binary library (.par .cbl
                                   .cpr .tap .atv) into a named spec set
+    lode inspect-network <f.ntw>  deobfuscate a Lode Data design file
     lode specs [name]             summarise and validate a spec set
     lode calc <network>           solve and print the design chart
     lode design <network>         run the automatic design tools and save
@@ -83,6 +84,23 @@ def cmd_import(args) -> int:
             print(f"  - {warning}")
     print("\nCHECK THE IMPORT REPORT against your Lode Data spec printout "
           "before designing against this set.")
+    return 0
+
+
+def cmd_inspect_network(args) -> int:
+    """Deobfuscate a Lode Data .ntw file and report what is in it."""
+    from .importers import compare, read_network
+
+    if len(args.paths) > 1:
+        print("keystream comparison")
+        print(compare(args.paths))
+        print()
+    for path in args.paths:
+        net = read_network(path)
+        print(net.summary())
+        if args.dump:
+            print(net.dump(limit=args.dump))
+        print()
     return 0
 
 
@@ -215,6 +233,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-n", "--dry-run", action="store_true",
                    help="report without writing the spec set")
     p.set_defaults(func=cmd_import)
+
+    p = sub.add_parser("inspect-network",
+                       help="deobfuscate and report on a Lode Data .ntw file")
+    p.add_argument("paths", nargs="+")
+    p.add_argument("--dump", type=int, default=0, metavar="N",
+                   help="hex-dump the N largest data clusters")
+    p.set_defaults(func=cmd_inspect_network)
 
     p = sub.add_parser("specs", help="summarise and validate a spec set")
     p.set_defaults(func=cmd_specs)

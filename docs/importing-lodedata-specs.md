@@ -89,3 +89,58 @@ Some families genuinely use a different record layout (an extra six-byte field
 ahead of the block — the 112 versus 118 byte records). The reader tries the
 alternate offset, and rejects the record if that fails too. Enter those
 families by hand on the Taps tab; everything else imports.
+
+
+---
+
+# Network files (`.ntw`) — container solved, layout not yet
+
+`lode inspect-network AL005.ntw --dump 4` deobfuscates a design file and
+reports what is in it. It does **not** yet rebuild plant topology, and it says
+so, because importing a design on a guess would hand you a plant that is not
+yours.
+
+## What is established
+
+**Header** — 512 bytes, the same shape as the spec files: title
+(`Lode Data Network File`), version (`Design 12.11`), licence, user.
+
+**Body** — obfuscated by XOR against a **fixed 100-byte keystream that is
+constant across files**. Four sample networks from one operator, of four
+different sizes and three different users, share it byte for byte.
+
+The period was *measured*, not assumed. At lag 100 the body self-matches on
+**93.98%** of bytes; every other lag up to 700 sits near **2.9%**.
+
+The keystream is recovered from the file itself: a design is mostly unused
+record slots holding one repeated template, so the most common 100-byte block
+is the keystream XOR that template. XOR every block against it and about
+**96% of the body becomes zero** — the signature of real sparse structured
+data. (The raw file contains *no* zero bytes at all, which is what gives the
+obfuscation away in the first place.)
+
+## What is not established, and why
+
+The template is not all zeros. So the recovered stream is
+`plaintext XOR template` — differences, not values. Decoded records come out
+as arrays of four-byte groups in which only the leading byte varies, and
+almost always between `0x40` and `0xC0`: a single differing bit. That is
+exactly what a difference against a non-zero template looks like, and it means
+absolute footages, tap values and house counts are still hidden.
+
+## What would finish it
+
+**Known plaintext.** Either of these pins the layout in one pass:
+
+1. **A small design and its numbers.** Save a network in Lode Data with
+   distinctive values — three or four poles at footages like 111, 222, 333 and
+   tap values 11, 17, 23 — and send the `.ntw` together with what the design
+   screen shows. Searching the deobfuscated body for those exact numbers
+   locates every field at once.
+2. **Two saves differing by one edit.** Save a design, change *one* footage,
+   save again under a new name. The bytes that differ are that field, and its
+   scale follows immediately.
+
+Option 2 is the stronger one: it isolates a single field with no ambiguity.
+With either, reading and writing `.ntw` becomes straightforward — the
+container work is already done.

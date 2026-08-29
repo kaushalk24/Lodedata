@@ -191,3 +191,92 @@ class TestWholeSet(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestNetworkContainer(unittest.TestCase):
+    """The .ntw container: header, keystream recovery, deobfuscation."""
+
+    KEY = bytes((i * 37 + 11) % 251 + 1 for i in range(100))   # no zero bytes
+
+    def _build(self, records, template=None):
+        """A .ntw-shaped file: 512-byte header then XOR-obfuscated records."""
+        template = template or bytes(100)
+        header = bytearray(512)
+        header[0:22] = b"Lode Data Network File"
+        header[28:40] = b"Design 12.11"
+        header[129:139] = b"LP-TEST123"
+        header[145:153] = b"TESTUSER"
+        body = bytearray()
+        for index in range(400):
+            plain = records.get(index, template)
+            body += bytes(a ^ b for a, b in zip(plain, self.KEY))
+        return bytes(header) + bytes(body)
+
+    def _write(self, data, tmp):
+        path = os.path.join(tmp, "T.ntw")
+        with open(path, "wb") as fh:
+            fh.write(data)
+        return path
+
+    def test_header_and_keystream_recovery(self):
+        from lode.importers import read_network
+
+        marker = bytes([9] * 20 + [0] * 80)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(self._build({7: marker, 190: marker}), tmp)
+            net = read_network(path)
+        self.assertEqual(net.title, "Lode Data Network File")
+        self.assertEqual(net.version, "Design 12.11")
+        self.assertEqual(net.licence, "LP-TEST123")
+        self.assertEqual(net.user, "TESTUSER")
+        # the template dominates, so the recovered stream is the true key
+        self.assertEqual(net.keystream, self.KEY)
+        self.assertGreater(net.zero_fraction, 0.9)
+
+    def test_the_marked_records_come_back(self):
+        from lode.importers import read_network
+
+        marker = bytes([9] * 20 + [0] * 80)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(self._build({7: marker}), tmp)
+            net = read_network(path)
+        start = 7 * 100
+        self.assertEqual(net.plain[start:start + 20], bytes([9] * 20))
+        clusters = net.clusters()
+        self.assertTrue(any(a == start for a, _ in clusters), clusters)
+
+    def test_periodicity_is_measured_not_assumed(self):
+        from lode.importers import period_confidence, read_network
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(self._build({}), tmp)
+            net = read_network(path)
+            raw = open(path, "rb").read()
+        # an all-template body repeats perfectly at the period
+        self.assertAlmostEqual(net.period_confidence, 1.0, places=6)
+        self.assertLess(period_confidence(raw, 37), 0.5)
+
+    def test_the_unfinished_layout_is_declared(self):
+        """The reader must not imply it can reconstruct topology."""
+        from lode.importers import read_network
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(self._build({3: bytes([1] * 100)}), tmp)
+            net = read_network(path)
+        joined = " ".join(net.notes).lower()
+        self.assertIn("not decoded yet", joined)
+        self.assertIn("known plaintext", joined)
+        self.assertIn("NOT decoded", net.summary())
+
+    def test_compare_reports_a_shared_keystream(self):
+        from lode.importers import compare
+
+        with tempfile.TemporaryDirectory() as tmp:
+            a = os.path.join(tmp, "A.ntw")
+            b = os.path.join(tmp, "B.ntw")
+            with open(a, "wb") as fh:
+                fh.write(self._build({2: bytes([5] * 100)}))
+            with open(b, "wb") as fh:
+                fh.write(self._build({9: bytes([6] * 100)}))
+            text = compare([a, b])
+        self.assertIn("share one keystream: True", text)
