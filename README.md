@@ -60,13 +60,58 @@ A web application for keying in an HFC network from scratch and designing it:
   token overlap that will find `625P3 AER EXT` for `EX .625P3 AER` but will
   never cross cable sizes or swap aerial for underground.
 
-### Running it
+### Trying it out
 
 ```sh
+git clone <this repo> && cd Lodedata
 pip install -r requirements.txt
-./run.sh                       # http://127.0.0.1:8000
-python3 -m pytest tests -q
+./run.sh                       # then open http://127.0.0.1:8000
 ```
+
+The first screen asks you to attach a spec set, because nothing is loaded by
+default — every level, loss and part number comes from the spec files.
+
+**With your own spec files.** Go to **Import**, choose all five files of a set
+(`.par .atv .tap .cpr .cbl` sharing one base name) and attach them. The Library
+tab then shows what was read: cables with their loop resistance and attenuation
+at each design frequency, taps with tap value and insertion loss per port count,
+couplers with their tap and thru legs, amplifiers with their In/Out levels and
+power steps. Set the frequency plan on the **Parameters** tab first if the spec
+was not entered against 54/860 MHz — the loss columns are read against whatever
+plan the design is set to.
+
+**Without any files.** Click *Load sample specs* on that first screen. They are
+samples, not a real spec set — the same caveat Lode Data puts on the ones it
+ships.
+
+Then on **Plant**: select a row, add what it feeds, set the cable and span
+length. Levels, tilt, return path and powering recalculate on every change, and
+anything out of spec is flagged in the Notes column. **Reports** gives the level
+sheet, bill of materials and powering, each downloadable as CSV.
+
+**Reading a `.ntw`.** Import → *Inspect*. It reports the file's header, who
+wrote it and how much of the payload is live. It does not yet import devices —
+see [`docs/open-questions.md`](docs/open-questions.md).
+
+### Running the tests
+
+```sh
+python3 -m pytest tests -q          # 15 tests on a bare checkout
+```
+
+To also run the checks that read real Lode Data files, drop them in `samples/`:
+
+```sh
+cp /path/to/*.par /path/to/*.cbl ... samples/
+python3 -m pytest tests -q          # 33 tests
+```
+
+`samples/` is gitignored, so your spec files stay out of the repository. Nested
+folders are fine, and `LODEDATA_SAMPLES=/somewhere pytest -q` points elsewhere.
+
+Those extra tests are the interesting ones — they check the readers against real
+data, for instance that `RMT2008-RF-20` decodes to exactly 20.0 dB and that
+cable loop resistances match the published figures.
 
 ## Layout
 

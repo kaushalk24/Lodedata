@@ -1,4 +1,5 @@
 """Lode Data file reading and spec-set upgrade."""
+import os
 import sys
 from pathlib import Path
 
@@ -12,14 +13,31 @@ from hfc.importer import library_from_spec_set, inspect_ntw, relink_library, _to
 from hfc.model import Network, Element
 from lodedata.obfuscation import NTW_KEY, deobfuscate, obfuscate, recover_key
 
-SAMPLES = Path("/tmp/claude-0/-home-user-Lodedata/"
-               "76afb63c-24f1-5bbe-9e80-a65f74c9f2ec/scratchpad/uploads")
-KERMIT = SAMPLES / "c710d98c-OneDrive_1_8282026" / "KERMIT750-2026"
-WVBECK = SAMPLES / "ea8baba7-OneDrive_2_8282026" / "WVBeck750"
-NTW = SAMPLES / "6f0a4dc0-OneDrive_1_8282026_1" / "AL005.ntw"
+# Real Lode Data files to check the readers against.  Drop them anywhere under
+# ./samples (or point LODEDATA_SAMPLES at a directory) and these tests run;
+# without them they skip, so the suite still passes on a clean checkout.
+SAMPLES = Path(os.environ.get("LODEDATA_SAMPLES", ROOT / "samples"))
+
+
+def _find(pattern: str) -> Path | None:
+    if not SAMPLES.is_dir():
+        return None
+    return next(iter(sorted(SAMPLES.rglob(pattern))), None)
+
+
+def _spec_base(stem_contains: str) -> Path | None:
+    hit = _find(f"*{stem_contains}*.cbl")
+    return hit.with_suffix("") if hit else None
+
+
+KERMIT = _spec_base("KERMIT") or SAMPLES / "missing"
+WVBECK = _spec_base("WVBeck") or SAMPLES / "missing"
+NTW = _find("*.ntw") or SAMPLES / "missing.ntw"
 
 needs_samples = pytest.mark.skipif(
-    not KERMIT.with_suffix(".cbl").exists(), reason="sample files not present")
+    not KERMIT.with_suffix(".cbl").exists() or not WVBECK.with_suffix(".cbl").exists(),
+    reason="sample spec sets not found; put them under ./samples "
+           "or set LODEDATA_SAMPLES")
 
 
 def test_obfuscation_round_trips():
