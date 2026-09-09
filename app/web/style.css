@@ -1,59 +1,92 @@
 :root{
-  --bg:#f6f7f9; --panel:#fff; --line:#d8dde5; --ink:#1b2330; --muted:#6b7686;
-  --accent:#1f6feb; --warn:#b4530a; --warn-bg:#fff4e5; --ok:#137333;
+  --black:#000; --green:#00e000; --dimgreen:#00a000; --yellow:#e8e800;
+  --cyan:#00e8e8; --magenta:#e800e8; --red:#ff4040; --white:#e0e0e0;
+  --grid:#303030; --chrome:#f0f0f0; --chromeline:#a0a0a0;
 }
 *{box-sizing:border-box}
-body{margin:0;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-  background:var(--bg);color:var(--ink)}
-header{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel);
-  border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
-h1{font-size:15px;margin:0 8px 0 0;font-weight:650;letter-spacing:.2px}
-h2{font-size:14px;margin:0 0 6px}
-nav{display:flex;gap:4px;margin-left:auto}
-button,.button{font:inherit;padding:4px 10px;border:1px solid var(--line);background:#fff;
-  border-radius:5px;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-block}
-button:hover,.button:hover{background:#eef2f7}
-button.active,.tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
-select,input,textarea{font:inherit;padding:4px 6px;border:1px solid var(--line);border-radius:5px;
-  background:#fff;color:var(--ink);max-width:100%}
-#status{font-size:12px;color:var(--muted);min-width:80px}
-main{padding:12px}
-.tab-panel{display:none}
-.tab-panel.active{display:block}
-.split{display:flex;gap:12px;align-items:flex-start}
-.tree-pane{flex:1;min-width:0}
-aside#inspector{width:320px;flex:none;background:var(--panel);border:1px solid var(--line);
-  border-radius:8px;padding:12px;position:sticky;top:56px;max-height:calc(100vh - 72px);overflow:auto}
-.toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
-.hint{color:var(--muted);font-size:12px}
-.totals{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:8px}
-.totals b{color:var(--ink)}
-.table-wrap{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:8px}
-table{border-collapse:collapse;width:auto;min-width:100%;font-size:12px;table-layout:auto}
-th:last-child,td:last-child{width:100%}
-th,td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
-th{background:#eef1f5;font-weight:600;position:sticky;top:0}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-tbody tr{cursor:pointer}
-tbody tr:hover{background:#f0f5ff}
-tbody tr.sel{background:#dbe8ff}
-tr.warn td{background:var(--warn-bg)}
-.note{color:var(--warn);font-size:11px;white-space:normal;min-width:220px}
-.type-tag{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.4px;
-  color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px;margin-right:6px}
-.form-grid{display:grid;grid-template-columns:220px 1fr;gap:6px 10px;align-items:center;
-  background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:10px}
-.field{margin-bottom:8px;display:flex;flex-direction:column;gap:3px}
-.field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;
-  margin-bottom:12px;max-width:760px}
-pre{background:#0f1622;color:#d6e1f2;padding:10px;border-radius:6px;overflow:auto;font-size:11px;
-  max-height:320px}
-.empty{color:var(--muted)}
-code{background:#eef1f5;padding:1px 4px;border-radius:3px}
-.danger{border-color:#d9534f;color:#d9534f}
+html,body{margin:0;height:100%;background:#7a7a7a;
+  font:13px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+#app{display:flex;flex-direction:column;height:100vh;background:var(--chrome);
+  border:1px solid var(--chromeline)}
 
-.needspec{padding:26px 20px;max-width:680px}
-.needspec h2{font-size:16px;margin-bottom:10px}
-.needspec p{margin:0 0 10px;color:var(--muted);white-space:normal;line-height:1.55}
-.needspec b{color:var(--ink)}
+.titlebar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff;
+  border-bottom:1px solid var(--chromeline);font-size:13px}
+.titlebar .ico{color:#2a6cc4}
+.menubar{display:flex;gap:2px;padding:2px 6px;background:#fff;border-bottom:1px solid var(--chromeline)}
+.menubar .mi{padding:3px 8px;cursor:pointer;border-radius:2px}
+.menubar .mi:hover{background:#d8e6f8}
+.toolbar{display:flex;align-items:center;gap:4px;padding:4px 6px;background:#fff;
+  border-bottom:1px solid var(--chromeline);flex-wrap:wrap}
+.toolbar .tb{width:26px;height:24px;border:1px solid transparent;background:none;
+  cursor:pointer;font-size:15px;line-height:1}
+.toolbar .tb:hover{border-color:#8ab;background:#e6f0fb}
+.toolbar .sep{width:1px;height:20px;background:var(--chromeline);margin:0 4px}
+.toolbar .spacer{flex:1}
+.sel{display:flex;align-items:center;gap:4px;font-size:12px}
+.sel select{font:12px inherit;padding:1px 2px}
+
+/* the DOS screen menu: three rows of numbered commands */
+.screenmenu{background:var(--black);padding:1px 0 2px}
+.smrow{display:flex;gap:2px;padding:0 2px 1px}
+.smkey{flex:1 1 0;min-width:0;padding:1px 5px;font:12px/1.35 "DejaVu Sans Mono",Menlo,Consolas,monospace;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:1px solid transparent}
+.smrow.r1 .smkey{background:#008000;color:#000;font-weight:700}
+.smrow.r2 .smkey{background:#003800;color:var(--green)}
+.smrow.r3 .smkey{background:#002000;color:var(--dimgreen)}
+.mode-entry .smrow.r1 .smkey{background:var(--cyan);color:#000}
+.mode-entry .smrow.r2 .smkey{background:#004848;color:var(--cyan)}
+.mode-power .smrow.r1 .smkey{background:var(--yellow);color:#000}
+.smkey:hover{border-color:#fff}
+.smkey.empty{background:transparent!important;cursor:default;border-color:transparent!important}
+
+.grid-wrap{position:relative;flex:1;overflow:auto;background:var(--black)}
+table.grid{border-collapse:collapse;width:100%;
+  font:13px/1.45 "DejaVu Sans Mono",Menlo,Consolas,"Courier New",monospace;
+  color:var(--green);background:var(--black)}
+table.grid th{color:var(--yellow);text-align:right;padding:0 6px;font-weight:400;
+  border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);
+  position:sticky;top:0;background:var(--black);white-space:nowrap}
+table.grid td{padding:0 6px;text-align:right;border-right:1px solid var(--grid);
+  white-space:nowrap;height:20px}
+td.gutter,th.gutter{width:14px;padding:0 2px;text-align:center;color:var(--dimgreen);
+  border-right:none}
+td.l,th.l{text-align:left}
+tr.red td{color:var(--red)}
+tr.yellow td{color:var(--yellow)}
+td.cur{background:var(--green);color:#000!important}
+tr.red td.cur,tr.yellow td.cur{color:#000!important}
+td.series1{color:var(--magenta)}
+td.amp{color:var(--white)}
+.totrow td{color:var(--dimgreen);border-top:1px solid var(--grid)}
+
+.infopanel{position:absolute;right:8px;bottom:8px;width:520px;background:var(--black);
+  border:1px solid #808000;color:var(--cyan);padding:6px 10px;
+  font:12px/1.45 "DejaVu Sans Mono",Menlo,Consolas,monospace;white-space:pre}
+
+.statusbar{display:flex;gap:1px;background:var(--chrome);border-top:1px solid var(--chromeline);
+  font-size:12px}
+.statusbar span{padding:3px 8px;border-right:1px solid var(--chromeline);
+  background:#fff;white-space:nowrap}
+.statusbar span:nth-child(2){flex:1}
+
+.modal[hidden]{display:none}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;
+  align-items:center;justify-content:center;z-index:50}
+.modalbox{background:#fff;border:1px solid var(--chromeline);padding:16px 18px;
+  min-width:420px;max-width:760px;max-height:80vh;overflow:auto;
+  box-shadow:0 8px 30px rgba(0,0,0,.4)}
+.modalbox h2{margin:0 0 10px;font-size:15px}
+.modalbox p{margin:0 0 10px;color:#444;line-height:1.5}
+.modalbox label{display:block;font-size:11px;text-transform:uppercase;
+  letter-spacing:.4px;color:#666;margin:8px 0 2px}
+.modalbox input,.modalbox select{width:100%;font:13px inherit;padding:4px 6px;
+  border:1px solid var(--chromeline)}
+.modalbox .row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+.modalbox button{font:13px inherit;padding:5px 12px;border:1px solid var(--chromeline);
+  background:#f4f4f4;cursor:pointer}
+.modalbox button.primary{background:#2a6cc4;border-color:#2a6cc4;color:#fff}
+.modalbox table{border-collapse:collapse;width:100%;font-size:12px;margin-top:6px}
+.modalbox th,.modalbox td{border-bottom:1px solid #ddd;padding:3px 6px;text-align:left}
+.modalbox tr{cursor:pointer}
+.modalbox tr:hover td{background:#eaf1fb}
+.hint{color:#666;font-size:12px}

@@ -125,6 +125,7 @@ def library_from_spec_set(base: str | Path,
                 id=new_id("tap"),
                 name=port.part,
                 ports=ports,
+                tap_id=t.tap_id or int(round(nominal)),
                 tap_value_db=round(nominal, 2),
                 tap_value=value_pts,
                 through_loss=[p for p in loss_pts
@@ -150,6 +151,7 @@ def library_from_spec_set(base: str | Path,
             name=p.name,
             kind=("power_inserter" if "PI" in p.name.upper()
                   else "coupler" if len(set(losses)) > 1 else "splitter"),
+            coupler_id=int(p.code) if 0 < p.code < 10000 else 0,
             port_losses=losses or [0.0],
             power_passing=[True] * max(1, len(losses)),
             source=f"lodedata:{base.name}.cpr",
@@ -220,7 +222,7 @@ def _tokens(name: str) -> frozenset:
 FUZZY_THRESHOLD = 0.6
 
 
-def relink_library(net, new_lib: Library, threshold: float = FUZZY_THRESHOLD) -> dict:
+def relink_library(design, new_lib: Library, threshold: float = FUZZY_THRESHOLD) -> dict:
     """Attach a different spec set to an existing design.
 
     Parts are re-matched by part number, which is how a spec upgrade actually
@@ -231,7 +233,7 @@ def relink_library(net, new_lib: Library, threshold: float = FUZZY_THRESHOLD) ->
     a token overlap so that `EX .625P3 AER` finds `625P3 AER EXT` across two
     revisions of a spec set.  Every decision is reported so it can be checked.
     """
-    old = net.library
+    old = design.library
     report = {"library": new_lib.name, "matched": 0,
               "exact": [], "fuzzy": [], "unmatched": []}
 
@@ -279,11 +281,14 @@ def relink_library(net, new_lib: Library, threshold: float = FUZZY_THRESHOLD) ->
             else:
                 report["unmatched"].append(f"{table}: {part.name}")
 
-    for el in net.elements.values():
-        if el.cable_id in translate:
-            el.cable_id = translate[el.cable_id]
-        if el.part_id in translate:
-            el.part_id = translate[el.part_id]
-    net.library = new_lib
-    net.imported_from = new_lib.imported_from
+    for branch in design.branches.values():
+        for node in branch.nodes:
+            node.cab_part = translate.get(node.cab_part, node.cab_part)
+            node.amp_part = translate.get(node.amp_part, node.amp_part)
+            for t in node.taps:
+                t.part_id = translate.get(t.part_id, t.part_id)
+            for c in node.couplers:
+                c.part_id = translate.get(c.part_id, c.part_id)
+    design.library = new_lib
+    design.imported_from = new_lib.imported_from
     return report

@@ -1,116 +1,51 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>HFC Design</title>
+<title>Design Assistant</title>
 <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-<header>
-  <h1>HFC Design</h1>
-  <select id="designPicker" title="Open a design"></select>
-  <button id="newDesign">New design</button>
-  <nav>
-    <button class="tab active" data-tab="plant">Plant</button>
-    <button class="tab" data-tab="reports">Reports</button>
-    <button class="tab" data-tab="library">Library</button>
-    <button class="tab" data-tab="params">Parameters</button>
-    <button class="tab" data-tab="import">Import</button>
-  </nav>
-  <span id="status"></span>
-</header>
 
-<main>
-  <!-- ---------------- plant ---------------- -->
-  <section id="tab-plant" class="tab-panel active">
-    <div class="split">
-      <div class="tree-pane">
-        <div class="toolbar">
-          <span class="hint">Select a row, then add what it feeds:</span>
-          <button data-add="amplifier">+ Amplifier</button>
-          <button data-add="tap">+ Tap</button>
-          <button data-add="splitter">+ Splitter</button>
-          <button data-add="power_inserter">+ Power inserter</button>
-          <button data-add="power_supply">+ Power supply</button>
-          <button data-add="subscriber">+ Subscriber</button>
-          <button data-add="terminator">+ Terminator</button>
-          <button data-add="node" id="addNode">+ Node (new source)</button>
-        </div>
-        <div class="totals" id="totals"></div>
-        <div class="table-wrap">
-          <table id="cascade">
-            <thead><tr>
-              <th>Device</th><th>Part</th><th>Cable</th><th class="n">ft</th>
-              <th class="n">Cum ft</th><th class="n">In lo</th><th class="n">In hi</th>
-              <th class="n">Out lo</th><th class="n">Out hi</th><th class="n">Tilt</th>
-              <th class="n">Gain</th><th class="n">Tap</th><th class="n">Rtn@node</th>
-              <th class="n">V</th><th class="n">A</th><th class="n">HP</th><th>Notes</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </div>
-      <aside id="inspector"><p class="empty">Select a device to edit it.</p></aside>
-    </div>
-  </section>
+<div id="app">
+  <div class="titlebar"><span class="ico">▣</span><span id="title">Design Assistant - Design - lode-1</span></div>
 
-  <!-- ---------------- reports ---------------- -->
-  <section id="tab-reports" class="tab-panel">
-    <div class="toolbar">
-      <button class="rep active" data-rep="levels">Level sheet</button>
-      <button class="rep" data-rep="bom">Bill of materials</button>
-      <button class="rep" data-rep="powering">Powering</button>
-      <a id="csvLink" class="button" href="#" download>Download CSV</a>
-    </div>
-    <div class="table-wrap"><table id="reportTable"><thead></thead><tbody></tbody></table></div>
-  </section>
+  <div class="menubar">
+    <span class="mi" data-menu="file">File</span><span class="mi" data-menu="edit">Edit</span>
+    <span class="mi" data-menu="mode">Mode</span><span class="mi" data-menu="tools">Tools</span>
+    <span class="mi" data-menu="global">Global Change</span><span class="mi" data-menu="spec">Spec Edit</span>
+    <span class="mi" data-menu="test">Test</span><span class="mi" data-menu="misc">Misc</span>
+    <span class="mi" data-menu="reports">Reports</span><span class="mi" data-menu="view">View</span>
+    <span class="mi" data-menu="help">Help</span>
+  </div>
 
-  <!-- ---------------- library ---------------- -->
-  <section id="tab-library" class="tab-panel">
-    <div class="toolbar">
-      <button class="lib active" data-lib="cables">Cables</button>
-      <button class="lib" data-lib="taps">Taps</button>
-      <button class="lib" data-lib="passives">Passives</button>
-      <button class="lib" data-lib="actives">Actives</button>
-      <button class="lib" data-lib="power_supplies">Power supplies</button>
-      <span class="hint" id="libSource"></span>
-    </div>
-    <div class="table-wrap"><table id="libTable"><thead></thead><tbody></tbody></table></div>
-  </section>
+  <div class="toolbar">
+    <button class="tb" id="tbNew" title="New network">🗋</button>
+    <button class="tb" id="tbOpen" title="Open network">🗀</button>
+    <button class="tb" id="tbSave" title="Save">🖫</button>
+    <span class="sep"></span>
+    <button class="tb" id="tbInsert" title="Insert node">✚</button>
+    <button class="tb" id="tbDelete" title="Delete node">━</button>
+    <span class="sep"></span>
+    <label class="sel">EQ <select id="selEQ"><option>Auto</option><option>EQ+</option><option>EQ-</option><option>EQe</option></select></label>
+    <label class="sel">OP <select id="selOP"><option>Off</option><option>OP+</option><option>OPf</option></select></label>
+    <label class="sel">TSG <select id="selTSG"><option>1</option><option>2</option><option>3</option></select></label>
+    <span class="spacer"></span>
+    <label class="sel">Network <select id="selNet"></select></label>
+    <label class="sel">Mode <select id="selMode">
+      <option value="design">Design</option><option value="entry">Entry</option>
+      <option value="power">Power</option></select></label>
+  </div>
 
-  <!-- ---------------- parameters ---------------- -->
-  <section id="tab-params" class="tab-panel">
-    <form id="paramForm" class="form-grid"></form>
-    <button id="saveParams">Save parameters</button>
-  </section>
+  <div class="screenmenu" id="screenmenu"></div>
 
-  <!-- ---------------- import ---------------- -->
-  <section id="tab-import" class="tab-panel">
-    <div class="card">
-      <h2>Attach a spec set</h2>
-      <p>Select all files of a Lode Data spec set
-        (<code>.cbl .cpr .atv .tap .par</code>). The equipment library is
-        replaced and every device in the design is re-matched by part name, so
-        the topology survives the upgrade.</p>
-      <input type="file" id="specFiles" multiple accept=".cbl,.cpr,.atv,.tap,.par,.prc,.per">
-      <button id="uploadSpec">Attach to this design</button>
-      <button id="uploadSample">Load sample specs instead</button>
-      <pre id="specResult"></pre>
-    </div>
-    <div class="card">
-      <h2>Read a <code>.ntw</code> design file</h2>
-      <p>The obfuscation is solved, so the payload is readable. The record
-        layout is not mapped yet — <code>.ntw</code> files hold no text at all,
-        only indices into the spec files — so this reports what the file is
-        rather than importing devices. See <code>docs/open-questions.md</code>
-        for what would close that gap.</p>
-      <input type="file" id="ntwFile" accept=".ntw">
-      <button id="uploadNtw">Inspect</button>
-      <pre id="ntwResult"></pre>
-    </div>
-  </section>
-</main>
+  <div class="grid-wrap">
+    <table class="grid" id="grid"><thead></thead><tbody></tbody></table>
+    <div class="infopanel" id="info"></div>
+  </div>
+
+  <div class="statusbar">
+    <span id="stSpecs">no specs</span>
+    <span id="stMsg"></span>
+    <span id="stBranch">Branch 1 of 1</span>
+    <span id="stFeeder">Feeder 1.1</span>
+    <span id="stMode">Import</span>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden><div class="modalbox" id="modalbox"></div></div>
 <script src="/app.js"></script>
-</body>
-</html>

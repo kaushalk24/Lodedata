@@ -3,338 +3,698 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const api = async (url, opts) => {
   const r = await fetch(url, opts);
-  if (!r.ok) throw new Error((await r.text()).slice(0, 300));
-  return r.headers.get('content-type')?.includes('json') ? r.json() : r.text();
+  if (!r.ok) throw new Error((await r.text()).slice(0, 400));
+  const t = r.headers.get('content-type') || '';
+  return t.includes('json') ? r.json() : r.text();
 };
-const status = m => { $('#status').textContent = m; if (m) setTimeout(() => {
-  if ($('#status').textContent === m) $('#status').textContent = ''; }, 2500); };
-
-const S = { design: null, results: null, selected: null, report: 'levels', libTab: 'cables' };
-
-const TYPES = ['node', 'amplifier', 'tap', 'splitter', 'power_inserter',
-               'power_supply', 'terminator', 'subscriber'];
-// which library table supplies the part list for each element type
-const PART_TABLE = { node: 'actives', amplifier: 'actives', tap: 'taps',
-  splitter: 'passives', power_inserter: 'passives', power_supply: 'power_supplies' };
-
-// ---------------------------------------------------------------- designs
-async function loadDesignList(selectId) {
-  const list = await api('/api/designs');
-  const sel = $('#designPicker');
-  sel.innerHTML = list.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
-  if (!list.length) return null;
-  sel.value = selectId && list.some(d => d.id === selectId) ? selectId : list[0].id;
-  return sel.value;
-}
-async function openDesign(id) {
-  S.design = await api('/api/designs/' + id);
-  S.selected = null;
-  await refresh();
-  renderParams();
-  renderLibrary();
-}
-async function refresh() {
-  S.results = await api(`/api/designs/${S.design.id}/results`);
-  renderCascade();
-  renderInspector();
-  if ($('#tab-reports').classList.contains('active')) renderReport();
-}
-async function reloadDesign() {
-  S.design = await api('/api/designs/' + S.design.id);
-  await refresh();
-}
-
-// ---------------------------------------------------------------- cascade
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-const num = v => (v === '' || v === null || v === undefined) ? '' : v;
+const msg = m => { $('#stMsg').textContent = m; if (m) setTimeout(() => {
+  if ($('#stMsg').textContent === m) $('#stMsg').textContent = ''; }, 4000); };
 
-function partName(el) {
-  const t = PART_TABLE[el.type];
-  if (!t || !el.part_id) return '';
-  return S.design.library[t]?.[el.part_id]?.name || '(missing)';
+const S = {
+  nid: null, net: null, scr: null, mode: 'design',
+  row: 0, col: 0, buffer: null,
+};
+
+// ---------------------------------------------------------------- columns
+// Each mode shows the same node lines with a different set of columns, as the
+// Design, Entry and Power screens do.
+function columns() {
+  const f = (S.scr && S.scr.frequencies) || [];
+  const lvl = f.map((mhz, i) => ({ key: 'lvl:' + i, head: String(mhz).replace('.0', ''),
+                                   cls: '', edit: false }));
+  const common = [
+    { key: 'ftg', head: 'ftg', edit: true },
+    { key: 'hc', head: 'hc', edit: true },
+    { key: 'cab', head: 'cab', edit: true },
+    { key: 'lv', head: 'lv', edit: true },
+  ];
+  if (S.mode === 'entry') {
+    return [
+      { key: 'branch', head: 'Branch' }, { key: 'node', head: 'Node' },
+      ...common,
+      { key: 'tsg', head: 'TSG', edit: true },
+      { key: 'map', head: 'Map', cls: 'l', edit: true },
+      { key: 'loc', head: 'Loc', cls: 'l', edit: true },
+      { key: 'cplr0', head: '[Branch1]', cls: 'l', edit: true },
+      { key: 'cplr1', head: '[Branch2]', cls: 'l', edit: true },
+      { key: 'ampname', head: 'Amp Name', cls: 'l', edit: true },
+    ];
+  }
+  if (S.mode === 'power') {
+    return [
+      { key: 'node', head: 'Node' },
+      { key: 'volt', head: 'Volt' }, { key: 'current', head: 'Current' },
+      ...common,
+      { key: 'amp', head: 'amp', edit: true },
+      { key: 'ampname', head: 'amp ID#', cls: 'l', edit: true },
+      { key: 'supply', head: 'supply', edit: true },
+      { key: 'cplr0', head: 'cplr[branch]', cls: 'l', edit: true },
+      { key: 'cplr1', head: 'cplr[branch]', cls: 'l', edit: true },
+    ];
+  }
+  return [
+    { key: 'node', head: 'Node' },
+    ...lvl,
+    ...common,
+    { key: 'amp', head: 'amp', edit: true },
+    { key: 'tsg', head: 'TSG', edit: true },
+    { key: 'tap0', head: 'tap1', edit: true }, { key: 'tap1', head: 'tap2', edit: true },
+    { key: 'tap2', head: 'tap3', edit: true }, { key: 'tap3', head: 'tap4', edit: true },
+    { key: 'cplr0', head: 'cplr[branch]', cls: 'l', edit: true },
+    { key: 'cplr1', head: 'cplr[branch]', cls: 'l', edit: true },
+  ];
 }
 
+function cellText(r, c) {
+  if (c.key.startsWith('lvl:')) {
+    const v = r.levels[+c.key.slice(4)];      // index into the frequency order
+    return v === undefined ? '' : v.toFixed(2);
+  }
+  switch (c.key) {
+    case 'branch': return r.branch;
+    case 'node': return r.node;
+    case 'ftg': return r.ftg || (r.ftg === 0 ? '0' : '');
+    case 'hc': return r.hc || '';
+    case 'cab': return r.cab || (r.cab_name ? r.cab : '');
+    case 'lv': return r.lv || '';
+    case 'tsg': return r.tsg || '';
+    case 'amp': return r.amp || '';
+    case 'ampname': return r.amp_label ? `[${r.amp_label}]` : (r.amp_name || '');
+    case 'map': return r.map || '';
+    case 'loc': return r.loc || '';
+    case 'supply': return r.supply || '';
+    case 'volt': return r.volts === null ? '' : r.volts.toFixed(2);
+    case 'current': return r.current ? r.current.toFixed(2) : '0.00';
+    case 'tap0': case 'tap1': case 'tap2': case 'tap3':
+      return r.taps[+c.key.slice(3)] || '';
+    case 'cplr0': case 'cplr1':
+      return r.couplers[+c.key.slice(4)] || '';
+  }
+  return '';
+}
+
+// ---------------------------------------------------------------- render
+function renderGrid() {
+  const cols = columns();
+  const rows = (S.scr && S.scr.rows) || [];
+  const thead = $('#grid thead'), tbody = $('#grid tbody');
+  thead.innerHTML = '<tr><th class="gutter"></th>' +
+    cols.map(c => `<th class="${c.cls || ''}">${esc(c.head)}</th>`).join('') +
+    '<th class="l"></th></tr>';
+
+  if (!S.net) { tbody.innerHTML = ''; return; }
+  if (!hasSpecs()) {
+    tbody.innerHTML = `<tr><td class="gutter"></td><td class="l" colspan="${cols.length + 1}"
+      style="color:var(--yellow);padding:18px 10px;white-space:normal;line-height:1.6">
+      No spec file attached.<br><br>
+      Nothing is loaded when a network is opened and nothing carries over from
+      another network: every level, loss, part number and powering figure comes
+      from the spec files.<br><br>
+      <span style="color:var(--green)">Spec Edit &rarr; Attach spec set</span>
+      &nbsp;to select a <b>.par .atv .tap .cpr .cbl</b> set,
+      or <span style="color:var(--green)">Spec Edit &rarr; Sample specs</span>
+      to try the program out.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map((r, i) => {
+    const cls = [r.severity, i === S.row ? 'onrow' : ''].filter(Boolean).join(' ');
+    const tds = cols.map((c, j) => {
+      const cur = (i === S.row && j === S.col) ? ' cur' : '';
+      let text = cellText(r, c);
+      if (i === S.row && j === S.col && S.buffer !== null) text = S.buffer + '_';
+      let extra = '';
+      if (c.key === 'cab' && r.cab >= 100) extra = ' series1';
+      if (c.key === 'ampname') extra = ' amp';
+      return `<td class="${c.cls || ''}${cur}${extra}" data-r="${i}" data-c="${j}">${esc(text)}</td>`;
+    }).join('');
+    return `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;
+  }).join('');
+
+  $$('#grid tbody td[data-r]').forEach(td => td.onclick = () => {
+    S.row = +td.dataset.r; S.col = +td.dataset.c; S.buffer = null;
+    renderGrid(); renderInfo();
+  });
+  renderInfo();
+}
+
+function renderInfo() {
+  const r = (S.scr && S.scr.rows[S.row]) || null;
+  const box = $('#info');
+  if (!r) { box.textContent = ''; return; }
+  const t = (S.scr && S.scr.totals) || {};
+  box.textContent =
+    `${r.branch}.${r.node}\n` +
+    `${r.address || 'No Address'}\n` +
+    `${r.cab_name || 'no cable'}\n` +
+    `Distance from previous node:   ${r.ftg}\n` +
+    `Total distance to start:       ${r.cumulative_ft}\n` +
+    `Housecounts this node:         ${r.hc}\n` +
+    `Voltage / current:             ${r.volts === null ? '-' : r.volts.toFixed(1)} V  ${r.current.toFixed(2)} A\n` +
+    (r.flags.length ? r.flags.map(f => `! ${f.message}`).join('\n') + '\n' : '') +
+    `\nnodes ${t.nodes || 0}  taps ${t.taps || 0}  actives ${t.actives || 0}  ` +
+    `homes ${t.homes || 0}  ${t.footage || 0} ft`;
+  $('#stBranch').textContent = `Branch ${r.branch} of ${t.branches || 1}`;
+  $('#stFeeder').textContent = `Feeder ${r.branch}.${r.node}`;
+}
+
+// ---------------------------------------------------------------- screen menu
+const MENUS = {
+  design: [
+    [['0', 'Alter', alter], ['1', 'Jump', jump], ['2', 'Forward', null],
+     ['3', 'Carry', carry], ['4', 'Fwd2A', null], ['5', 'Test', test],
+     ['6', 'WillWrk', null], ['7', 'AutoCpl', null], ['8', 'Recalc', recalc],
+     ['9', 'Toggle', null], ['/', 'Distance', distance]],
+    [['.0', 'Break', null], ['.1', 'Join', null], ['.2', 'BkFeed', null],
+     ['.3', 'UnBkFd', null], ['.4', 'XFd2A', null], ['.5', 'MoveCpl', null],
+     ['.6', 'XWillWk', null], ['.7', 'SetMDU', null], ['.8', 'RotTap', null],
+     ['.9', 'Copy', null], ['.+', 'Name', nameAmp]],
+    [['..0', 'SpcVvv', null], ['..1', 'Xspec', null], ['..2', 'FwdFd', null],
+     ['..3', 'UnFFd', null], ['..4', 'BrLabel', null], ['..5', 'Dsmry', dsummary],
+     ['..6', 'Clear', clearCell], ['..7', 'CAwBF', null], ['..8', 'XCAmp', null],
+     ['..9', 'LckDStr', null], ['..+', 'Notes', notes]],
+  ],
+  entry: [
+    [['-0', 'Fd/Rev', null], ['-1', 'Jump', jump], ['-2', 'Ins/Ex', insertNode],
+     ['-3', 'Return', null], ['-4', 'NetInit', netInit], ['-5', 'ChBrSt', null],
+     ['-6', 'CrAfTh', null], ['-7', 'CrAfLst', null], ['-8', 'DelBr', delBranch],
+     ['-9', 'SetMDU', null]],
+    [['-.4', 'Label', null], ['-.6', 'New', insertNode], ['-.9', 'DpMDU', null],
+     ['-.+', 'Name', nameAmp], ['-..+', 'Notes', notes]],
+    [],
+  ],
+  power: [
+    [['0', 'Alter', alter], ['1', 'Jump', jump], ['2', 'Clear', clearCell],
+     ['3', 'CarryPS', null], ['4', 'Recalc', recalc], ['5', 'Test', test],
+     ['6', 'Locate', null], ['7', 'BOM', () => openReport('bom')],
+     ['8', 'Calc', recalc], ['9', 'NodeNIU', null], ['/', 'Distance', distance]],
+    [['.0', 'Break', null], ['.1', 'Join', null], ['.2', 'ApArea', null],
+     ['.3', 'CarryLE', null], ['.4', 'Report', () => openReport('powering')],
+     ['.5', 'CarCplr', null], ['.6', 'TstArea', null], ['.7', 'Loc Mnu', null],
+     ['.8', 'NIUtest', null], ['.9', 'Br NIU', null], ['.+', 'Name', nameAmp]],
+    [['..0', 'SpcVvv', null], ['..1', 'Xspec', null], ['..2', 'Append', null],
+     ['..3', 'Unapnd', null], ['..4', 'Trans', null], ['..7', 'SetMDU', null],
+     ['..+', 'Notes', notes], ['..9', 'DS NIU', null]],
+  ],
+};
+
+function renderMenu() {
+  const rows = MENUS[S.mode];
+  $('#screenmenu').innerHTML = rows.map((row, i) =>
+    `<div class="smrow r${i + 1}">` + (row.length
+      ? row.map(([k, label], j) =>
+          `<span class="smkey" data-m="${i}" data-i="${j}">${esc(k)} ${esc(label)}</span>`).join('')
+      : '<span class="smkey empty">&nbsp;</span>') + '</div>').join('');
+  $$('.smkey[data-m]').forEach(el => el.onclick = () => {
+    const fn = MENUS[S.mode][+el.dataset.m][+el.dataset.i][2];
+    if (fn) fn(); else msg(`${el.textContent.trim()} is not implemented yet`);
+  });
+  document.body.className = 'mode-' + S.mode;
+  $('#app').className = 'mode-' + S.mode;
+}
+
+// ---------------------------------------------------------------- editing
+const EDIT_ORDER = ['ftg', 'hc', 'cab', 'lv'];
+
+function curCol() { return columns()[S.col]; }
+function curRow() { return S.scr && S.scr.rows[S.row]; }
+
+async function commitBuffer(advance) {
+  const c = curCol(), r = curRow();
+  if (!c || !r || S.buffer === null) return;
+  const val = S.buffer.trim();
+  S.buffer = null;
+  const body = {};
+  if (['ftg', 'hc', 'cab', 'lv', 'tsg', 'amp', 'supply'].includes(c.key)) {
+    const n = val === '' ? 0 : Number(val);
+    if (Number.isNaN(n)) { msg('not a number'); renderGrid(); return; }
+    if (c.key === 'supply') body.supply_volts = n;
+    else if (c.key === 'amp') {
+      if (!n) { body.clear_amp = true; }
+      else {
+        const part = pickActiveById(n);
+        if (!part) { msg(`no active with ID ${n} in the spec set`); renderGrid(); return; }
+        body.amp = n; body.amp_part = part.id;
+      }
+    } else if (c.key === 'cab') {
+      body.cab = n;
+      const part = pickCableById(n);
+      body.cab_part = part ? part.id : null;
+      if (!part && n) msg(`cable ${n} is not in the spec set`);
+    } else body[c.key] = n;
+  } else if (['map', 'loc', 'ampname'].includes(c.key)) {
+    body[c.key === 'ampname' ? 'amp_label' : c.key] = val;
+  } else { renderGrid(); return; }
+
+  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body) });
+  await refresh();
+  if (advance) moveToNextField();
+}
+
+function moveToNextField() {
+  const cols = columns();
+  const c = cols[S.col];
+  const i = EDIT_ORDER.indexOf(c && c.key);
+  if (i >= 0 && i < EDIT_ORDER.length - 1) {
+    const next = cols.findIndex(x => x.key === EDIT_ORDER[i + 1]);
+    if (next >= 0) { S.col = next; renderGrid(); return; }
+  }
+  // past the last field: drop to the next node line, as Entry does
+  S.row = Math.min(S.row + 1, (S.scr.rows.length - 1));
+  S.col = cols.findIndex(x => x.key === 'ftg');
+  renderGrid();
+}
+
+// ---------------------------------------------------------------- keyboard
+document.addEventListener('keydown', async ev => {
+  if (!$('#modal').hidden) return;
+  if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+  const cols = columns();
+  const k = ev.key;
+
+  if (k === 'ArrowUp') { S.row = Math.max(0, S.row - 1); S.buffer = null; }
+  else if (k === 'ArrowDown') { S.row = Math.min((S.scr?.rows.length || 1) - 1, S.row + 1); S.buffer = null; }
+  else if (k === 'ArrowLeft') { S.col = Math.max(0, S.col - 1); S.buffer = null; }
+  else if (k === 'ArrowRight') { S.col = Math.min(cols.length - 1, S.col + 1); S.buffer = null; }
+  else if (k === 'Home') { S.row = 0; }
+  else if (k === 'End') { S.row = (S.scr?.rows.length || 1) - 1; }
+  else if (k === '.') {
+    // the field separator: commit and step to the next field
+    if (S.buffer !== null) { ev.preventDefault(); await commitBuffer(true); return; }
+    moveToNextField(); ev.preventDefault(); return;
+  }
+  else if (k === 'Enter') {
+    ev.preventDefault();
+    if (S.buffer !== null) { await commitBuffer(false); }
+    else await openCell();
+    return;
+  }
+  else if (/^[0-9]$/.test(k) || (k === '-' && S.buffer === null)) {
+    const c = cols[S.col];
+    if (c && c.edit) { S.buffer = (S.buffer || '') + k; }
+  }
+  else if (k === 'Backspace') {
+    ev.preventDefault();
+    if (S.buffer) S.buffer = S.buffer.slice(0, -1);
+    else if (S.buffer === '') S.buffer = null;
+  }
+  else if (k === 'Escape') { S.buffer = null; }
+  else if (k === 'Insert') { ev.preventDefault(); await insertNode(); return; }
+  else if (k === 'Delete') { ev.preventDefault(); await deleteNode(); return; }
+  else return;
+  ev.preventDefault();
+  renderGrid();
+});
+
+// opening a cell: taps, couplers and actives get a picker
+async function openCell() {
+  const c = curCol(), r = curRow();
+  if (!c || !r) return;
+  if (c.key.startsWith('tap')) return pickTap(+c.key.slice(3));
+  if (c.key.startsWith('cplr')) return pickCoupler(+c.key.slice(4));
+  if (c.key === 'amp') return pickActive();
+  if (c.key === 'cab') return pickCable();
+  if (c.key === 'ampname') return nameAmp();
+  msg('nothing to open on this column');
+}
+
+// ---------------------------------------------------------------- pickers
 function hasSpecs() {
-  const l = S.design?.library || {};
+  const l = (S.net && S.net.library) || {};
   return Object.keys(l.cables || {}).length + Object.keys(l.taps || {}).length
        + Object.keys(l.actives || {}).length + Object.keys(l.passives || {}).length > 0;
 }
+const libTable = t => Object.values((S.net && S.net.library[t]) || {});
+const pickCableById = n => libTable('cables')[n] || null;
+const pickActiveById = n => libTable('actives')[n % libTable('actives').length] || null;
 
-function renderCascade() {
-  const tb = $('#cascade tbody');
-  const r = S.results;
-  if (!hasSpecs()) {
-    tb.innerHTML = `<tr><td colspan="17">
-      <div class="needspec">
-        <h2>Attach a spec set to start designing</h2>
-        <p>Nothing is loaded by default and nothing carries over from another
-           design. Every level, loss, part number and powering figure comes from
-           the spec files, so a design has no meaning until one is attached.</p>
-        <p>Go to <b>Import</b> and select a Lode Data spec set — the
-           <code>.par .atv .tap .cpr .cbl</code> files that share one name — or
-           load the built-in sample specs to try the tool out.</p>
-        <p><button id="loadSample">Load sample specs</button>
-           <span class="hint">samples only, not for real design</span></p>
-      </div></td></tr>`;
-    $('#totals').textContent = '';
-    const b = $('#loadSample');
-    if (b) b.onclick = loadSampleSpecs;
-    return;
-  }
-  if (!r || !r.order.length) {
-    tb.innerHTML = `<tr><td colspan="17" class="empty">No devices yet. Add a node to start.</td></tr>`;
-    $('#totals').textContent = '';
-    return;
-  }
-  tb.innerHTML = r.order.map(id => {
-    const row = r.rows[id], el = S.design.elements[id];
-    const warn = row.warnings.length ? ' warn' : '';
-    const sel = S.selected === id ? ' sel' : '';
-    const pad = '&nbsp;'.repeat(row.depth * 4);
-    return `<tr class="${warn}${sel}" data-id="${id}">
-      <td>${pad}<span class="type-tag">${esc(row.type.replace('_', ' '))}</span>${esc(row.label)}</td>
-      <td>${esc(partName(el))}</td>
-      <td>${esc(row.cable_name)}</td>
-      <td class="n">${row.length_ft || ''}</td>
-      <td class="n">${row.cumulative_ft || ''}</td>
-      <td class="n">${row.input.low}</td><td class="n">${row.input.high}</td>
-      <td class="n">${row.output.low}</td><td class="n">${row.output.high}</td>
-      <td class="n">${row.output.tilt}</td>
-      <td class="n">${num(row.gain_high)}</td>
-      <td class="n">${row.tap_port ? row.tap_port.high : ''}</td>
-      <td class="n">${row.return_at_node ? row.return_at_node.high : ''}</td>
-      <td class="n">${num(row.volts)}</td>
-      <td class="n">${row.segment_current_a || ''}</td>
-      <td class="n">${row.houses || ''}</td>
-      <td class="note">${esc(row.warnings.join('; '))}</td></tr>`;
-  }).join('');
-  const t = r.totals;
-  $('#totals').innerHTML = [
-    ['Devices', t.elements], ['Amplifiers', t.amplifiers], ['Taps', t.taps],
-    ['Homes passed', t.homes_passed], ['Footage', t.footage + ' ft'],
-    ['Longest run', t.max_cumulative_ft + ' ft'],
-    ['Tap ports', `${t.min_tap_port_dbmv} … ${t.max_tap_port_dbmv} dBmV`],
-    ['Warnings', t.warnings],
-  ].map(([k, v]) => `${k} <b>${esc(v)}</b>`).join(' · ')
-    + (r.problems.length ? ` · <span class="note">${esc(r.problems.join('; '))}</span>` : '');
-  $$('#cascade tbody tr[data-id]').forEach(tr =>
-    tr.onclick = () => { S.selected = tr.dataset.id; renderCascade(); renderInspector(); });
+function modal(html) {
+  $('#modalbox').innerHTML = html;
+  $('#modal').hidden = false;
+  const c = $('#mClose'); if (c) c.onclick = closeModal;
+}
+function closeModal() { $('#modal').hidden = true; }
+$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+
+function chooser(title, items, onPick, note) {
+  modal(`<h2>${esc(title)}</h2>${note ? `<p class="hint">${esc(note)}</p>` : ''}
+    <table><tbody>${items.map((it, i) =>
+      `<tr data-i="${i}"><td>${esc(it.label)}</td><td>${esc(it.detail || '')}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="row"><button id="mClose">Cancel</button>
+      <button id="mNone">Clear this cell</button></div>`);
+  $$('#modalbox tr[data-i]').forEach(tr => tr.onclick = async () => {
+    closeModal(); await onPick(items[+tr.dataset.i]);
+  });
+  $('#mNone').onclick = async () => { closeModal(); await onPick(null); };
 }
 
-// ---------------------------------------------------------------- inspector
-function opts(table, selected, blank) {
-  const entries = Object.values(S.design.library[table] || {})
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return (blank ? `<option value="">— none —</option>` : '') + entries.map(p =>
-    `<option value="${p.id}"${p.id === selected ? ' selected' : ''}>${esc(p.name)}</option>`).join('');
-}
-function field(label, html) {
-  return `<div class="field"><label>${esc(label)}</label>${html}</div>`;
-}
-function input(name, value, type = 'text', step) {
-  return `<input name="${name}" type="${type}" ${step ? `step="${step}"` : ''}
-    value="${value === null || value === undefined ? '' : esc(value)}">`;
+async function pickTap(slot) {
+  const r = curRow();
+  const taps = libTable('taps').sort((a, b) =>
+    b.tap_value_db - a.tap_value_db || a.ports - b.ports);
+  chooser(`Tap for node ${r.branch}.${r.node}, slot ${slot + 1}`,
+    taps.map(t => ({ id: t.id, label: `${t.name}`,
+      detail: `${t.ports} port · ${t.tap_value_db} dB · insertion ${t.through_loss.length ? t.through_loss.at(-1)[1] : '?'} dB` })),
+    async pick => {
+      await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/tap`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) });
+      await refresh();
+    }, 'Tap values are drawn in the bracket style of their port count: /2/ [4] {6} <8>');
 }
 
-function renderInspector() {
-  const box = $('#inspector');
-  const el = S.selected && S.design.elements[S.selected];
-  if (!el) { box.innerHTML = '<p class="empty">Select a device to edit it.</p>'; return; }
-  const isSource = el.type === 'node' && !el.parent_id;
-  const table = PART_TABLE[el.type];
-  const parents = Object.values(S.design.elements).filter(e => e.id !== el.id);
+async function pickCoupler(slot) {
+  const r = curRow();
+  const items = libTable('passives').map(p => ({ id: p.id, label: p.name,
+    detail: `legs ${p.port_losses.map(v => v + ' dB').join(' / ')}` }));
+  chooser(`Coupler for node ${r.branch}.${r.node}`, items, async pick => {
+    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/coupler`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) });
+    await refresh();
+    msg(pick ? 'coupler placed; it starts a new branch' : 'coupler and its branch removed');
+  }, 'Placing a coupler creates the branch it feeds.');
+}
 
-  box.innerHTML = `<h2>${esc(el.label || el.type)}</h2>
-    <form id="elForm">
-      ${field('Label', input('label', el.label))}
-      ${field('Type', `<select name="type">${TYPES.map(t =>
-        `<option value="${t}"${t === el.type ? ' selected' : ''}>${t.replace('_', ' ')}</option>`).join('')}</select>`)}
-      ${table ? field('Part', `<select name="part_id">${opts(table, el.part_id, true)}</select>`) : ''}
-      ${field('Fed from', `<select name="parent_id"><option value="">— source —</option>${
-        parents.map(p => `<option value="${p.id}"${p.id === el.parent_id ? ' selected' : ''}>${esc(p.label)}</option>`).join('')}</select>`)}
-      ${field('Parent output port', input('parent_port', el.parent_port, 'number', '1'))}
-      ${field('Cable', `<select name="cable_id">${opts('cables', el.cable_id, true)}</select>`)}
-      ${field('Span length (ft)', input('length_ft', el.length_ft, 'number', '1'))}
-      ${el.type === 'tap' || el.type === 'subscriber' ? field('Homes passed', input('houses', el.houses, 'number', '1')) : ''}
-      ${el.type === 'amplifier' ? field('Output level at high freq (dBmV)', input('output_dbmv', el.output_dbmv, 'number', '0.1')) : ''}
-      ${el.type === 'amplifier' ? field('Output tilt (dB)', input('tilt_db', el.tilt_db, 'number', '0.1')) : ''}
-      ${isSource ? field('Launch level at high freq (dBmV)', input('source_dbmv', el.source_dbmv, 'number', '0.1')) : ''}
-      ${isSource ? field('Launch tilt (dB)', input('source_tilt_db', el.source_tilt_db, 'number', '0.1')) : ''}
-      ${el.type === 'power_supply' ? field('Supply volts', input('supply_volts', el.supply_volts, 'number', '1')) : ''}
-      ${field('Notes', `<textarea name="notes" rows="2">${esc(el.notes || '')}</textarea>`)}
-      <button type="submit">Save</button>
-      <button type="button" id="delEl" class="danger">Delete (and everything below)</button>
-    </form>`;
+async function pickActive() {
+  const r = curRow();
+  const items = libTable('actives').map(a => ({ id: a.id, label: a.name,
+    detail: `${a.kind} · in ${a.in_forward_high}/${a.in_forward_low} · out ${a.out_forward_high}/${a.out_forward_low}` }));
+  chooser(`Active for node ${r.branch}.${r.node}`, items, async pick => {
+    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pick ? { amp: 11, amp_part: pick.id } : { clear_amp: true }) });
+    await refresh();
+  });
+}
 
-  $('#elForm').onsubmit = async ev => {
-    ev.preventDefault();
-    const fd = new FormData(ev.target);
-    const body = { ...el };
-    for (const [k, v] of fd.entries()) {
-      if (['length_ft', 'output_dbmv', 'tilt_db', 'source_dbmv', 'source_tilt_db',
-           'supply_volts'].includes(k)) body[k] = v === '' ? null : Number(v);
-      else if (['parent_port', 'houses'].includes(k)) body[k] = Number(v || 0);
-      else body[k] = v === '' ? null : v;
-    }
-    body.length_ft = body.length_ft ?? 0;
-    delete body.id; delete body.x; delete body.y;
-    await api(`/api/designs/${S.design.id}/elements/${el.id}`,
-      { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    status('Saved'); await reloadDesign();
+async function pickCable() {
+  const r = curRow();
+  const items = libTable('cables').map((c, i) => ({ id: c.id, idx: i, label: c.name,
+    detail: `${c.attenuation.length ? c.attenuation.at(-1)[1] + ' dB/100ft' : ''} · loop ${c.loop_resistance_ohm_per_1000ft} Ω/1000ft` }));
+  chooser(`Cable for node ${r.branch}.${r.node}`, items, async pick => {
+    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(pick ? { cab: pick.idx, cab_part: pick.id } : { cab: 0, cab_part: null }) });
+    await refresh();
+  }, 'Even cable IDs are aerial, odd are underground.');
+}
+
+// ---------------------------------------------------------------- commands
+async function insertNode() {
+  const r = curRow();
+  await api(`/api/networks/${S.nid}/branches/${r ? r.branch : 1}/nodes`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ after: r ? r.node : 0 }) });
+  await refresh(); S.row = Math.min(S.row + 1, S.scr.rows.length - 1); renderGrid();
+  msg('node inserted');
+}
+async function deleteNode() {
+  const r = curRow(); if (!r) return;
+  await api(`/api/networks/${S.nid}/branches/${r.branch}/nodes/${r.node}`,
+    { method: 'DELETE' });
+  await refresh(); msg('node deleted');
+}
+async function delBranch() {
+  const r = curRow(); if (!r || r.branch === 1) { msg('the feeder cannot be deleted'); return; }
+  if (!confirm(`Delete branch ${r.branch} and everything on it?`)) return;
+  await api(`/api/networks/${S.nid}/branches/${r.branch}`, { method: 'DELETE' });
+  S.row = 0; await refresh(); msg('branch deleted');
+}
+function alter() { openCell(); }
+function jump() {
+  const v = prompt('Jump to node (branch.node)', '1.1'); if (!v) return;
+  const [b, n] = v.split('.').map(Number);
+  const i = S.scr.rows.findIndex(r => r.branch === b && r.node === (n || 1));
+  if (i < 0) { msg('no such node'); return; }
+  S.row = i; renderGrid();
+}
+function carry() {
+  const r = curRow(), c = curCol(); if (!r || !c) return;
+  msg(`Carry: hold ${c.head} down the branch — not implemented yet`);
+}
+function distance() {
+  const r = curRow(); if (!r) return;
+  msg(`${r.branch}.${r.node}: ${r.cumulative_ft} ft from the start of the network`);
+}
+function test() {
+  const bad = S.scr.rows.filter(r => r.severity);
+  if (!bad.length) { msg('Test: no errors'); return; }
+  modal(`<h2>Test — ${bad.length} node(s) flagged</h2>
+    <table><tbody>${bad.map(r => `<tr><td>${r.branch}.${r.node}</td>
+      <td style="color:${r.severity === 'red' ? '#b00' : '#a70'}">${esc(r.flags.map(f => f.message).join('; '))}</td></tr>`).join('')}</tbody></table>
+    <div class="row"><button id="mClose" class="primary">Close</button></div>`);
+}
+function dsummary() {
+  const t = S.scr.totals;
+  modal(`<h2>Downstream summary</h2><table><tbody>${
+    Object.entries(t).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')
+  }</tbody></table><div class="row"><button id="mClose" class="primary">Close</button></div>`);
+}
+async function recalc() { await refresh(); msg('recalculated'); }
+async function clearCell() {
+  const c = curCol(), r = curRow(); if (!c || !r) return;
+  if (c.key.startsWith('tap')) return pickTap(+c.key.slice(3));
+  S.buffer = ''; await commitBuffer(false);
+}
+async function nameAmp() {
+  const r = curRow(); if (!r) return;
+  const v = prompt('Amplifier / power supply name (Amplifier Definition)', r.amp_label || '');
+  if (v === null) return;
+  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amp_label: v }) });
+  await refresh();
+}
+async function notes() {
+  const r = curRow(); if (!r) return;
+  const v = prompt('Note at this node', '');
+  if (v === null) return;
+  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note: v }) });
+  await refresh(); msg('note saved');
+}
+function netInit() {
+  const n = S.net;
+  modal(`<h2>Network Initialization</h2>
+    <p>The levels and characteristics the network starts from.</p>
+    <label>Launch level at the forward high frequency (dBmV)</label>
+    <input id="niLevel" type="number" step="0.1" value="${n.source_dbmv}">
+    <label>Launch tilt (dB)</label>
+    <input id="niTilt" type="number" step="0.1" value="${n.source_tilt_db}">
+    <label>Forward high / low (MHz)</label>
+    <div style="display:flex;gap:6px">
+      <input id="niFh" type="number" value="${n.parameters.forward_high_mhz}">
+      <input id="niFl" type="number" value="${n.parameters.forward_low_mhz}"></div>
+    <label>Return high / low (MHz)</label>
+    <div style="display:flex;gap:6px">
+      <input id="niRh" type="number" value="${n.parameters.return_high_mhz}">
+      <input id="niRl" type="number" value="${n.parameters.return_low_mhz}"></div>
+    <label>Power supply voltage</label>
+    <input id="niPs" type="number" value="${n.supply_volts}">
+    <div class="row"><button class="primary" id="niOk">OK</button>
+      <button id="mClose">Cancel</button></div>`);
+  $('#niOk').onclick = async () => {
+    await api(`/api/networks/${S.nid}`, { method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        source_dbmv: +$('#niLevel').value, source_tilt_db: +$('#niTilt').value,
+        supply_volts: +$('#niPs').value,
+        parameters: { forward_high_mhz: +$('#niFh').value, forward_low_mhz: +$('#niFl').value,
+                      return_high_mhz: +$('#niRh').value, return_low_mhz: +$('#niRl').value } }) });
+    closeModal(); await reload(); msg('network initialised');
   };
-  $('#delEl').onclick = async () => {
-    if (!confirm('Delete this device and everything it feeds?')) return;
-    await api(`/api/designs/${S.design.id}/elements/${el.id}`, { method: 'DELETE' });
-    S.selected = null; status('Deleted'); await reloadDesign();
-  };
 }
 
-// ---------------------------------------------------------------- add
-async function loadSampleSpecs() {
-  status('Loading sample specs…');
-  await api(`/api/designs/${S.design.id}/library/sample`, { method: 'POST' });
-  status('Sample specs attached');
-  await reloadDesign();
-  renderLibrary();
+async function openReport(kind) {
+  const rows = await api(`/api/networks/${S.nid}/reports/${kind}`);
+  const cols = rows.length ? Object.keys(rows[0]) : [];
+  modal(`<h2>${kind === 'bom' ? 'Bill of Materials' : kind === 'powering' ? 'Powering report' : 'Level sheet'}</h2>
+    <table><thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <div class="row"><a class="button" href="/api/networks/${S.nid}/reports/${kind}?format=csv"
+       download><button>Download CSV</button></a>
+      <button id="mClose" class="primary">Close</button></div>`);
 }
 
-async function addElement(type) {
-  if (!hasSpecs()) { alert('Attach a spec set first — see the Import tab.'); return; }
-  const parent = type === 'node' ? null : S.selected;
-  if (type !== 'node' && !parent) { alert('Select the device this one is fed from first.'); return; }
-  const defaults = { type, parent_id: parent, parent_port: 0, length_ft: 0 };
-  if (type === 'node') { defaults.source_dbmv = 50; defaults.source_tilt_db = 10; }
-  const el = await api(`/api/designs/${S.design.id}/elements`,
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(defaults) });
-  S.selected = el.id;
-  await reloadDesign();
-}
-
-// ---------------------------------------------------------------- reports
-async function renderReport() {
-  const rows = await api(`/api/designs/${S.design.id}/reports/${S.report}`);
-  const thead = $('#reportTable thead'), tbody = $('#reportTable tbody');
-  $('#csvLink').href = `/api/designs/${S.design.id}/reports/${S.report}?format=csv`;
-  if (!rows.length) { thead.innerHTML = ''; tbody.innerHTML = '<tr><td class="empty">Nothing to report yet.</td></tr>'; return; }
-  const cols = Object.keys(rows[0]);
-  thead.innerHTML = `<tr>${cols.map(c => `<th>${esc(c.replace(/_/g, ' '))}</th>`).join('')}</tr>`;
-  tbody.innerHTML = rows.map(r => `<tr>${cols.map(c =>
-    `<td${typeof r[c] === 'number' ? ' class="n"' : ''}>${esc(r[c])}</td>`).join('')}</tr>`).join('');
-}
-
-// ---------------------------------------------------------------- library
-function renderLibrary() {
-  if (!S.design) return;
-  const table = S.design.library[S.libTab] || {};
-  const rows = Object.values(table).sort((a, b) => a.name.localeCompare(b.name));
-  $('#libSource').textContent = S.design.library.name
-    ? `${S.design.library.name} — ${rows.length} parts`
-    : 'No spec set attached — see the Import tab';
-  const thead = $('#libTable thead'), tbody = $('#libTable tbody');
-  if (!rows.length) { thead.innerHTML = ''; tbody.innerHTML = '<tr><td class="empty">Empty.</td></tr>'; return; }
-  const cols = Object.keys(rows[0]).filter(c => c !== 'id');
-  thead.innerHTML = `<tr>${cols.map(c => `<th>${esc(c.replace(/_/g, ' '))}</th>`).join('')}</tr>`;
-  tbody.innerHTML = rows.map(p => `<tr>${cols.map(c => {
-    const v = p[c];
-    return `<td${typeof v === 'number' ? ' class="n"' : ''}>${esc(
-      Array.isArray(v) ? JSON.stringify(v) : v)}</td>`;
-  }).join('')}</tr>`).join('');
-}
-
-// ---------------------------------------------------------------- parameters
-const PARAM_LABELS = {
-  forward_low_mhz: 'Forward low frequency (MHz)', forward_high_mhz: 'Forward high frequency (MHz)',
-  return_low_mhz: 'Return low frequency (MHz)', return_high_mhz: 'Return high frequency (MHz)',
-  min_tap_port_dbmv: 'Minimum tap port level (dBmV)', max_tap_port_dbmv: 'Maximum tap port level (dBmV)',
-  min_amp_input_dbmv: 'Minimum amplifier input (dBmV)',
-  return_transmit_dbmv: 'Upstream transmit level (dBmV)',
-  return_target_at_node_dbmv: 'Target return level at node (dBmV)',
-  supply_volts: 'Default supply voltage (V)', min_device_volts: 'Minimum device voltage (V)',
-  temperature_f: 'Design temperature (F)',
+// ---------------------------------------------------------------- menus
+const MENU_ACTIONS = {
+  file: [['New network', newNetwork], ['Open network', openNetwork],
+         ['Import .ntw', importNtw]],
+  mode: [['Design', () => setMode('design')], ['Entry', () => setMode('entry')],
+         ['Power', () => setMode('power')]],
+  spec: [['Attach spec set', attachSpec], ['Sample specs', sampleSpecs],
+         ['View library', viewLibrary]],
+  reports: [['Level sheet', () => openReport('levels')],
+            ['Bill of Materials', () => openReport('bom')],
+            ['Powering', () => openReport('powering')]],
+  test: [['Test network', test], ['Downstream summary', dsummary]],
+  edit: [['Insert node', insertNode], ['Delete node', deleteNode],
+         ['Delete branch', delBranch]],
+  tools: [['Network Initialization', netInit]],
+  view: [['Recalculate', recalc]],
+  misc: [['Name amplifier', nameAmp], ['Note', notes]],
+  global: [['Network Initialization', netInit]],
+  help: [['Keys', showHelp]],
 };
-function renderParams() {
-  if (!S.design) return;
-  $('#paramForm').innerHTML = Object.entries(S.design.parameters).map(([k, v]) =>
-    `<label for="p_${k}">${esc(PARAM_LABELS[k] || k)}</label>
-     <input id="p_${k}" name="${k}" type="number" step="0.1" value="${esc(v)}">`).join('');
-}
-$('#saveParams').onclick = async () => {
-  const fd = new FormData($('#paramForm'));
-  const params = {};
-  for (const [k, v] of fd.entries()) params[k] = Number(v);
-  await api(`/api/designs/${S.design.id}`, { method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parameters: params }) });
-  status('Parameters saved'); await reloadDesign();
-};
-
-// ---------------------------------------------------------------- import
-$('#uploadSpec').onclick = async () => {
-  const files = $('#specFiles').files;
-  if (!files.length) { alert('Choose the spec files first.'); return; }
-  const fd = new FormData();
-  [...files].forEach(f => fd.append('files', f));
-  status('Attaching…');
-  try {
-    const out = await api(`/api/designs/${S.design.id}/library/spec`, { method: 'POST', body: fd });
-    $('#specResult').textContent =
-      `Library: ${out.library.name}\n` +
-      `Cables ${Object.keys(out.library.cables).length}, taps ${Object.keys(out.library.taps).length}, ` +
-      `passives ${Object.keys(out.library.passives).length}, actives ${Object.keys(out.library.actives).length}\n` +
-      `Re-matched ${out.relink.matched} part(s).\n` +
-      (out.relink.unmatched.length
-        ? `No match in the new spec set:\n  ${out.relink.unmatched.join('\n  ')}` : 'Everything matched.');
-    status('Spec attached'); await reloadDesign(); renderLibrary();
-  } catch (e) { $('#specResult').textContent = e.message; status('Failed'); }
-};
-$('#uploadSample').onclick = loadSampleSpecs;
-$('#uploadNtw').onclick = async () => {
-  const f = $('#ntwFile').files[0];
-  if (!f) { alert('Choose a .ntw file first.'); return; }
-  const fd = new FormData(); fd.append('file', f);
-  status('Reading…');
-  try {
-    $('#ntwResult').textContent = JSON.stringify(await api('/api/import/ntw',
-      { method: 'POST', body: fd }), null, 2);
-    status('');
-  } catch (e) { $('#ntwResult').textContent = e.message; status('Failed'); }
-};
-
-// ---------------------------------------------------------------- chrome
-$$('.tab').forEach(b => b.onclick = () => {
-  $$('.tab').forEach(x => x.classList.remove('active'));
-  $$('.tab-panel').forEach(x => x.classList.remove('active'));
-  b.classList.add('active');
-  $('#tab-' + b.dataset.tab).classList.add('active');
-  if (b.dataset.tab === 'reports') renderReport();
-  if (b.dataset.tab === 'library') renderLibrary();
+$$('.menubar .mi').forEach(mi => mi.onclick = () => {
+  const items = MENU_ACTIONS[mi.dataset.menu];
+  if (!items) { msg('not implemented'); return; }
+  modal(`<h2>${esc(mi.textContent)}</h2><table><tbody>${
+    items.map((it, i) => `<tr data-i="${i}"><td>${esc(it[0])}</td></tr>`).join('')
+  }</tbody></table><div class="row"><button id="mClose">Close</button></div>`);
+  $$('#modalbox tr[data-i]').forEach(tr => tr.onclick = () => {
+    closeModal(); items[+tr.dataset.i][1]();
+  });
 });
-$$('.rep').forEach(b => b.onclick = () => {
-  $$('.rep').forEach(x => x.classList.remove('active'));
-  b.classList.add('active'); S.report = b.dataset.rep; renderReport();
-});
-$$('.lib').forEach(b => b.onclick = () => {
-  $$('.lib').forEach(x => x.classList.remove('active'));
-  b.classList.add('active'); S.libTab = b.dataset.lib; renderLibrary();
-});
-$$('[data-add]').forEach(b => b.onclick = () => addElement(b.dataset.add));
-$('#designPicker').onchange = e => openDesign(e.target.value);
-$('#newDesign').onclick = async () => {
-  const name = prompt('Name for the new design?', 'New design');
-  if (!name) return;
-  const d = await api('/api/designs', { method: 'POST',
+
+function showHelp() {
+  modal(`<h2>Keys</h2>
+   <p>Arrow keys move the cursor. Type digits to enter a value.
+   <b>.</b> commits and steps to the next field, as it does in Entry mode:
+   <code>107 . 2 . 0</code> enters 107 feet, 2 houses, cable 0.
+   <b>Enter</b> commits, or opens a picker on the tap, coupler, amp and cable
+   columns. <b>Insert</b> adds a node, <b>Delete</b> removes one,
+   <b>Esc</b> abandons what you were typing.</p>
+   <p>The numbered bars are the screen menu — click them or use the menu bar.</p>
+   <div class="row"><button id="mClose" class="primary">Close</button></div>`);
+}
+
+// ---------------------------------------------------------------- files
+async function newNetwork() {
+  const name = prompt('Name for the new network', 'lode-1'); if (!name) return;
+  const d = await api('/api/networks', { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, sample_specs: false }) });
-  await loadDesignList(d.id); await openDesign(d.id);
-};
+  await loadList(d.id); await open(d.id);
+}
+async function openNetwork() {
+  const list = await api('/api/networks');
+  chooser('Open network', list.map(n => ({ id: n.id, label: n.name, detail: n.updated })),
+    async pick => { if (pick) { await open(pick.id); } });
+}
+function attachSpec() {
+  modal(`<h2>Attach a spec set</h2>
+    <p>Select all files of one Lode Data spec set — the
+    <b>.par .atv .tap .cpr .cbl</b> files that share a base name. Nothing is
+    loaded until you do: every level, loss and part number comes from them.</p>
+    <input type="file" id="specFiles" multiple accept=".par,.atv,.tap,.cpr,.cbl,.prc,.per">
+    <div class="row"><button class="primary" id="specGo">Attach</button>
+      <button id="mClose">Cancel</button></div><pre id="specOut" style="display:none"></pre>`);
+  $('#specGo').onclick = async () => {
+    const files = $('#specFiles').files;
+    if (!files.length) return;
+    const fd = new FormData(); [...files].forEach(f => fd.append('files', f));
+    const out = await api(`/api/networks/${S.nid}/library/spec`, { method: 'POST', body: fd });
+    closeModal(); await reload();
+    msg(`${out.library.name}: ${Object.keys(out.library.cables).length} cables, ` +
+        `${Object.keys(out.library.taps).length} taps, ` +
+        `${Object.keys(out.library.passives).length} couplers, ` +
+        `${Object.keys(out.library.actives).length} actives`);
+  };
+}
+async function sampleSpecs() {
+  await api(`/api/networks/${S.nid}/library/sample`, { method: 'POST' });
+  await reload(); msg('sample specs attached — samples only, not for real design');
+}
+function viewLibrary() {
+  const lib = S.net.library;
+  const sect = (t, cols) => `<h2 style="margin-top:14px">${t}</h2><table><thead><tr>${
+    cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
+    Object.values(lib[t.toLowerCase()] || {}).map(p => `<tr>${
+      cols.map(c => `<td>${esc(fmtLib(p, c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  modal(`<h2>${esc(lib.name || 'no spec set')}</h2>` +
+    sect('Cables', ['name', 'loop', 'attenuation']) +
+    sect('Taps', ['name', 'ports', 'value', 'insertion']) +
+    sect('Passives', ['name', 'kind', 'legs']) +
+    sect('Actives', ['name', 'kind', 'in', 'out', 'power']) +
+    `<div class="row"><button id="mClose" class="primary">Close</button></div>`);
+}
+function fmtLib(p, c) {
+  switch (c) {
+    case 'name': return p.name;
+    case 'loop': return p.loop_resistance_ohm_per_1000ft;
+    case 'attenuation': return (p.attenuation || []).map(a => `${a[0]}:${a[1]}`).join('  ');
+    case 'ports': return p.ports;
+    case 'value': return p.tap_value_db;
+    case 'insertion': return (p.through_loss || []).map(a => `${a[0]}:${a[1]}`).join('  ');
+    case 'kind': return p.kind;
+    case 'legs': return (p.port_losses || []).join(' / ');
+    case 'in': return [p.in_forward_high, p.in_forward_low, p.in_return_high, p.in_return_low].join('/');
+    case 'out': return [p.out_forward_high, p.out_forward_low, p.out_return_high, p.out_return_low].join('/');
+    case 'power': return (p.power_draw || []).map(a => `${a[0]}V:${a[1]}A`).join(' ');
+  }
+  return '';
+}
+function importNtw() {
+  modal(`<h2>Import a .ntw network file</h2>
+    <p>The payload obfuscation is solved so the file can be read, but the record
+    layout is not mapped yet — .ntw files hold no text, only indices into the
+    spec files. This reports what the file is.</p>
+    <input type="file" id="ntwFile" accept=".ntw">
+    <div class="row"><button class="primary" id="ntwGo">Read</button>
+      <button id="mClose">Cancel</button></div><pre id="ntwOut"></pre>`);
+  $('#ntwGo').onclick = async () => {
+    const f = $('#ntwFile').files[0]; if (!f) return;
+    const fd = new FormData(); fd.append('file', f);
+    const out = await api('/api/import/ntw', { method: 'POST', body: fd });
+    $('#ntwOut').textContent = JSON.stringify(out, null, 2);
+  };
+}
+
+// ---------------------------------------------------------------- lifecycle
+function setMode(m) {
+  S.mode = m; S.buffer = null;
+  S.col = Math.max(1, columns().findIndex(c => c.key === 'ftg'));
+  $('#selMode').value = m;
+  $('#title').textContent =
+    `Design Assistant - ${m === 'design' ? 'Design' : m === 'entry' ? 'Entry' : 'Power'} - ${S.net ? S.net.name : ''}`;
+  renderMenu(); renderGrid();
+}
+async function refresh() {
+  S.scr = await api(`/api/networks/${S.nid}/screen`);
+  if (S.row >= S.scr.rows.length) S.row = Math.max(0, S.scr.rows.length - 1);
+  renderGrid();
+}
+async function reload() {
+  S.net = await api(`/api/networks/${S.nid}`);
+  $('#stSpecs').textContent = S.net.library.name || 'no spec file attached';
+  await refresh();
+}
+async function open(id) {
+  S.nid = id; S.row = 0;
+  await reload(); setMode(S.mode);
+  $('#selNet').value = id;
+}
+async function loadList(sel) {
+  const list = await api('/api/networks');
+  $('#selNet').innerHTML = list.map(n =>
+    `<option value="${n.id}">${esc(n.name)}</option>`).join('');
+  if (!list.length) return null;
+  const id = sel && list.some(n => n.id === sel) ? sel : list[0].id;
+  $('#selNet').value = id;
+  return id;
+}
+$('#selNet').onchange = e => open(e.target.value);
+$('#selMode').onchange = e => setMode(e.target.value);
+$('#tbNew').onclick = newNetwork;
+$('#tbOpen').onclick = openNetwork;
+$('#tbSave').onclick = () => msg('saved');
+$('#tbInsert').onclick = insertNode;
+$('#tbDelete').onclick = deleteNode;
 
 (async () => {
-  let id = await loadDesignList();
+  let id = await loadList();
   if (!id) {
-    const d = await api('/api/designs', { method: 'POST',
+    const d = await api('/api/networks', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'First design', sample_specs: false }) });
-    id = await loadDesignList(d.id);
+      body: JSON.stringify({ name: 'lode-1', sample_specs: false }) });
+    id = await loadList(d.id);
   }
-  await openDesign(id);
+  await open(id);
 })();

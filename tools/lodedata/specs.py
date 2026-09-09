@@ -45,6 +45,10 @@ TAP_PORT_SLOTS = {8: 16, 2: 134, 4: 246, 6: 358}
 # within a slot, relative to the part-number field
 TAP_VALUE_BLOCK = 25        # losses toward the tap ports
 TAP_INSERTION_BLOCK = 65    # hard cable in to hard cable out
+# "The Tap ID is the number the Design Assistant will use to identify all tap
+# values and usually corresponds to the actual tap value."  It matches the
+# value in the 2-port part number in every record of both sample spec sets.
+TAP_ID_OFFSET = 129
 TAP_NAME_SLOTS = TAP_PORT_SLOTS      # kept for older callers
 
 
@@ -218,6 +222,7 @@ class TapPort:
 @dataclass
 class TapSpec:
     slot: int
+    tap_id: int = 0                             # the row's identifying value
     ports: dict = field(default_factory=dict)   # port count -> TapPort
     parts: dict = field(default_factory=dict)   # port count -> part number
 
@@ -253,7 +258,8 @@ def read_taps(data: bytes) -> list:
             )
         if not ports:
             continue
-        out.append(TapSpec(slot=slot, ports=ports,
+        tap_id = struct.unpack_from("<i", seg, TAP_ID_OFFSET)[0] // SCALE
+        out.append(TapSpec(slot=slot, tap_id=tap_id, ports=ports,
                            parts={str(k): v.part for k, v in ports.items()}))
     return out
 

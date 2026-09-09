@@ -1,83 +1,78 @@
-"""Design reports: level/cascade sheet, bill of materials, powering."""
+"""Design reports: the level sheet, bill of materials and powering."""
 from __future__ import annotations
 
 import csv
 import io
 
-from .model import Network
-from .engine import calculate, Results
+from .plant import Design
+from .screen import build, Screen
 
 
-def level_report(net: Network, res: Results | None = None) -> list:
-    res = res or calculate(net)
+def level_report(design: Design, scr: Screen | None = None) -> list:
+    scr = scr or build(design)
+    freqs = scr.frequencies
     out = []
-    for eid in res.order:
-        r = res.rows[eid]
-        out.append({
-            "depth": r.depth,
-            "label": r.label,
-            "type": r.type,
-            "cable": r.cable_name,
-            "length_ft": round(r.length_ft, 1),
-            "cumulative_ft": round(r.cumulative_ft, 1),
-            "span_loss_high": round(r.span_loss_high, 2),
-            "in_low": round(r.input.low, 2),
-            "in_high": round(r.input.high, 2),
-            "out_low": round(r.output.low, 2),
-            "out_high": round(r.output.high, 2),
-            "tilt": round(r.output.tilt, 2),
-            "gain_high": round(r.gain_high, 2) if r.gain_high is not None else "",
-            "tap_low": round(r.tap_port.low, 2) if r.tap_port else "",
-            "tap_high": round(r.tap_port.high, 2) if r.tap_port else "",
-            "return_at_node_low": round(r.return_at_node.low, 2) if r.return_at_node else "",
-            "return_at_node_high": round(r.return_at_node.high, 2) if r.return_at_node else "",
-            "volts": round(r.volts, 1) if r.volts is not None else "",
-            "current_a": round(r.segment_current_a, 2),
-            "houses": r.houses,
-            "warnings": "; ".join(r.warnings),
+    for r in scr.rows:
+        row = {"branch": r.branch, "node": r.node}
+        for f in freqs:
+            row[f"{f:g} MHz"] = round(r.levels.get(f, 0.0), 2)  # noqa: keeps MHz labels
+        row.update({
+            "ftg": round(r.ftg), "hc": r.hc, "cab": r.cab_name, "lv": r.lv,
+            "amp": r.amp_name, "taps": " ".join(r.taps),
+            "couplers": " ".join(r.couplers),
+            "cumulative ft": round(r.cumulative_ft),
+            "volts": "" if r.volts is None else round(r.volts, 1),
+            "amps": round(r.current, 2),
+            "flags": "; ".join(m for _, m in r.flags),
         })
+        out.append(row)
     return out
 
 
-def bill_of_materials(net: Network) -> list:
+def bill_of_materials(design: Design) -> list:
+    lib = design.library
     counts: dict = {}
     footage: dict = {}
-    for el in net.elements.values():
-        part = None
-        for table in (net.library.taps, net.library.passives,
-                      net.library.actives, net.library.power_supplies):
-            if el.part_id in table:
-                part = table[el.part_id]
-                break
-        if part is not None:
-            key = (type(part).__name__.replace("Type", ""), part.name)
-            counts[key] = counts.get(key, 0) + 1
-        if el.cable_id and el.length_ft:
-            cable = net.library.cables.get(el.cable_id)
-            if cable:
-                footage[cable.name] = footage.get(cable.name, 0.0) + el.length_ft
 
-    rows = [{"category": cat, "item": name, "quantity": n, "unit": "ea"}
-            for (cat, name), n in sorted(counts.items())]
-    rows += [{"category": "Cable", "item": name, "quantity": round(ft, 1),
+    def bump(category: str, name: str, n: int = 1):
+        counts[(category, name)] = counts.get((category, name), 0) + n
+
+    for b in design.branches.values():
+        for n in b.nodes:
+            if n.amp_part and n.amp_part in lib.actives:
+                bump("Active", lib.actives[n.amp_part].name)
+            for t in n.taps:
+                if t.part_id in lib.taps:
+                    bump("Tap", lib.taps[t.part_id].name)
+            for c in n.couplers:
+                if c.part_id in lib.passives:
+                    bump("Coupler", lib.passives[c.part_id].name)
+            if n.supply_volts:
+                bump("Power supply", f"{n.supply_volts:g} V")
+            cable = lib.cables.get(n.cab_part)
+            if cable and n.ftg:
+                footage[cable.name] = footage.get(cable.name, 0.0) + n.ftg
+
+    rows = [{"category": c, "item": i, "quantity": q, "unit": "ea"}
+            for (c, i), q in sorted(counts.items())]
+    rows += [{"category": "Cable", "item": name, "quantity": round(ft),
               "unit": "ft"} for name, ft in sorted(footage.items())]
     return rows
 
 
-def powering_report(net: Network, res: Results | None = None) -> list:
-    res = res or calculate(net)
+def powering_report(design: Design, scr: Screen | None = None) -> list:
+    scr = scr or build(design)
     rows = []
-    for eid in res.order:
-        r = res.rows[eid]
-        if r.current_a == 0 and r.volts is None:
+    for r in scr.rows:
+        if not (r.amp or r.supply or r.current):
             continue
         rows.append({
-            "label": r.label,
-            "type": r.type,
-            "draw_a": round(r.current_a, 2),
-            "carried_a": round(r.segment_current_a, 2),
-            "volts": round(r.volts, 1) if r.volts is not None else "",
-            "warnings": "; ".join(w for w in r.warnings if "V at the device" in w),
+            "branch": r.branch, "node": r.node,
+            "device": r.amp_name or ("power supply" if r.supply else ""),
+            "supply V": r.supply or "",
+            "volts": "" if r.volts is None else round(r.volts, 1),
+            "amps carried": round(r.current, 2),
+            "flags": "; ".join(m for s, m in r.flags if "V" in m),
         })
     return rows
 

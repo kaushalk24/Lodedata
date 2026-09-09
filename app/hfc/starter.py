@@ -94,7 +94,7 @@ def starter_library() -> Library:
             lib.add(TapType(
                 id=f"tap_{ports}x{value}",
                 name=f"{ports}-port {value} dB tap",
-                ports=ports, tap_value_db=float(value),
+                ports=ports, tap_id=int(value), tap_value_db=float(value),
                 through_loss=[[55.0, t55], [750.0, t750]],
                 return_through_loss=[[5.0, t55], [42.0, t55]],
                 current_draw_a=0.0, power_passing=True,
@@ -103,7 +103,7 @@ def starter_library() -> Library:
     for name, kind, losses, powers in _PASSIVES:
         lib.add(PassiveType(
             id=f"psv_{name.replace(' ', '_').replace('-', '_')}",
-            name=name, kind=kind,
+            name=name, kind=kind, coupler_id=len(losses),
             port_losses=losses, power_passing=powers, source="starter",
         ))
     for name, kind, outs, ins, outs_lv, nf, watts in _ACTIVES:

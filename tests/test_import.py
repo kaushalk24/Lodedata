@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "app"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from hfc.importer import library_from_spec_set, inspect_ntw, relink_library, _tokens
-from hfc.model import Network, Element
+from hfc.plant import Design, Node
 from lodedata.obfuscation import NTW_KEY, deobfuscate, obfuscate, recover_key
 
 # Real Lode Data files to check the readers against.  Drop them anywhere under
@@ -116,28 +116,32 @@ def test_token_split_ignores_punctuation():
 
 @needs_samples
 def test_spec_upgrade_keeps_the_design_wired_up():
+    """Swapping spec sets must keep every span pointing at the right cable."""
     old = library_from_spec_set(KERMIT)
     new = library_from_spec_set(WVBECK)
-    net = Network(name="t", library=old)
+    d = Design(name="t", library=old)
+    feeder = d.ensure_feeder()
     picks = ["EX .625P3 AER", "EX .875P3 UG", "EX .500P3 AER"]
-    for i, name in enumerate(picks):
+    for name in picks:
         cid = next(c.id for c in old.cables.values() if c.name == name)
-        net.add(Element(id=f"e{i}", type="tap", cable_id=cid, length_ft=100))
+        feeder.nodes.append(Node(ftg=100, cab_part=cid))
+    d.renumber(feeder)
 
-    report = relink_library(net, new)
+    report = relink_library(d, new)
     assert report["matched"] > 40
-    resolved = [new.cables[net.elements[f"e{i}"].cable_id].name for i in range(3)]
+    resolved = [new.cables[n.cab_part].name for n in feeder.nodes if n.cab_part]
     # size and aerial/underground must both survive the upgrade
     assert resolved == ["625P3 AER EXT", "875P3 UG EXT", "500P3 AER EXT"]
-    assert net.validate() == []
+    assert d.validate() == []
 
 
 @needs_samples
 def test_upgrade_never_crosses_cable_sizes():
     old = library_from_spec_set(KERMIT)
     new = library_from_spec_set(WVBECK)
-    net = Network(name="t", library=old)
-    report = relink_library(net, new)
+    d = Design(name="t", library=old)
+    d.ensure_feeder()
+    report = relink_library(d, new)
     for line in report["fuzzy"]:
         if not line.startswith("cables:"):
             continue
