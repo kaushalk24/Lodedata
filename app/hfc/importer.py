@@ -23,12 +23,34 @@ from lodedata.obfuscation import deobfuscate, recover_key, NTW_KEY, PAYLOAD_STAR
 from lodedata import specs as ld_specs                     # noqa: E402
 
 from .model import (Library, CableType, TapType, PassiveType, ActiveType,
-                    new_id)
+                    DesignParameters, new_id)
 
-# The reference frequency the .cbl coefficients are assumed to describe.
-# Unconfirmed -- see docs/open-questions.md item 2.1.  Exposed so it can be
-# corrected in one place once we have a screenshot of the cable spec editor.
-CBL_COEFF_REFERENCE_MHZ = 750.0
+# A loss block is ten int32 fixed-point values, laid out the same way in the
+# cable and coupler files (docs/lode-data-manual-notes.md):
+#   0     loss at the forward HIGH frequency
+#   1     loss at the forward LOW frequency
+#   2-5   the four optional extra forward frequencies
+#   6     loss at the return HIGH frequency (Rh, default 42 MHz)
+#   7     loss at the return LOW frequency  (Rl, default 5 MHz)
+#   8-9   the two optional extra return frequencies
+# The frequencies themselves live in the Parameters file, which is why import
+# takes the design's own parameters rather than assuming a frequency plan.
+BLOCK_HIGH, BLOCK_LOW, BLOCK_RH, BLOCK_RL = 0, 1, 6, 7
+
+# Loop resistance 99 means "never power this" -- the convention for fibre and
+# anything else not meant to carry power.
+NON_POWERING_LOOP_RESISTANCE = 99.0
+
+
+def _loss_points(block, params: DesignParameters) -> list:
+    """A loss block -> [(MHz, dB per 100 ft)] the engine can interpolate."""
+    pairs = [
+        (params.return_low_mhz,   abs(block[BLOCK_RL])),
+        (params.return_high_mhz,  abs(block[BLOCK_RH])),
+        (params.forward_low_mhz,  abs(block[BLOCK_LOW])),
+        (params.forward_high_mhz, abs(block[BLOCK_HIGH])),
+    ]
+    return [[f, round(v, 4)] for f, v in pairs if v]
 
 
 def _tap_value_from_part(part: str) -> float | None:
@@ -44,24 +66,37 @@ def _tap_value_from_part(part: str) -> float | None:
     return None
 
 
-def library_from_spec_set(base: str | Path) -> Library:
-    """Load ``<base>.cbl/.cpr/.atv/.tap`` into a Library."""
+def library_from_spec_set(base: str | Path,
+                         params: DesignParameters | None = None) -> Library:
+    """Load ``<base>.cbl/.cpr/.atv/.tap`` into a Library.
+
+    ``params`` supplies the four design frequencies the spec file's loss
+    columns were entered against; they live in the Parameters file, so pass
+    the design's own rather than guessing.
+    """
     base = Path(base)
+    params = params or DesignParameters()
     spec = ld_specs.load_spec_set(base)
     lib = Library(name=base.name, imported_from=str(base.name))
 
     for c in spec.cables:
-        # coefficient 0 is the dominant attenuation term; treat it as dB/100 ft
-        # at the reference frequency and let the sqrt(f) law fill in the rest.
-        a = c.forward_coeffs[0] if c.forward_coeffs else 0.0
+        loop = round(c.loop_resistance_ohm_per_ft * 1000, 3)
+        notes = []
+        if abs(loop - NON_POWERING_LOOP_RESISTANCE) < 0.01:
+            notes.append("loop resistance 99: not to be powered (fibre or similar)")
+        if c.connector_part:
+            notes.append(f"connector {c.connector_part}")
         lib.add(CableType(
             id=new_id("cbl"),
             name=c.name,
-            kind="drop" if "RG" in c.name.upper() else "hardline",
-            loop_resistance_ohm_per_1000ft=round(c.loop_resistance_ohm_per_ft * 1000, 3),
-            attenuation=[[CBL_COEFF_REFERENCE_MHZ, round(a, 4)]] if a else [],
-            notes=(f"Lode Data coefficients fwd={c.forward_coeffs[:3]} "
-                   f"ret={c.return_coeffs[:3]}; connector {c.connector_part}"),
+            # cable IDs are 0-99 and the parity is the construction type
+            kind="drop" if "RG" in c.name.upper()
+                 else ("hardline" if c.index % 2 == 0 else "hardline"),
+            loop_resistance_ohm_per_1000ft=loop,
+            attenuation=_loss_points(c.forward_coeffs, params),
+            notes="; ".join(
+                [f"cable ID {c.index} ({'aerial' if c.index % 2 == 0 else 'underground'})"]
+                + notes),
             source=f"lodedata:{base.name}.cbl",
         ))
 
@@ -84,12 +119,16 @@ def library_from_spec_set(base: str | Path) -> Library:
             ))
 
     for p in spec.couplers:
+        # a coupler record carries two loss blocks: the thru leg then the tap
+        # leg, each in the same ten-value layout the cable file uses
+        legs = [p.values[0:10], p.values[10:20]]
+        losses = [abs(leg[BLOCK_HIGH]) for leg in legs if any(leg)]
         lib.add(PassiveType(
             id=new_id("psv"),
             name=p.name,
             kind="power_inserter" if "PI" in p.name.upper() else "splitter",
-            port_losses=[],                # needs ground truth
-            power_passing=[],
+            port_losses=[round(v, 2) for v in losses],
+            power_passing=[True] * len(losses),
             source=f"lodedata:{base.name}.cpr",
         ))
 

@@ -16,6 +16,9 @@ groundwork for an HFC network design application that can read them.
   part-number fields and the `int32 × 1e6` fixed-point number convention.
   Cable loop-resistance values decode to exactly the published figures for the
   real Commscope/other cables, which confirms the decode.
+* The cable and coupler loss blocks: ten slots holding losses at the forward
+  High and Low and return Rh and Rl frequencies plus optional extras, confirmed
+  against the manual and by ratio analysis over 62 cables in two spec sets.
 
 **Not solved yet** — both blocked on inputs I don't have; see
 [`docs/open-questions.md`](docs/open-questions.md)
@@ -23,10 +26,15 @@ groundwork for an HFC network design application that can read them.
 * The `.ntw` record layout (design files contain no text, only indices into the
   spec files, so there is nothing to bootstrap from without a known-content
   sample).
-* The cable attenuation, tap-loss and amplifier-gain formulas — the numbers are
-  readable, their exact meaning needs one screenshot each from the application.
-* The application's UI and UX — `docs.lodedata.com` is blocked by this
-  environment's network policy, so the manual has not been read.
+* The tap-loss and amplifier-gain field positions — the numbers are readable,
+  their exact meaning needs one screenshot each from the application.
+* The application's screens. `docs.lodedata.com` is blocked by this
+  environment's egress proxy, but much of the manual's **text** was recovered
+  through web search and is written up in
+  [`docs/lode-data-manual-notes.md`](docs/lode-data-manual-notes.md) — it
+  confirmed the cable and coupler loss layout, the cable ID convention and the
+  program's input model. Search returns no images, so the screenshots are still
+  missing.
 
 ## The design tool
 
@@ -72,6 +80,7 @@ app/api.py               HTTP API and static hosting
 app/web/                 the interface, no build step
 tools/lodedata/          low-level Lode Data file readers and CLI
 docs/file-formats.md     what the bytes mean, and how each claim was verified
+docs/lode-data-manual-notes.md  what the vendor manual says, and how it was obtained
 docs/open-questions.md   what is needed to finish
 tests/                   engine and importer tests
 ```

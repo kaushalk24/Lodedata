@@ -8,10 +8,12 @@ Everything here was derived from the sample files supplied with this task:
 | `KERMIT750-2026.{par,cbl,cpr,tap,atv}` | equipment spec set | licence `LP-BSQN2J3` (`.atv`: `LP-990XYP3-1`) |
 | `WVBeck750.{par,cbl,cpr,tap,atv}` | equipment spec set | same licences, different content |
 
-Nothing below comes from vendor documentation — `docs.lodedata.com` is blocked by
-this environment's egress policy, so every statement here is an inference from
-the bytes, cross-checked against real HFC hardware specifications where possible.
-Items that are still guesses are marked **(unconfirmed)**.
+The layouts below were inferred from the bytes and cross-checked against real
+HFC hardware specifications. Several of them have since been **confirmed against
+the vendor manual**, recovered through web search because `docs.lodedata.com`
+itself is blocked by this environment's egress proxy — see
+`lode-data-manual-notes.md` for how, and for what that does and does not prove.
+Items still unverified are marked **(unconfirmed)**.
 
 ---
 
@@ -90,6 +92,8 @@ tested and only phase 0 produces a low-entropy result.
   key phases. Part numbers are therefore stored as *indices into the spec files*,
   not as names — which is exactly why a design cannot be opened without its spec
   set, and why re-pointing a design at a new spec set is a meaningful operation.
+  The manual confirms the split: spec files "define every piece of equipment used
+  by the Design Assistant and every operating parameter of the program".
 * `0xFFFF` / `0xFFFFFFFF` is the "unset / not connected" sentinel.
 * Numbers are little-endian and follow the same 1e6 fixed-point convention as the
   spec files.
@@ -129,14 +133,43 @@ right-aligned with leading spaces.
 | offset | type | field |
 |---|---|---|
 | 0 | u8 | `0x6F` record marker |
-| 1 | u16 | record index |
+| 1 | u16 | cable ID, 0–99. **Even = aerial, odd = underground** |
 | 5 | char[25] | cable name, e.g. `EX .625P3 AER` |
-| 30 | i32 | loop resistance, ohms per **foot** (`1070` → 1.07 Ω/1000 ft) |
-| 34 | i32[10] | forward-path coefficients |
-| 74 | i32[10] | return-path coefficients (identical to forward in every sample) |
+| 30 | i32 | loop resistance, ohms per **foot** (`1070` → 1.07 Ω/1000 ft). `99` means never power this — the convention for fibre |
+| 34 | i32[10] | loss block (see below) |
+| 74 | i32[10] | second loss block, identical to the first in every sample **(unconfirmed what distinguishes them)** |
 | 114 | char[15] | footage/marker part, e.g. `FT-625` |
 | 129 | char[15] | connector part, e.g. `PT-625` |
 | 144 | i32[5] | flags, all `1` in the samples **(unconfirmed)** |
+
+The table is exactly 100 records, matching the manual's "one hundred different
+types of cable, numbered 0 through 99". The aerial/underground parity rule holds
+for all 62 named cables across both sample spec sets, with no exceptions.
+
+**The loss block** — the same ten-slot layout is used by the coupler file:
+
+| index | meaning |
+|---|---|
+| 0 | dB/100 ft at the forward **High** frequency |
+| 1 | dB/100 ft at the forward **Low** frequency |
+| 2–5 | the four optional extra forward frequencies |
+| 6 | at the return **Rh** frequency (default 42 MHz) — stored negative here |
+| 7 | at the return **Rl** frequency (default 5 MHz) — stored negative here |
+| 8–9 | the two optional extra return frequencies |
+
+The frequencies themselves live in the Parameters file, so an importer has to be
+told the frequency plan rather than assume one. Confirmed numerically over 62
+cables in two independent spec sets — medians, because the values are hand-typed
+from manufacturer charts and no individual cable follows the √f law exactly:
+
+| ratio | KERMIT | WVBeck | √f prediction |
+|---|---|---|---|
+| Low / High | 0.2528 | 0.2541 | √(54/860) = 0.2506 |
+| Rh / Low | 0.8828 | 0.8750 | √(42/54) = 0.8819 |
+| Rl / Low | 0.2989 | 0.2889 | √(5/54) = 0.3043 |
+
+Both sample sets were therefore entered against roughly a 54 / 860 MHz forward
+band with the default 42 / 5 MHz return, despite both being named "750".
 
 Loop resistance is the strongest confirmation that the decode is right — the
 values land exactly on the published figures for the real cables:
@@ -165,7 +198,24 @@ and is the single highest-value thing to pin down (see open questions).
 | 0 | u8 | `0x6F` record marker |
 | 1 | i32 | packed value code |
 | 5 | char[25] | part number, e.g. `SSP-7K`, `RLDC12-8`, `MDU COUPLER` |
-| 30 | i32[…] | port losses (through / tap), 1e6 fixed point |
+| 30 | i32[10] | loss block for one leg |
+| 70 | i32[10] | loss block for the other leg |
+
+Same loss-block layout as the cable file — the manual describes "four columns to
+the right of the Thru label … at the forward high, forward low, return high, and
+return low frequencies". Decoding the two blocks that way produces a coherent
+directional-coupler family:
+
+| part | leg A | leg B |
+|---|---|---|
+| SSP-3K | 4.9 | 4.9 |
+| SSP-7K | 8.1 | 3.5 |
+| SSP-9K | 10.2 | 2.9 |
+| SSP-12K | 13.4 | 2.2 |
+
+Looser coupling costs more on one leg and less on the other, and the balanced
+part has equal legs. Which block the file calls "Thru" is **unconfirmed** — the
+numbers suggest leg A is the tap leg.
 
 The code at +1 is exactly the dB value in the part number for the simple parts
 (`SSP-3K` → 3, `SSP-7K` → 7, `SSP-9K` → 9, `SSP-12K` → 12) but is a packed

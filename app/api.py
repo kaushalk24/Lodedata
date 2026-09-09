@@ -222,7 +222,9 @@ async def attach_spec_set(design_id: str, files: list[UploadFile] = File(...)):
             base = Path(tmp) / Path(name).stem
         if base is None:
             raise HTTPException(400, "no files uploaded")
-        lib = library_from_spec_set(base)
+        # the spec file's loss columns are entered against the frequencies in
+        # the Parameters file, so import against this design's own plan
+        lib = library_from_spec_set(base, net.parameters)
     report_ = relink_library(net, lib)
     save(net)
     return {"library": lib.to_dict(), "relink": report_}

@@ -1,84 +1,91 @@
-# What I need from you to finish this
+# What is still needed
 
-## 1. The documentation site is blocked (hard blocker)
+Updated after recovering much of the vendor manual through web search — see
+`lode-data-manual-notes.md`. Several earlier questions are now answered; what
+remains is listed below.
 
-`https://docs.lodedata.com/design/manual/getting-started/` — and every other page
-on that host — is refused by this environment's egress proxy (`403` on the
-CONNECT tunnel). That is an organisation network policy, not a site outage; I
-can't route around it and I shouldn't try. `lodedata.com` is blocked too.
+## Resolved since the first pass
 
-So I have **not** read the manual, and I have not seen a single screenshot of the
-application. That is the half of your request I could not start: "go through
-every image, understand how the UI and UX is" needs the actual pages.
+* **Cable attenuation model.** The four loss columns are the forward High,
+  forward Low, return Rh and return Rl frequencies, in dB per 100 ft, at the
+  frequencies set in the Parameters file. Confirmed by the manual and by ratio
+  analysis over 62 cables in two spec sets. Applied to the importer.
+* **Loop resistance.** Ohms per 1000 ft (or per 1000 m in metric), and `99` is
+  the sentinel for "never power this". Applied.
+* **Cable IDs.** 0–99, even = aerial, odd = underground. Zero exceptions across
+  both spec sets. Applied.
+* **Coupler losses.** Two loss blocks per record, same layout as cables.
+  Applied.
+* **Why `.ntw` files hold no text.** The manual confirms spec files define every
+  piece of equipment; the design file only references them.
 
-Any of these unblocks it, easiest first:
+## 1. Screenshots — the remaining documentation gap
 
-* Save the manual pages to a file and upload them — in Chrome, *Print → Save as
-  PDF* on each section, or *Save page as → Web page, complete* and zip the
-  folder (this keeps the screenshots, which is the important part).
-* Or paste the page text into the chat, section by section.
-* Or ask whoever administers this workspace to allow `docs.lodedata.com`.
+Web search returns text, not images, and a good part of this manual is pictures
+of the screen. I still have not seen the application. If you want the interface
+to match, this is what to send — browser **Save page as → Web page, complete**,
+zipped, keeps the images:
 
-Screenshots matter more than text here. What I most want to see: the main design
-window, the device-placement/key-in dialogs for amplifier, tap, cable and power
-supply, the spec/equipment editors, the level and design-report views, and the
-file-open/spec-attach flow.
+* Design Mode and Entry Mode screens (the column layout and how a row reads)
+* the Network Initialization window
+* the cable, tap, coupler and active spec editors
+* Powering Mode
+* the Parameters tap-selection tab
 
-## 2. Ground truth to finish the number formats
+## 2. Ground truth for the remaining numbers
 
-I have the storage format solved (see `file-formats.md`) but three specific
-formulas need one real example each to lock down. Any screenshot or printout
-from the running application will do it:
+Still guessing at these, and one screenshot each settles them:
 
-1. **Cable attenuation model.** Open the cable spec editor on `EX .500P3 AER`
-   and screenshot it. The file stores `2.16, 0.52` plus `−0.48, −0.16`, and the
-   real cable is 1.42 dB/100 ft at 750 MHz. One screenshot tells me what those
-   coefficients mean and what frequency they are normalised to, and then every
-   cable calculation is exact.
-2. **Tap values.** A tap chart or the tap spec editor for `MMT2830` — I need the
-   tap loss and insertion loss it shows, so I can locate them in the record.
-3. **Amplifier data.** The spec editor for `BLE-7-750PSS`, so I can label the
-   `19 / 15 / 21 / 49 / 38 / 43` figures and the response table.
+1. **Tap spec editor for `MMT2830`** — I can read the part numbers per port
+   count but not yet the tap loss, insertion loss and self-term values inside
+   the record's sub-blocks.
+2. **Active spec editor for `BLE-7-750PSS`** — the numeric block decodes to
+   19 / 15 / 21 / 49 / 38 / 43 dB plus a response table of pairs
+   `(38, 0.69) (45, 0.62) (52, 0.58) …`. The manual gives me module input,
+   noise figure and output tilt as the fields to expect, but not which is which.
+3. **Which coupler leg is "Thru"** — the numbers say leg A is the tap leg; one
+   look at the editor confirms or flips it.
 
-## 3. Ground truth to finish the `.ntw` design file
+## 3. A data question about your spec files, not the format
 
-The obfuscation is fully solved and I can read the plaintext. What's left is the
-record layout, and `.ntw` files contain **no text at all** — every part is an
-index into the spec files — so I can't bootstrap the layout from strings.
+Both sample spec sets carry attenuation roughly **40% above** the published
+catalogue figures for the cables they name. `EX .500P3` is entered as 2.16
+dB/100 ft at the forward high frequency; pristine .500 P3 is about 1.53 at
+860 MHz. The ratios between frequencies and between cable sizes are all correct,
+so this is not a decoding error — every cable is scaled up consistently.
 
-The fastest possible unlock: **build a deliberately tiny design in Lode Data and
-send me both the file and the report.** Something like a power supply, one
-amplifier, one span of `.500P3` at a known footage, one tap, one terminator.
-Then send:
+Is that deliberate (an aged-plant or "existing" allowance, since the parts are
+named `EX …` and `… EXT`), or are those files entered against a much higher
+forward frequency than the 860 MHz the ratios imply? It changes every level the
+app computes from an imported spec set.
 
-* the `.ntw` file,
-* its spec set (all five files),
-* and a printed/exported design report or BOM for it (levels, footages, part
-  list).
+## 4. The `.ntw` record layout — the one real blocker left
 
-With a known 5-device design I can identify every table in an afternoon. With
-only large real-world designs it is guesswork.
+The obfuscation is solved and the payload is readable, but the record layout is
+not mapped, and design files contain no text to bootstrap from.
 
-Almost as good, and cheaper: take one of the `AL00x.ntw` files you already sent
-and export whatever text/CSV/report the application can produce for it. Any
-export that lists devices with their part numbers and levels lets me match rows
-against the binary.
+Fastest unlock, by a distance: **build a deliberately tiny design and send me
+the file plus its report.** A power supply, one amplifier, one span of `.500P3`
+at a known footage, one tap, a terminator. Send the `.ntw`, its spec set, and a
+printed or exported design report. With known content I can identify every table
+quickly; with only large real designs it stays guesswork.
 
-Also useful: two `.ntw` files that differ by exactly one known edit (save, add
-one 26 dB tap, save again). Diffing those pinpoints the tap table immediately.
+Nearly as good and much cheaper: export any report from one of the `AL00x.ntw`
+files you already sent. The manual says reports can be written to `.XLS`
+("simply type the name of the Excel file followed by .XLS"), so a Single Network
+BOM or an Active report as a spreadsheet would give me rows to match against the
+binary.
 
-## 4. Product decisions I need from you
+Also useful: two `.ntw` files that differ by exactly one known edit — save, add
+one 26 dB tap, save again. Diffing those points straight at the tap table.
 
-1. **What are you building?** A desktop application (installable, works offline,
-   like the original), or a web application (browser, multi-user, hosted)? This
-   is the single biggest fork and everything else follows from it.
-2. **How far does version 1 go?** Options, roughly in order of effort:
-   a. data entry + calculations + reports, no map (spreadsheet-like tree view);
-   b. the above plus a schematic canvas you draw the network on;
-   c. the above plus geographic basemaps / GIS import, like the real product.
-3. **Forward only, or forward + return path?** Return-path (5–42 MHz) design
-   roughly doubles the calculation work.
-4. **Do you need to write `.ntw` files back**, or is importing them enough and
-   your own format is the working format? Import-only is much less risky.
-5. **Who are the users** — just you, or a team? That decides whether this needs
-   accounts, sharing and a server at all.
+## 5. Product direction, now that the manual has shown its hand
+
+The real program's input model is a **keyboard-driven span sheet**, not forms:
+type `1 0 7 . 2 . 0 ⏎` for 107 feet, 2 houses, cable 0, where `.` moves to the
+next column. Columns are `ftg | hc | cab | lv`, and the same rows gain computed
+columns in Design mode and voltage/current in Powering mode.
+
+That is much faster than the form-based inspector currently in the app, and it
+is what your designers will expect. Worth building — but it is a real piece of
+work, so say the word before I do it.

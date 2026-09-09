@@ -98,3 +98,84 @@ def test_upgrade_never_crosses_cable_sizes():
         digits_before = {t for t in _tokens(before) if any(c.isdigit() for c in t)}
         digits_after = {t for t in _tokens(after.split("(")[0]) if any(c.isdigit() for c in t)}
         assert digits_before & digits_after, line
+
+
+@needs_samples
+def test_cable_losses_land_on_the_four_design_frequencies():
+    from hfc.model import DesignParameters
+    params = DesignParameters(forward_low_mhz=54, forward_high_mhz=860,
+                              return_low_mhz=5, return_high_mhz=42)
+    lib = library_from_spec_set(KERMIT, params)
+    c = next(c for c in lib.cables.values() if c.name == "EX .625P3 AER")
+    at = dict((f, v) for f, v in c.attenuation)
+    # the four columns of the cable spec: Rl, Rh, Low, High
+    assert at == {5.0: 0.13, 42.0: 0.39, 54: 0.45, 860: 1.78}
+
+
+@needs_samples
+@pytest.mark.parametrize("spec", ["KERMIT", "WVBECK"])
+def test_loss_columns_sit_at_the_expected_design_frequencies(spec):
+    """Columns 0,1,6,7 are High, Low, Rh and Rl -- shown by their ratios.
+
+    The values are hand-typed from manufacturer charts so no single cable
+    follows the sqrt(f) law exactly, but across a whole spec file the median
+    ratios pin down which frequency each column belongs to.  A wrong column
+    assignment would be nowhere near these numbers.
+    """
+    import math
+    import statistics
+    import struct
+
+    path = (KERMIT if spec == "KERMIT" else WVBECK).with_suffix(".cbl")
+    data = path.read_bytes()
+    low_over_high, rh_over_low, rl_over_low = [], [], []
+    for r in range(100):
+        seg = data[512 + r * 394: 512 + (r + 1) * 394]
+        if seg[0] != 0x6F or not seg[5:30].split(b"\0")[0].strip():
+            continue
+        v = [x / 1e6 for x in struct.unpack_from("<10i", seg, 34)]
+        if v[0] and v[1]:
+            low_over_high.append(v[1] / v[0])
+        if v[1] and v[6]:
+            rh_over_low.append(abs(v[6]) / v[1])
+        if v[1] and v[7]:
+            rl_over_low.append(abs(v[7]) / v[1])
+
+    assert len(low_over_high) >= 20
+    # forward high sits about 16x the forward low: 54 MHz against 860
+    assert abs(statistics.median(low_over_high) - math.sqrt(54 / 860)) < 0.02
+    # return high is the 42 MHz column, return low the 5 MHz one
+    assert abs(statistics.median(rh_over_low) - math.sqrt(42 / 54)) < 0.02
+    assert abs(statistics.median(rl_over_low) - math.sqrt(5 / 54)) < 0.02
+
+
+@needs_samples
+@pytest.mark.parametrize("spec", ["KERMIT", "WVBECK"])
+def test_even_cable_ids_are_aerial_and_odd_are_underground(spec):
+    lib = library_from_spec_set(KERMIT if spec == "KERMIT" else WVBECK)
+    checked = 0
+    for c in lib.cables.values():
+        name = c.name.upper()
+        if "AER" in name or name.endswith(" AE"):
+            expected = "aerial"
+        elif "UG" in name or "UNDER" in name:
+            expected = "underground"
+        else:
+            continue
+        assert expected in c.notes, f"{c.name}: {c.notes}"
+        checked += 1
+    assert checked >= 20
+
+
+@needs_samples
+def test_coupler_legs_track_their_part_numbers():
+    lib = library_from_spec_set(KERMIT)
+    by_name = {p.name: p for p in lib.passives.values()}
+    # a directional coupler family: looser coupling costs more on the tap leg
+    # and less on the through leg
+    tap = [by_name[f"SSP-{n}K"].port_losses[0] for n in (7, 9, 12)]
+    thru = [by_name[f"SSP-{n}K"].port_losses[1] for n in (7, 9, 12)]
+    assert tap == sorted(tap)
+    assert thru == sorted(thru, reverse=True)
+    # the balanced splitter has equal legs
+    assert len(set(by_name["SSP-3K"].port_losses)) == 1
