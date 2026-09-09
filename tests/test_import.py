@@ -179,3 +179,43 @@ def test_coupler_legs_track_their_part_numbers():
     assert thru == sorted(thru, reverse=True)
     # the balanced splitter has equal legs
     assert len(set(by_name["SSP-3K"].port_losses)) == 1
+
+
+@needs_samples
+def test_actives_carry_in_and_out_levels_at_the_four_frequencies():
+    lib = library_from_spec_set(KERMIT)
+    by_name = {a.name: a for a in lib.actives.values()}
+
+    ble = by_name["BLE-7-750PSS"]
+    assert [ble.in_forward_high, ble.in_forward_low,
+            ble.in_return_high, ble.in_return_low] == [19.0, 15.0, 21.0, 21.0]
+    assert [ble.out_forward_high, ble.out_forward_low,
+            ble.out_return_high, ble.out_return_low] == [49.0, 38.0, 43.0, 43.0]
+    assert ble.forward_max_gain_db == 30.0
+    assert ble.forward_default_tilt_db == 11.0
+    assert ble.return_max_gain_db == 22.0
+
+
+@needs_samples
+def test_input_level_99_marks_a_fibre_fed_node():
+    lib = library_from_spec_set(KERMIT)
+    by_name = {a.name: a for a in lib.actives.values()}
+    node = by_name["BTN NODE-9"]
+    assert not node.needs_rf_input
+    assert node.kind == "node"
+    assert node.forward_max_gain_db == 0.0
+    # the sentinel classifies parts the name alone would miss
+    assert by_name["5F31QSA004-9"].kind == "node"
+
+
+@needs_samples
+def test_active_power_tables_are_constant_power_curves():
+    lib = library_from_spec_set(KERMIT)
+    by_name = {a.name: a for a in lib.actives.values()}
+    for name, watts in [("MB-750D-H", 43.0), ("BTN NODE-9", 71.0)]:
+        part = by_name[name]
+        assert len(part.power_draw) >= 4
+        power = [v * a for v, a in part.power_draw]
+        assert all(abs(w - watts) < 1.5 for w in power), (name, power)
+        # draw must rise as the applied voltage sags
+        assert part.current_at(45) > part.current_at(90)

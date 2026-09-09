@@ -233,10 +233,17 @@ def _return(net: Network, res: Results) -> None:
 # --------------------------------------------------------------------------
 # powering
 # --------------------------------------------------------------------------
-def _element_current(net: Network, el: Element) -> float:
-    if el.type == "amplifier":
+def _element_current(net: Network, el: Element, volts: float | None = None) -> float:
+    """Current this one device draws at the voltage actually reaching it.
+
+    Actives are constant-power, so the draw rises as the voltage sags. The
+    spec file carries a voltage/current table for exactly this reason.
+    """
+    if el.type in ("amplifier", "node"):
         part = net.library.actives.get(el.part_id)
-        return part.current_draw_a if part else 0.0
+        if not part:
+            return 0.0
+        return part.current_at(volts) if volts is not None else part.current_draw_a
     if el.type == "tap":
         part = net.library.taps.get(el.part_id)
         return part.current_draw_a if part else 0.0
@@ -253,48 +260,59 @@ def _blocks_power(net: Network, el: Element, port: int) -> bool:
     return False
 
 
+# voltage and current depend on each other, so solve by iteration; four passes
+# is far more than enough for the few-volt corrections involved
+POWERING_PASSES = 4
+
+
 def _powering(net: Network, res: Results) -> None:
     p = net.parameters
+    supply = next((e.supply_volts for e in net.elements.values()
+                   if e.type == "power_supply" and e.supply_volts), None)
+    supply = supply if supply is not None else p.supply_volts
+
+    volts: dict = {eid: supply for eid in res.rows}
 
     def accumulate(el: Element) -> float:
-        """Total current drawn by this element and everything it powers."""
-        total = _element_current(net, el)
+        """Current drawn by this element and everything it powers."""
+        own = _element_current(net, el, volts.get(el.id, supply))
+        total = own
         for child in net.children(el.id):
             if _blocks_power(net, el, child.parent_port):
                 continue
             total += accumulate(child)
         row = res.rows.get(el.id)
         if row is not None:
-            row.current_a = _element_current(net, el)
+            row.current_a = own
             row.segment_current_a = total
         return total
 
-    def distribute(el: Element, volts: float):
+    def distribute(el: Element, v: float):
         row = res.rows.get(el.id)
         if row is None:
             return
         if el.length_ft and el.cable_id:
             cable = net.library.cables.get(el.cable_id)
             if cable:
-                volts -= row.segment_current_a * cable.resistance_ohms(el.length_ft)
-        row.volts = volts
-        if volts < p.min_device_volts and _element_current(net, el) > 0:
-            row.warnings.append(
-                f"{volts:.0f} V at the device is under the "
-                f"{p.min_device_volts:.0f} V minimum")
+                v -= row.segment_current_a * cable.resistance_ohms(el.length_ft)
+        volts[el.id] = v
         for child in net.children(el.id):
             if _blocks_power(net, el, child.parent_port):
                 continue
-            distribute(child, volts)
+            distribute(child, v)
 
-    for root in net.roots():
-        accumulate(root)
-        supply = None
-        for e in net.elements.values():
-            if e.type == "power_supply" and e.supply_volts:
-                supply = e.supply_volts
-                break
-        distribute(root, supply if supply is not None else p.supply_volts)
+    for _ in range(POWERING_PASSES):
+        for root in net.roots():
+            accumulate(root)
+            distribute(root, supply)
+
+    for eid, row in res.rows.items():
+        v = volts.get(eid)
+        row.volts = v
+        if v is not None and v < p.min_device_volts and row.current_a > 0:
+            row.warnings.append(
+                f"{v:.0f} V at the device is under the "
+                f"{p.min_device_volts:.0f} V minimum")
 
 
 # --------------------------------------------------------------------------

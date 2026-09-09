@@ -42,14 +42,29 @@ _PASSIVES = [
     ("Power inserter", "power_inserter", [0.5], [True]),
 ]
 
+# name, kind, outputs, In(fwd hi, fwd lo, ret hi, ret lo),
+#                        Out(fwd hi, fwd lo, ret hi, ret lo), NF, watts
+# In forward high of 99 marks an optical node: fibre fed, no RF input.
 _ACTIVES = [
-    # name, kind, outputs, fwd max gain, default out, tilt, NF, ret gain, amps
-    ("Optical node (4 out)", "node", 4, 0.0, 50.0, 10.0, 6.0, 0.0, 3.0),
-    ("Optical node (2 out)", "node", 2, 0.0, 50.0, 10.0, 6.0, 0.0, 2.5),
-    ("System amplifier", "bridger", 4, 40.0, 50.0, 10.0, 7.0, 22.0, 2.2),
-    ("Line extender", "line_extender", 1, 35.0, 48.0, 9.0, 8.0, 20.0, 1.0),
-    ("Mini bridger", "bridger", 2, 37.0, 49.0, 9.0, 7.5, 21.0, 1.6),
+    ("Optical node (4 out)", "node", 4, (99.0, 0.0, 27.0, 27.0),
+     (50.0, 40.0, 0.0, 0.0), 6.0, 70.0),
+    ("Optical node (2 out)", "node", 2, (99.0, 0.0, 27.0, 27.0),
+     (50.0, 40.0, 0.0, 0.0), 6.0, 60.0),
+    ("System amplifier", "bridger", 4, (17.0, 13.0, 21.0, 21.0),
+     (50.0, 40.0, 43.0, 43.0), 7.0, 55.0),
+    ("Line extender", "line_extender", 1, (19.0, 15.0, 21.0, 21.0),
+     (48.0, 39.0, 40.0, 40.0), 8.0, 30.0),
+    ("Mini bridger", "bridger", 2, (12.0, 11.0, 21.0, 21.0),
+     (49.0, 38.0, 40.0, 40.0), 7.5, 43.0),
 ]
+
+# Actives are constant-power devices, so the draw is derived from the wattage
+# across the usual operating range rather than stated as a single number.
+_POWER_VOLTAGES = (38.0, 45.0, 52.0, 60.0, 70.0, 80.0, 90.0)
+
+
+def _power_table(watts: float) -> list:
+    return [[v, round(watts / v, 2)] for v in _POWER_VOLTAGES]
 
 _SUPPLIES = [
     ("90 V / 15 A supply", 90.0, 15.0),
@@ -85,13 +100,17 @@ def starter_library() -> Library:
             name=name, kind=kind,
             port_losses=losses, power_passing=powers, source="starter",
         ))
-    for name, kind, outs, gain, out, tilt, nf, rgain, amps in _ACTIVES:
+    for name, kind, outs, ins, outs_lv, nf, watts in _ACTIVES:
         lib.add(ActiveType(
             id=f"act_{name.replace(' ', '_').replace('(', '').replace(')', '')}",
             name=name, kind=kind, outputs=outs,
-            forward_max_gain_db=gain, forward_default_output_dbmv=out,
-            forward_default_tilt_db=tilt, noise_figure_db=nf,
-            return_max_gain_db=rgain, current_draw_a=amps,
+            in_forward_high=ins[0], in_forward_low=ins[1],
+            in_return_high=ins[2], in_return_low=ins[3],
+            out_forward_high=outs_lv[0], out_forward_low=outs_lv[1],
+            out_return_high=outs_lv[2], out_return_low=outs_lv[3],
+            noise_figure_db=nf,
+            power_draw=_power_table(watts),
+            current_draw_a=round(watts / 60.0, 2),
             source="starter",
         ))
     for name, v, a in _SUPPLIES:

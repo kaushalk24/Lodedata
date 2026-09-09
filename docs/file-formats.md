@@ -103,6 +103,17 @@ tested and only phase 0 produces a low-entropy result.
   `int16 + byte`, `-1` when unused) and larger device tables. Full record layout
   is **not yet mapped** — see `docs/open-questions.md`.
 
+Constraints the manual gives for that mapping, all useful when the tables are
+finally identified:
+
+* A **node** is one screen line — a pole or pedestal — and a **branch** is a run
+  of nodes starting from a coupler. So the design is branches of nodes, not a
+  free-form graph.
+* **House count per node maxes at 63**, a 6-bit field.
+* Branch type is carried alongside the branch number: normal, no-footage,
+  backfeed, forwardfeed.
+* A `.LCK` sidecar next to the `.NTW` marks the file open by another user.
+
 ---
 
 ## 3. Spec files — record tables
@@ -232,13 +243,34 @@ family+value for the rest (`RLDC12-8` → 408, `GNA INT DC-12` → 612,
 | 30 | char[10] | option/kit part, e.g. `RA-KIT\40` |
 | 40 | char[5] | second option part, e.g. `T\40` |
 | 45 | char[10] | (blank in samples) |
-| 59 | i32[…] | gains, levels and a frequency-response table |
+| 59 | i32[4] | **In** — level required at forward High, forward Low, return Rh, return Rl |
+| 75 | i32[4] | **Out** — level produced at the same four frequencies |
+| 91 | i32[2] | zero in every sample |
+| 99 | i32[2]×n | **power draw table**: (volts, amps) pairs, ends at a zero entry |
 
-The numeric block decodes to sensible amplifier data: `19.0, 15.0, 21.0, 21.0,
-49.0, 38.0, 43.0, 43.0` (gain and operating-level figures) followed by pairs that
-look like a response table — `(38, 0.69) (45, 0.62) (52, 0.58) (60, 0.54)
-(70, 0.47) (80, 0.43) (90, 0.39)`. Which column is frequency and which is
-gain/tilt is **unconfirmed**.
+Confirmed by the manual: the actives file holds "the signal levels required at
+the forward and return inputs, as well as the forward and return outputs
+produced by each active as indicated by the column prefix In or Out", plus
+"power requirements".
+
+| part | In (Fh, Fl, Rh, Rl) | Out (Fh, Fl, Rh, Rl) | forward gain | output tilt |
+|---|---|---|---|---|
+| BLE-7-750PSS | 19, 15, 21, 21 | 49, 38, 43, 43 | 30 dB | 11 dB |
+| MB-750D-H | 12, 11, 21, 21 | 49, 38, 40, 40 | 37 dB | 11 dB |
+| BTN NODE-9 | **99**, 0, 27, 27 | 46, 36, 0, 0 | — | 10 dB |
+
+**A forward input of 99 is the "no RF input" sentinel** — the same convention as
+loop resistance 99 on cables. It marks a fibre-fed optical node, and identifies
+parts whose name does not say so (`5F31QSA004-9`).
+
+The trailing table is a **constant-power curve**, which is why the file stores a
+table rather than a single current figure — an active draws more as the applied
+voltage sags:
+
+| MB-750D-H | 38 V | 45 | 52 | 60 | 70 | 80 | 90 |
+|---|---|---|---|---|---|---|---|
+| amps | 1.12 | 0.96 | 0.83 | 0.72 | 0.62 | 0.54 | 0.48 |
+| watts | 42.6 | 43.2 | 43.2 | 43.2 | 43.4 | 43.2 | 43.2 |
 
 ### 3.4 `.tap` — taps (908 bytes)
 

@@ -129,7 +129,13 @@ class ActiveSpec:
     name: str
     housing: str
     option_parts: list
-    values: list
+    # levels required at, and produced by, the active at the four design
+    # frequencies: forward high, forward low, return high, return low
+    input_levels: list = field(default_factory=list)
+    output_levels: list = field(default_factory=list)
+    # [[volts, amps], ...] -- actives are constant-power, so the draw is a curve
+    power_draw: list = field(default_factory=list)
+    values: list = field(default_factory=list)
 
 
 def read_actives(data: bytes) -> list:
@@ -139,12 +145,22 @@ def read_actives(data: bytes) -> list:
         if not name:
             continue
         parts = [x for x in (_name(seg[30:40]), _name(seg[40:45])) if x]
+        nums = [_fx(v) for v in struct.unpack_from("<24i", seg, 59)]
+        # +99 onward is a (volts, amps) table, terminated by a zero volts entry
+        table = []
+        for i in range(8, 24, 2):
+            volts, amps = nums[i], nums[i + 1]
+            if volts > 0 and amps > 0:
+                table.append([round(volts, 1), round(amps, 3)])
         out.append(ActiveSpec(
             slot=slot,
             name=name,
             housing=_name(seg[18:20]),
             option_parts=parts,
-            values=[_fx(v) for v in struct.unpack_from("<24i", seg, 59)],
+            input_levels=[round(v, 2) for v in nums[0:4]],
+            output_levels=[round(v, 2) for v in nums[4:8]],
+            power_draw=table,
+            values=nums,
         ))
     return out
 

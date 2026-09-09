@@ -98,9 +98,12 @@ def test_powering_drops_voltage_with_distance():
                     parent_port=0, cable_id="cbl_p500_P3", length_ft=2000,
                     part_id="act_Line_extender"))
     res = calculate(net)
-    assert res.rows["a1"].volts is not None
-    assert res.rows["a1"].volts < 90.0
-    assert res.rows["a1"].segment_current_a >= 1.0
+    a1 = res.rows["a1"]
+    assert a1.volts is not None
+    assert a1.volts < 90.0
+    assert a1.current_a > 0
+    # the amplifier and everything past it is carried through this span
+    assert a1.segment_current_a >= a1.current_a
 
 
 def test_tap_level_window_warnings():
@@ -135,3 +138,37 @@ def test_round_trip_serialisation():
     assert again.name == net.name
     assert len(again.elements) == len(net.elements)
     assert calculate(again).totals == calculate(net).totals
+
+
+def test_actives_are_constant_power_so_draw_rises_as_voltage_sags():
+    """The spec file carries a voltage/current table, not one number.
+
+    A long enough run drops the voltage at the amplifier, and the draw it
+    reports must be higher than the same part's draw at the supply voltage.
+    """
+    net = build()
+    net.add(Element(id="ps", type="power_supply", label="PS1",
+                    parent_id="n1", parent_port=1, supply_volts=90.0))
+    part = net.library.actives["act_Line_extender"]
+    assert part.power_draw, "starter actives should carry a power table"
+
+    net.add(Element(id="a1", type="amplifier", label="LE far", parent_id="t2",
+                    parent_port=0, cable_id="cbl_RG-6_drop", length_ft=4000,
+                    part_id="act_Line_extender"))
+    res = calculate(net)
+    a1 = res.rows["a1"]
+    assert a1.volts < 90.0
+    assert a1.current_a > part.current_at(90.0)
+    # constant power: volts times amps stays put across the table
+    watts = [round(v * a, 0) for v, a in part.power_draw]
+    assert max(watts) - min(watts) <= 1.0
+
+
+def test_optical_node_needs_no_rf_input():
+    net = build()
+    node = net.library.actives["act_Optical_node_4_out"]
+    assert not node.needs_rf_input
+    assert node.forward_max_gain_db == 0.0
+    # a fibre-fed node must never be flagged for gain it does not provide
+    res = calculate(net)
+    assert not any("tops out" in w for w in res.rows["n1"].warnings)

@@ -4,7 +4,21 @@ Updated after recovering much of the vendor manual through web search — see
 `lode-data-manual-notes.md`. Several earlier questions are now answered; what
 remains is listed below.
 
-## Resolved since the first pass
+## Resolved in the second pass (the rest of the sidebar)
+
+* **The actives file is solved.** Two sets of four levels — In then Out, at the
+  four design frequencies — followed by a voltage/current draw table. Forward
+  input 99 is the "no RF input" sentinel marking a fibre-fed node. Applied: the
+  app now derives gain, tilt and return gain from the levels, and powering
+  solves current and voltage together because actives are constant-power.
+* **The data model.** A node is one screen line, a pole or pedestal; a branch is
+  a run of nodes starting from a coupler; house count per node maxes at 63.
+* **The distortion model.** C/N on a 10-log rule, CTB on 20-log, each type
+  carrying a signal band, a derate factor and a source level.
+* Tap self-termination, drop types (RES/COM/MDU), the `.LCK` sidecar, macros,
+  command line switches, the Control file. See `lode-data-manual-notes.md`.
+
+## Resolved in the first pass
 
 * **Cable attenuation model.** The four loss columns are the forward High,
   forward Low, return Rh and return Rl frequencies, in dB per 100 ft, at the
@@ -37,14 +51,14 @@ zipped, keeps the images:
 Still guessing at these, and one screenshot each settles them:
 
 1. **Tap spec editor for `MMT2830`** — I can read the part numbers per port
-   count but not yet the tap loss, insertion loss and self-term values inside
-   the record's sub-blocks.
-2. **Active spec editor for `BLE-7-750PSS`** — the numeric block decodes to
-   19 / 15 / 21 / 49 / 38 / 43 dB plus a response table of pairs
-   `(38, 0.69) (45, 0.62) (52, 0.58) …`. The manual gives me module input,
-   noise figure and output tilt as the fields to expect, but not which is which.
-3. **Which coupler leg is "Thru"** — the numbers say leg A is the tap leg; one
+   count, and the manual says the record holds loss values, insertion losses and
+   self-term parameters per port count, but I have not located them in the
+   908-byte record yet. This is now the last unsolved spec file.
+2. **Which coupler leg is "Thru"** — the numbers say leg A is the tap leg; one
    look at the editor confirms or flips it.
+3. **Pad and equalizer banks** — the actives file references banks of pad and EQ
+   values by number. I have not found where the banks themselves live; they may
+   be in the Parameters file.
 
 ## 3. A data question about your spec files, not the format
 

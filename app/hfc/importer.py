@@ -133,10 +133,23 @@ def library_from_spec_set(base: str | Path,
         ))
 
     for a in spec.actives:
+        ins = a.input_levels or [0, 0, 0, 0]
+        outs = a.output_levels or [0, 0, 0, 0]
+        nominal = 60.0
+        # an input requirement of 99 is the "no RF input" sentinel, i.e. the
+        # device is fibre fed -- a more reliable marker than the part name
+        fibre_fed = ins[0] >= 99.0
         lib.add(ActiveType(
             id=new_id("act"),
             name=a.name,
-            kind="node" if "NODE" in a.name.upper() else "line_extender",
+            kind="node" if (fibre_fed or "NODE" in a.name.upper()) else "line_extender",
+            in_forward_high=ins[0], in_forward_low=ins[1],
+            in_return_high=ins[2], in_return_low=ins[3],
+            out_forward_high=outs[0], out_forward_low=outs[1],
+            out_return_high=outs[2], out_return_low=outs[3],
+            power_draw=a.power_draw,
+            current_draw_a=next((amps for v, amps in a.power_draw
+                                 if abs(v - nominal) < 6), 0.0),
             source=f"lodedata:{base.name}.atv",
         ))
 

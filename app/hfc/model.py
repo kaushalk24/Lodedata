@@ -114,22 +114,80 @@ class PassiveType:
         return True
 
 
+# An input requirement of 99 means "no RF input needed" -- what an optical node
+# carries, since it is fed by fibre. Same sentinel convention as cable loop 99.
+NO_RF_INPUT = 99.0
+
+
 @dataclass
 class ActiveType:
-    """Amplifier, line extender or optical node."""
+    """Amplifier, line extender or optical node.
+
+    The four In and four Out levels mirror the Lode Data actives file: the
+    level required at, and produced by, the active at each of the four design
+    frequencies.
+    """
     id: str
     name: str
     kind: str = "line_extender"                # node | trunk | bridger | line_extender
     outputs: int = 1
-    forward_max_gain_db: float = 35.0
-    forward_default_output_dbmv: float = 48.0
-    forward_default_tilt_db: float = 9.0       # high minus low across the forward band
+    # required input levels (dBmV)
+    in_forward_high: float = 13.0
+    in_forward_low: float = 9.0
+    in_return_high: float = 21.0
+    in_return_low: float = 21.0
+    # produced output levels (dBmV)
+    out_forward_high: float = 48.0
+    out_forward_low: float = 39.0
+    out_return_high: float = 40.0
+    out_return_low: float = 40.0
     noise_figure_db: float = 7.0
-    return_max_gain_db: float = 20.0
-    return_default_input_dbmv: float = 15.0
-    current_draw_a: float = 1.0
+    # powering: current draw against applied voltage, [[volts, amps], ...].
+    # Actives are constant-power, so draw rises as the voltage sags -- which is
+    # why the real spec file carries a table rather than one number.
+    power_draw: list = field(default_factory=list)
+    current_draw_a: float = 1.0                # used when no table is present
     min_operating_voltage: float = 42.0
     source: str = "manual"
+
+    @property
+    def forward_max_gain_db(self) -> float:
+        if self.in_forward_high >= NO_RF_INPUT:
+            return 0.0
+        return self.out_forward_high - self.in_forward_high
+
+    @property
+    def forward_default_output_dbmv(self) -> float:
+        return self.out_forward_high
+
+    @property
+    def forward_default_tilt_db(self) -> float:
+        return self.out_forward_high - self.out_forward_low
+
+    @property
+    def return_max_gain_db(self) -> float:
+        if not self.out_return_high:
+            return 0.0
+        return self.out_return_high - self.in_return_high
+
+    @property
+    def needs_rf_input(self) -> bool:
+        return self.in_forward_high < NO_RF_INPUT
+
+    def current_at(self, volts: float) -> float:
+        """Current drawn at an applied voltage, from the spec table."""
+        if not self.power_draw:
+            return self.current_draw_a
+        pts = sorted((float(v), float(a)) for v, a in self.power_draw)
+        if len(pts) == 1 or volts <= pts[0][0]:
+            return pts[0][1]
+        if volts >= pts[-1][0]:
+            return pts[-1][1]
+        for (v0, a0), (v1, a1) in zip(pts, pts[1:]):
+            if v0 <= volts <= v1:
+                t = (volts - v0) / (v1 - v0) if v1 != v0 else 0.0
+                return a0 + t * (a1 - a0)
+        return pts[-1][1]
 
 
 @dataclass
