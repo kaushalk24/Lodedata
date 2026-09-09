@@ -131,6 +131,7 @@ def screen(nid: str):
 
 class NodeEdit(BaseModel):
     ftg: float | None = None
+    through_leg: int | None = None
     hc: int | None = None
     cab: int | None = None
     cab_part: str | None = None

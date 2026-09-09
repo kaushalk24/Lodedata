@@ -510,3 +510,87 @@ Placed **outside** the quoted path on the shortcut Target line, e.g.
 [Macros](https://docs.lodedata.com/design/guides/macros/),
 [Active Entry Menu](https://docs.lodedata.com/design/manual/active-entry/),
 [FAQ](https://docs.lodedata.com/FAQ/).
+
+
+---
+
+# Third pass — from the screenshots
+
+The PDFs carry the screen images, so the interface could finally be read rather
+than guessed at. Design, Entry and Power are the same node lines with different
+columns:
+
+```
+Design  Node | 860 | 54 | 42 | 5 | ftg | hc | cab | lv | amp | TSG |
+        tap1 tap2 tap3 tap4 | cplr[branch] | cplr[branch] | 550
+Entry   Branch | Node | ftg | hc | cab | lv | TSG | Map | Loc |
+        [Branch1] | [Branch2] | Amp Name
+Power   Node | Volt | Current | ftg-hc-cab-lv | amp | amp ID# | supply | % |
+        cplr[branch] | cplr[branch] | NIU
+```
+
+Black ground, green data, yellow column headers, a solid green block for the
+cursor, and three rows of numbered screen-menu commands coloured per mode —
+green in Design, cyan in Entry, yellow on the first row in Power.
+
+## Tap display — the bracket is the port count
+
+Quoted exactly:
+
+```
+/26/  represents a two-port 26 tap
+[26]  represents a 4-port 26 tap
+{26}  represents a 6-port (if any)
+<26>  represents a 8-port 26 tap
+```
+
+The tap column is four wide, "a maximum house count of 32, four 8-port taps on
+a single node/line".
+
+## Branch display — the bracket is the branch type
+
+The coupler columns show "the coupler ID # as well as the branch number that is
+created by that coupler. The value of the coupler is outside of the brackets
+and the branch number is inside of them."
+
+| shown | meaning |
+|---|---|
+| `[#]` | normal branch |
+| `(#)` | no footage in the branch (not the same as empty) |
+| `{#}` | backfeed |
+| `<#>` | forwardfeed |
+
+## Which leg is the through leg
+
+A designation between the coupler ID and the brackets says where the low-loss
+leg goes:
+
+| shown | through (low-loss) leg |
+|---|---|
+| `8[2]` | downstream — the standard case |
+| `8 -[2]` | to the branch in the left-most coupler column |
+| `3[2][3]` | downstream; both tap legs feed branches 2 and 3 |
+| `3 -[2][3]` | to branch 2 |
+| `3 =[2][3]` | `--`, which looks like `=`: to the right-most column, branch 3 |
+
+This changes the arithmetic, not just the picture, so it is modelled.
+
+## Navigation — "." is a prefix, not just a separator
+
+| keys | effect |
+|---|---|
+| `↑` `↓` | up/down one node |
+| `←` `→` | left/right one column |
+| `. ↑` `. ↓` | top / bottom of the current branch |
+| `. →` `. ←` | into the branch beginning on the highlighted node / back |
+| `Page Up` `Page Down` | back / forward one branch |
+| `. Page Up` `. Page Down` | first / last branch |
+| `Insert` `. Insert` | insert a line at / below the cursor |
+| `Delete` `. Delete` | delete a line / undelete |
+| `.` while typing | field separator: `107 . 2 . 0` |
+| `Num Lock` | remapped to Esc; also opens the NETWORK MODIFIED menu (3 Restore, 7 Save, 9 Switch) |
+| `/` | backspace in Entry; toggles standard/expanded display in Design |
+| `*` | macros; `* *` opens the macro manager |
+
+So **one branch is on screen at a time** — "a branch can be thought of as one
+page on the display" — and you page between them. That is how the app now works.

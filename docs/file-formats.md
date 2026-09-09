@@ -305,12 +305,19 @@ One record holds one tap *value*, with a sub-block per port count. The manual:
 4-way, 6-way, and 8-way."  The file allocates 256 slots; the samples use
 indices 0–38.
 
-| offset | port count |
-|---|---|
-| 16 | 8-port |
-| 134 | 2-port |
-| 246 | 4-port |
-| 358 | 6-port |
+| offset | port count | drawn as |
+|---|---|---|
+| 16 | 8-port | `<26>` |
+| 134 | 2-port | `/26/` |
+| 246 | 4-port | `[26]` |
+| 358 | 6-port | `{26}` |
+
+The bracket style is how the Design screen identifies the port count, quoted
+from the manual. Beside the port slots, **offset +129 holds the Tap ID** — the
+row's identifying value, which "usually corresponds to the actual tap value"
+and is what the screen prints inside the brackets. It matches the value in the
+2-port part number in every record of both sample spec sets, and the rows
+descend from the highest value, as the manual says they should.
 
 Each slot holds a 14-character part number, then two ten-slot loss blocks in
 the same layout as cables and couplers:

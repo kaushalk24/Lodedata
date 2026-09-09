@@ -56,6 +56,16 @@ class CouplerPlacement:
     style: str = BRANCH_NORMAL
 
 
+# Which leg of a coupler carries the through (low-loss) path.  From the manual:
+# "8[2]" sends the through leg downstream; "8 -[2]" a single minus sends it to
+# the branch in the left-most coupler column; "3 =[2][3]" a double minus, which
+# looks like an equals sign, sends it to the right-most.
+THROUGH_DOWNSTREAM = 0
+THROUGH_FIRST = 1
+THROUGH_SECOND = 2
+THROUGH_MARK = {THROUGH_DOWNSTREAM: "", THROUGH_FIRST: "-", THROUGH_SECOND: "="}
+
+
 @dataclass
 class Node:
     """One line of the screen."""
@@ -71,6 +81,7 @@ class Node:
     amp_label: str = ""         # from the Amplifier Definition window
     taps: list = field(default_factory=list)      # up to 4 TapPlacement
     couplers: list = field(default_factory=list)  # up to 2 CouplerPlacement
+    through_leg: int = THROUGH_DOWNSTREAM
     map: str = ""
     loc: str = ""
     address: str = ""

@@ -14,8 +14,19 @@ const msg = m => { $('#stMsg').textContent = m; if (m) setTimeout(() => {
 
 const S = {
   nid: null, net: null, scr: null, mode: 'design',
+  branch: 1,          // the branch page on screen -- one at a time, as in the program
   row: 0, col: 0, buffer: null,
+  dot: false,         // the "." prefix that turns a nav key into a branch move
 };
+
+// rows of the branch currently on screen
+function pageRows() {
+  if (!S.scr) return [];
+  return S.scr.rows.filter(r => r.branch === S.branch);
+}
+function branchMeta(n) {
+  return (S.scr && S.scr.branches.find(b => b.number === n)) || null;
+}
 
 // ---------------------------------------------------------------- columns
 // Each mode shows the same node lines with a different set of columns, as the
@@ -98,7 +109,7 @@ function cellText(r, c) {
 // ---------------------------------------------------------------- render
 function renderGrid() {
   const cols = columns();
-  const rows = (S.scr && S.scr.rows) || [];
+  const rows = pageRows();
   const thead = $('#grid thead'), tbody = $('#grid tbody');
   thead.innerHTML = '<tr><th class="gutter"></th>' +
     cols.map(c => `<th class="${c.cls || ''}">${esc(c.head)}</th>`).join('') +
@@ -140,7 +151,7 @@ function renderGrid() {
 }
 
 function renderInfo() {
-  const r = (S.scr && S.scr.rows[S.row]) || null;
+  const r = pageRows()[S.row] || null;
   const box = $('#info');
   if (!r) { box.textContent = ''; return; }
   const t = (S.scr && S.scr.totals) || {};
@@ -155,7 +166,9 @@ function renderInfo() {
     (r.flags.length ? r.flags.map(f => `! ${f.message}`).join('\n') + '\n' : '') +
     `\nnodes ${t.nodes || 0}  taps ${t.taps || 0}  actives ${t.actives || 0}  ` +
     `homes ${t.homes || 0}  ${t.footage || 0} ft`;
-  $('#stBranch').textContent = `Branch ${r.branch} of ${t.branches || 1}`;
+  const m = branchMeta(S.branch);
+  $('#stBranch').textContent =
+    `Branch ${m ? m.position : 1} of ${(S.scr && S.scr.branches.length) || 1}`;
   $('#stFeeder').textContent = `Feeder ${r.branch}.${r.node}`;
 }
 
@@ -218,7 +231,7 @@ function renderMenu() {
 const EDIT_ORDER = ['ftg', 'hc', 'cab', 'lv'];
 
 function curCol() { return columns()[S.col]; }
-function curRow() { return S.scr && S.scr.rows[S.row]; }
+function curRow() { return pageRows()[S.row]; }
 
 async function commitBuffer(advance) {
   const c = curCol(), r = curRow();
@@ -263,7 +276,7 @@ function moveToNextField() {
     if (next >= 0) { S.col = next; renderGrid(); return; }
   }
   // past the last field: drop to the next node line, as Entry does
-  S.row = Math.min(S.row + 1, (S.scr.rows.length - 1));
+  S.row = Math.min(S.row + 1, pageRows().length - 1);
   S.col = cols.findIndex(x => x.key === 'ftg');
   renderGrid();
 }
@@ -275,16 +288,43 @@ document.addEventListener('keydown', async ev => {
   const cols = columns();
   const k = ev.key;
 
-  if (k === 'ArrowUp') { S.row = Math.max(0, S.row - 1); S.buffer = null; }
-  else if (k === 'ArrowDown') { S.row = Math.min((S.scr?.rows.length || 1) - 1, S.row + 1); S.buffer = null; }
-  else if (k === 'ArrowLeft') { S.col = Math.max(0, S.col - 1); S.buffer = null; }
-  else if (k === 'ArrowRight') { S.col = Math.min(cols.length - 1, S.col + 1); S.buffer = null; }
+  const n = pageRows().length;
+  if (k === 'ArrowUp') {
+    if (S.dot) S.row = 0; else S.row = Math.max(0, S.row - 1);
+    S.buffer = null; S.dot = false;
+  }
+  else if (k === 'ArrowDown') {
+    if (S.dot) S.row = n - 1; else S.row = Math.min(n - 1, S.row + 1);
+    S.buffer = null; S.dot = false;
+  }
+  else if (k === 'ArrowRight') {
+    // ". →" moves to the branch beginning on the highlighted node
+    if (S.dot) { S.dot = false; ev.preventDefault(); enterBranch(); return; }
+    S.col = Math.min(cols.length - 1, S.col + 1); S.buffer = null;
+  }
+  else if (k === 'ArrowLeft') {
+    if (S.dot) { S.dot = false; ev.preventDefault(); returnToParent(); return; }
+    S.col = Math.max(0, S.col - 1); S.buffer = null;
+  }
+  else if (k === 'PageUp') {
+    ev.preventDefault();
+    if (S.dot) { S.dot = false; gotoBranch(S.scr.branches[0].number); }
+    else stepBranch(-1);
+    return;
+  }
+  else if (k === 'PageDown') {
+    ev.preventDefault();
+    if (S.dot) { S.dot = false; gotoBranch(S.scr.branches.at(-1).number); }
+    else stepBranch(1);
+    return;
+  }
   else if (k === 'Home') { S.row = 0; }
-  else if (k === 'End') { S.row = (S.scr?.rows.length || 1) - 1; }
+  else if (k === 'End') { S.row = n - 1; }
   else if (k === '.') {
-    // the field separator: commit and step to the next field
+    // typing: the field separator. Otherwise the prefix for a branch move.
     if (S.buffer !== null) { ev.preventDefault(); await commitBuffer(true); return; }
-    moveToNextField(); ev.preventDefault(); return;
+    S.dot = true; msg('. — press an arrow or Page key for a branch move');
+    ev.preventDefault(); return;
   }
   else if (k === 'Enter') {
     ev.preventDefault();
@@ -301,7 +341,7 @@ document.addEventListener('keydown', async ev => {
     if (S.buffer) S.buffer = S.buffer.slice(0, -1);
     else if (S.buffer === '') S.buffer = null;
   }
-  else if (k === 'Escape') { S.buffer = null; }
+  else if (k === 'Escape') { S.buffer = null; S.dot = false; }
   else if (k === 'Insert') { ev.preventDefault(); await insertNode(); return; }
   else if (k === 'Delete') { ev.preventDefault(); await deleteNode(); return; }
   else return;
@@ -319,6 +359,38 @@ async function openCell() {
   if (c.key === 'cab') return pickCable();
   if (c.key === 'ampname') return nameAmp();
   msg('nothing to open on this column');
+}
+
+function gotoBranch(n, node) {
+  if (!branchMeta(n)) return;
+  S.branch = n; S.buffer = null;
+  const rows = pageRows();
+  S.row = node ? Math.max(0, rows.findIndex(r => r.node === node)) : 0;
+  const cols = columns();
+  S.col = Math.max(1, cols.findIndex(c => c.key === 'ftg'));
+  renderGrid();
+  const m = branchMeta(n);
+  msg(`branch ${n}${m && m.parent_branch ? ` — from ${m.parent_branch}.${m.parent_node}` : ' — the feeder'}`);
+}
+function stepBranch(delta) {
+  const list = S.scr.branches.map(b => b.number);
+  const i = list.indexOf(S.branch);
+  const next = list[Math.min(list.length - 1, Math.max(0, i + delta))];
+  if (next === S.branch) { msg(delta < 0 ? 'first branch' : 'last branch'); return; }
+  gotoBranch(next);
+}
+function enterBranch() {
+  const r = curRow();
+  if (!r || !r.couplers.length) { msg('no branch begins on this node'); return; }
+  // the branch number is what sits inside the brackets
+  const m = /[[({<](\d+)[\])}>]/.exec(r.couplers[0]);
+  if (!m) { msg('no branch on this node'); return; }
+  gotoBranch(+m[1]);
+}
+function returnToParent() {
+  const m = branchMeta(S.branch);
+  if (!m || !m.parent_branch) { msg('already on the feeder'); return; }
+  gotoBranch(m.parent_branch, m.parent_node);
 }
 
 // ---------------------------------------------------------------- pickers
@@ -376,7 +448,8 @@ async function pickCoupler(slot) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) });
     await refresh();
-    msg(pick ? 'coupler placed; it starts a new branch' : 'coupler and its branch removed');
+    msg(pick ? 'coupler placed — it starts a new branch; press . → to go into it'
+             : 'coupler and its branch removed');
   }, 'Placing a coupler creates the branch it feeds.');
 }
 
@@ -410,7 +483,7 @@ async function insertNode() {
   await api(`/api/networks/${S.nid}/branches/${r ? r.branch : 1}/nodes`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ after: r ? r.node : 0 }) });
-  await refresh(); S.row = Math.min(S.row + 1, S.scr.rows.length - 1); renderGrid();
+  await refresh(); S.row = Math.min(S.row + 1, pageRows().length - 1); renderGrid();
   msg('node inserted');
 }
 async function deleteNode() {
@@ -422,16 +495,18 @@ async function deleteNode() {
 async function delBranch() {
   const r = curRow(); if (!r || r.branch === 1) { msg('the feeder cannot be deleted'); return; }
   if (!confirm(`Delete branch ${r.branch} and everything on it?`)) return;
+  const parent = branchMeta(r.branch);
   await api(`/api/networks/${S.nid}/branches/${r.branch}`, { method: 'DELETE' });
-  S.row = 0; await refresh(); msg('branch deleted');
+  await refresh();
+  gotoBranch(parent && parent.parent_branch ? parent.parent_branch : 1);
+  msg('branch deleted');
 }
 function alter() { openCell(); }
 function jump() {
-  const v = prompt('Jump to node (branch.node)', '1.1'); if (!v) return;
+  const v = prompt('Jump to node (branch.node)', `${S.branch}.1`); if (!v) return;
   const [b, n] = v.split('.').map(Number);
-  const i = S.scr.rows.findIndex(r => r.branch === b && r.node === (n || 1));
-  if (i < 0) { msg('no such node'); return; }
-  S.row = i; renderGrid();
+  if (!branchMeta(b)) { msg('no such branch'); return; }
+  gotoBranch(b, n || 1);
 }
 function carry() {
   const r = curRow(), c = curCol(); if (!r || !c) return;
@@ -528,6 +603,11 @@ const MENU_ACTIONS = {
          ['Import .ntw', importNtw]],
   mode: [['Design', () => setMode('design')], ['Entry', () => setMode('entry')],
          ['Power', () => setMode('power')]],
+  branch: [['Next branch  (Page Down)', () => stepBranch(1)],
+           ['Previous branch  (Page Up)', () => stepBranch(-1)],
+           ['Into the branch on this node  (. \u2192)', enterBranch],
+           ['Back to the parent branch  (. \u2190)', returnToParent],
+           ['Branch list', branchList]],
   spec: [['Attach spec set', attachSpec], ['Sample specs', sampleSpecs],
          ['View library', viewLibrary]],
   reports: [['Level sheet', () => openReport('levels')],
@@ -553,6 +633,14 @@ $$('.menubar .mi').forEach(mi => mi.onclick = () => {
   });
 });
 
+function branchList() {
+  const items = S.scr.branches.map(b => ({ n: b.number,
+    label: `Branch ${b.number}${b.label ? ' — ' + b.label : ''}`,
+    detail: b.parent_branch ? `${b.nodes} nodes · from ${b.parent_branch}.${b.parent_node} · ${b.style}`
+                            : `${b.nodes} nodes · feeder` }));
+  chooser('Branches', items, pick => { if (pick) gotoBranch(pick.n); });
+}
+
 function showHelp() {
   modal(`<h2>Keys</h2>
    <p>Arrow keys move the cursor. Type digits to enter a value.
@@ -561,6 +649,12 @@ function showHelp() {
    <b>Enter</b> commits, or opens a picker on the tap, coupler, amp and cable
    columns. <b>Insert</b> adds a node, <b>Delete</b> removes one,
    <b>Esc</b> abandons what you were typing.</p>
+   <p>One branch is on screen at a time, as in the program.
+   <b>Page Down</b> / <b>Page Up</b> move between branches,
+   <b>. Page Down</b> / <b>. Page Up</b> jump to the last or first.
+   <b>. &rarr;</b> goes into the branch beginning on the highlighted node and
+   <b>. &larr;</b> comes back to the parent. <b>. &uarr;</b> / <b>. &darr;</b>
+   go to the top and bottom of the branch.</p>
    <p>The numbered bars are the screen menu — click them or use the menu bar.</p>
    <div class="row"><button id="mClose" class="primary">Close</button></div>`);
 }
@@ -658,7 +752,8 @@ function setMode(m) {
 }
 async function refresh() {
   S.scr = await api(`/api/networks/${S.nid}/screen`);
-  if (S.row >= S.scr.rows.length) S.row = Math.max(0, S.scr.rows.length - 1);
+  if (!branchMeta(S.branch)) S.branch = S.scr.branches.length ? S.scr.branches[0].number : 1;
+  S.row = Math.max(0, Math.min(S.row, pageRows().length - 1));
   renderGrid();
 }
 async function reload() {
@@ -667,7 +762,7 @@ async function reload() {
   await refresh();
 }
 async function open(id) {
-  S.nid = id; S.row = 0;
+  S.nid = id; S.row = 0; S.branch = 1;
   await reload(); setMode(S.mode);
   $('#selNet').value = id;
 }

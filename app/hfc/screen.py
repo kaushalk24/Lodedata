@@ -13,7 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .plant import Design, Branch, Node, TAP_BRACKETS, BRANCH_BRACKETS, bracket
+from .plant import (Design, Branch, Node, TAP_BRACKETS, BRANCH_BRACKETS,
+                    THROUGH_MARK, THROUGH_DOWNSTREAM, bracket)
 
 POWERING_PASSES = 4
 
@@ -78,12 +79,14 @@ class Row:
 class Screen:
     rows: list = field(default_factory=list)
     frequencies: list = field(default_factory=list)   # column order
+    branches: list = field(default_factory=list)      # paging metadata
     problems: list = field(default_factory=list)
     totals: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
         return {"rows": [r.as_dict() for r in self.rows],
                 "frequencies": self.frequencies,
+                "branches": self.branches,
                 "problems": self.problems, "totals": self.totals}
 
 
@@ -170,25 +173,36 @@ def build(design: Design) -> Screen:
 
             scr.rows.append(row)
 
-            # couplers start branches, walked where they sit
-            for cp in node.couplers:
-                passive = lib.passives.get(cp.part_id)
-                child = design.branch(cp.branch)
-                style = BRANCH_BRACKETS.get(cp.style, "[]")
-                cid = cp.coupler_id or (passive.coupler_id if passive else 0)
-                row.couplers.append(f"{cid or ''}{bracket(str(cp.branch), style)}")
-                if not child:
-                    continue
-                # port 0 is the through leg, the tap legs follow
-                tap_leg = passive.port_db(1) if passive else 0.0
-                down = {f: (levels[f] - tap_leg if _is_forward(p, f)
-                            else levels[f] + tap_leg) for f in freqs}
-                walk(child, down, depth + 1, cum_ft, True)
-                if passive:
-                    thru = passive.port_db(0)
-                    for f in freqs:
-                        levels[f] = (levels[f] - thru if _is_forward(p, f)
-                                     else levels[f] + thru)
+            # couplers start branches, walked where their coupler sits.
+            # The through (low-loss) leg goes downstream unless the node says
+            # otherwise -- that is what the "-" and "=" designations mean.
+            if node.couplers:
+                passive = next((lib.passives.get(c.part_id)
+                                for c in node.couplers if c.part_id), None)
+                thru_db = passive.port_db(0) if passive else 0.0
+                tap_db = passive.port_db(1) if passive else 0.0
+                mark = THROUGH_MARK.get(node.through_leg, "")
+                for i, cp in enumerate(node.couplers):
+                    style = BRANCH_BRACKETS.get(cp.style, "[]")
+                    cid = cp.coupler_id or (passive.coupler_id if passive else 0)
+                    head = f"{cid or ''}{mark}" if i == 0 else ""
+                    row.couplers.append(head + bracket(str(cp.branch), style))
+
+                def leg(which: int) -> float:
+                    return thru_db if which == node.through_leg else tap_db
+
+                for i, cp in enumerate(node.couplers, start=1):
+                    child = design.branch(cp.branch)
+                    if not child:
+                        continue
+                    loss = leg(i)
+                    down = {f: (levels[f] - loss if _is_forward(p, f)
+                                else levels[f] + loss) for f in freqs}
+                    walk(child, down, depth + 1, cum_ft, True)
+                loss = leg(THROUGH_DOWNSTREAM)
+                for f in freqs:
+                    levels[f] = (levels[f] - loss if _is_forward(p, f)
+                                 else levels[f] + loss)
 
     feeder = design.branches.get(1)
     if feeder:
@@ -203,6 +217,16 @@ def build(design: Design) -> Screen:
     _gutter(scr)
     _powering(design, scr)
     _totals(design, scr)
+    order = []
+    for r in scr.rows:
+        if r.branch not in order:
+            order.append(r.branch)
+    scr.branches = [{
+        "number": b.number, "parent_branch": b.parent_branch,
+        "parent_node": b.parent_node, "style": b.style, "label": b.label,
+        "nodes": len(b.nodes),
+        "position": order.index(b.number) + 1 if b.number in order else 0,
+    } for b in sorted(design.branches.values(), key=lambda x: x.number)]
     return scr
 
 
