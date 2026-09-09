@@ -37,8 +37,15 @@ LAYOUT = {
     "tap": (512, 908, 16),
 }
 
-# tap part-number slots, keyed by the port count they belong to
-TAP_NAME_SLOTS = {8: 16, 2: 134, 4: 246, "aux1": 588, "aux2": 700}
+# Tap records hold one row per tap value, with a sub-block for each port
+# count.  Slot offsets confirmed against two independent vendors' spec sets:
+# RMT2008-RF-20 sits at +16 and decodes to exactly 20.0 dB, RMT2002-RF-23 at
+# +134 to 23.0 dB, and so on.
+TAP_PORT_SLOTS = {8: 16, 2: 134, 4: 246, 6: 358}
+# within a slot, relative to the part-number field
+TAP_VALUE_BLOCK = 25        # losses toward the tap ports
+TAP_INSERTION_BLOCK = 65    # hard cable in to hard cable out
+TAP_NAME_SLOTS = TAP_PORT_SLOTS      # kept for older callers
 
 
 def _records(data: bytes, kind: str):
@@ -100,6 +107,9 @@ class CouplerSpec:
                              # for others it looks like family*100 + value
                              # (RLDC12-8 -> 408).  Needs ground truth to split.
     values: list             # remaining fixed-point fields, still being mapped
+    tap_legs: int = 1        # branches this coupler creates (stored as count-1)
+    internal: bool = False   # an internal coupler: no fittings BOMed, must sit
+                             # at the same location as an amplifier
 
 
 def read_couplers(data: bytes) -> list:
@@ -115,6 +125,8 @@ def read_couplers(data: bytes) -> list:
             name=name,
             alt_name=_name(seg[13:30]),
             code=_fx(struct.unpack_from("<i", seg, 1)[0]),
+            tap_legs=seg[110] + 1,
+            internal=bool(seg[113]),
             values=[_fx(v) for v in struct.unpack_from("<20i", seg, 30)],
         ))
     return out
@@ -138,6 +150,29 @@ class ActiveSpec:
     values: list = field(default_factory=list)
 
 
+# The .atv file holds more than the Actives table -- the manual describes
+# Reserve Gain, Power Steps, Pads/EQ banks 1-8 and a Configuration Table as
+# further pages.  Where the Actives table ends is not mapped, so records are
+# checked for plausibility instead of assumed: past the end, the fixed stride
+# reads into another page and produces levels like 538.97 dB.
+LEVEL_RANGE = (-40.0, 120.0)
+VOLTAGE_RANGE = (20.0, 150.0)
+MAX_AMPS = 30.0
+
+
+def _plausible_active(name: str, levels: list, table: list) -> bool:
+    if len(name) < 2 or not all(32 <= ord(c) < 127 for c in name):
+        return False
+    if not all(LEVEL_RANGE[0] <= v <= LEVEL_RANGE[1] for v in levels):
+        return False
+    for volts, amps in table:
+        if not (VOLTAGE_RANGE[0] <= volts <= VOLTAGE_RANGE[1]):
+            return False
+        if not (0 < amps <= MAX_AMPS):
+            return False
+    return True
+
+
 def read_actives(data: bytes) -> list:
     out = []
     for slot, off, seg in _records(data, "atv"):
@@ -152,13 +187,16 @@ def read_actives(data: bytes) -> list:
             volts, amps = nums[i], nums[i + 1]
             if volts > 0 and amps > 0:
                 table.append([round(volts, 1), round(amps, 3)])
+        levels = [round(v, 2) for v in nums[0:8]]
+        if not _plausible_active(name, levels, table):
+            continue
         out.append(ActiveSpec(
             slot=slot,
             name=name,
             housing=_name(seg[18:20]),
             option_parts=parts,
-            input_levels=[round(v, 2) for v in nums[0:4]],
-            output_levels=[round(v, 2) for v in nums[4:8]],
+            input_levels=levels[0:4],
+            output_levels=levels[4:8],
             power_draw=table,
             values=nums,
         ))
@@ -169,27 +207,54 @@ def read_actives(data: bytes) -> list:
 # taps
 # --------------------------------------------------------------------------
 @dataclass
+class TapPort:
+    """One port-count variant of a tap value."""
+    ports: int
+    part: str
+    tap_value: list = field(default_factory=list)   # [High, Low, Rh, Rl] dB
+    insertion: list = field(default_factory=list)   # [High, Low, Rh, Rl] dB
+
+
+@dataclass
 class TapSpec:
     slot: int
-    parts: dict              # port count / slot label -> part number
-    values: list
+    ports: dict = field(default_factory=dict)   # port count -> TapPort
+    parts: dict = field(default_factory=dict)   # port count -> part number
+
+    @property
+    def tap_value_db(self) -> float:
+        """Nominal value of the row: the forward-high figure of any variant."""
+        for n in (2, 4, 8, 6):
+            p = self.ports.get(n)
+            if p and p.tap_value:
+                return p.tap_value[0]
+        return 0.0
+
+
+def _loss4(seg: bytes, base: int) -> list:
+    """Read the four required frequencies out of a ten-slot loss block."""
+    return [round(_fx(struct.unpack_from("<i", seg, base + 4 * i)[0]), 3)
+            for i in (0, 1, 6, 7)]
 
 
 def read_taps(data: bytes) -> list:
     out = []
     for slot, off, seg in _records(data, "tap"):
-        parts = {}
-        for key, o in TAP_NAME_SLOTS.items():
-            p = _name(seg[o:o + 16])
-            if p:
-                parts[str(key)] = p
-        if not parts:
+        ports = {}
+        for count, o in TAP_PORT_SLOTS.items():
+            part = _name(seg[o:o + 16])
+            if not part:
+                continue
+            ports[count] = TapPort(
+                ports=count,
+                part=part,
+                tap_value=_loss4(seg, o + TAP_VALUE_BLOCK),
+                insertion=_loss4(seg, o + TAP_INSERTION_BLOCK),
+            )
+        if not ports:
             continue
-        out.append(TapSpec(
-            slot=slot,
-            parts=parts,
-            values=[_fx(v) for v in struct.unpack_from("<8i", seg, 32)],
-        ))
+        out.append(TapSpec(slot=slot, ports=ports,
+                           parts={str(k): v.part for k, v in ports.items()}))
     return out
 
 

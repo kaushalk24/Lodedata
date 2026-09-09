@@ -70,14 +70,23 @@ class CableType:
 
 @dataclass
 class TapType:
+    """A tap of one port count.
+
+    Lode Data calls the two loss sets "Tap Value" -- the loss toward the tap
+    ports -- and "Tap Losses", the insertion loss from hard cable in to hard
+    cable out.  Both are given at each design frequency, so both are stored
+    as frequency tables rather than single numbers.
+    """
     id: str
     name: str
     ports: int = 4
-    tap_value_db: float = 26.0
-    through_loss: list = field(default_factory=list)      # [(MHz, dB)]
+    tap_value_db: float = 26.0                            # nominal, for display
+    tap_value: list = field(default_factory=list)         # [(MHz, dB)] toward the ports
+    through_loss: list = field(default_factory=list)      # [(MHz, dB)] insertion
     return_through_loss: list = field(default_factory=list)
     current_draw_a: float = 0.0
     power_passing: bool = True
+    self_terminating: bool = False
     source: str = "manual"
 
     def through_db(self, mhz: float, reverse: bool = False) -> float:
@@ -85,7 +94,8 @@ class TapType:
         return interpolate_sqrt([tuple(p) for p in pts], mhz)
 
     def tap_db(self, mhz: float) -> float:
-        # tap-port loss is essentially flat; the value in the part number is it
+        if self.tap_value:
+            return interpolate_sqrt([tuple(p) for p in self.tap_value], mhz)
         return self.tap_value_db
 
 
@@ -175,19 +185,32 @@ class ActiveType:
         return self.in_forward_high < NO_RF_INPUT
 
     def current_at(self, volts: float) -> float:
-        """Current drawn at an applied voltage, from the spec table."""
+        """Current drawn at an applied voltage.
+
+        The manual defines these as *power steps*, not a curve to interpolate:
+        "from Vmin to V2, it uses A1 amperes; from V2 to V3, A2 amperes are
+        used".  So each entry gives the draw from its own voltage up to the
+        next one.
+        """
         if not self.power_draw:
             return self.current_draw_a
         pts = sorted((float(v), float(a)) for v, a in self.power_draw)
-        if len(pts) == 1 or volts <= pts[0][0]:
-            return pts[0][1]
-        if volts >= pts[-1][0]:
-            return pts[-1][1]
-        for (v0, a0), (v1, a1) in zip(pts, pts[1:]):
-            if v0 <= volts <= v1:
-                t = (volts - v0) / (v1 - v0) if v1 != v0 else 0.0
-                return a0 + t * (a1 - a0)
-        return pts[-1][1]
+        if volts < pts[0][0]:
+            return pts[0][1]              # below Vmin: the worst-case draw
+        current = pts[0][1]
+        for v, a in pts:
+            if volts >= v:
+                current = a
+            else:
+                break
+        return current
+
+    @property
+    def min_voltage(self) -> float:
+        """Vmin: the lowest voltage at which the active will operate."""
+        if self.power_draw:
+            return min(float(v) for v, _ in self.power_draw)
+        return self.min_operating_voltage
 
 
 @dataclass
@@ -338,9 +361,19 @@ class Network:
             del self.elements[eid]
         return removed
 
+    @property
+    def has_specs(self) -> bool:
+        """A design cannot be calculated until a spec set is attached."""
+        lib = self.library
+        return bool(lib.cables or lib.taps or lib.actives or lib.passives)
+
     def validate(self) -> list:
         """Structural problems, as a list of human-readable strings."""
         problems = []
+        if not self.has_specs:
+            problems.append(
+                "no spec set attached: every level, loss and part comes from "
+                "the spec files, so attach one before designing")
         for e in self.elements.values():
             if e.parent_id and e.parent_id not in self.elements:
                 problems.append(f"{e.label or e.id}: parent no longer exists")

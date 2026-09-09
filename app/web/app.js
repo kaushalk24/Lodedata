@@ -55,9 +55,33 @@ function partName(el) {
   return S.design.library[t]?.[el.part_id]?.name || '(missing)';
 }
 
+function hasSpecs() {
+  const l = S.design?.library || {};
+  return Object.keys(l.cables || {}).length + Object.keys(l.taps || {}).length
+       + Object.keys(l.actives || {}).length + Object.keys(l.passives || {}).length > 0;
+}
+
 function renderCascade() {
   const tb = $('#cascade tbody');
   const r = S.results;
+  if (!hasSpecs()) {
+    tb.innerHTML = `<tr><td colspan="17">
+      <div class="needspec">
+        <h2>Attach a spec set to start designing</h2>
+        <p>Nothing is loaded by default and nothing carries over from another
+           design. Every level, loss, part number and powering figure comes from
+           the spec files, so a design has no meaning until one is attached.</p>
+        <p>Go to <b>Import</b> and select a Lode Data spec set — the
+           <code>.par .atv .tap .cpr .cbl</code> files that share one name — or
+           load the built-in sample specs to try the tool out.</p>
+        <p><button id="loadSample">Load sample specs</button>
+           <span class="hint">samples only, not for real design</span></p>
+      </div></td></tr>`;
+    $('#totals').textContent = '';
+    const b = $('#loadSample');
+    if (b) b.onclick = loadSampleSpecs;
+    return;
+  }
   if (!r || !r.order.length) {
     tb.innerHTML = `<tr><td colspan="17" class="empty">No devices yet. Add a node to start.</td></tr>`;
     $('#totals').textContent = '';
@@ -167,7 +191,16 @@ function renderInspector() {
 }
 
 // ---------------------------------------------------------------- add
+async function loadSampleSpecs() {
+  status('Loading sample specs…');
+  await api(`/api/designs/${S.design.id}/library/sample`, { method: 'POST' });
+  status('Sample specs attached');
+  await reloadDesign();
+  renderLibrary();
+}
+
 async function addElement(type) {
+  if (!hasSpecs()) { alert('Attach a spec set first — see the Import tab.'); return; }
   const parent = type === 'node' ? null : S.selected;
   if (type !== 'node' && !parent) { alert('Select the device this one is fed from first.'); return; }
   const defaults = { type, parent_id: parent, parent_port: 0, length_ft: 0 };
@@ -195,7 +228,9 @@ function renderLibrary() {
   if (!S.design) return;
   const table = S.design.library[S.libTab] || {};
   const rows = Object.values(table).sort((a, b) => a.name.localeCompare(b.name));
-  $('#libSource').textContent = `${S.design.library.name} — ${rows.length} parts`;
+  $('#libSource').textContent = S.design.library.name
+    ? `${S.design.library.name} — ${rows.length} parts`
+    : 'No spec set attached — see the Import tab';
   const thead = $('#libTable thead'), tbody = $('#libTable tbody');
   if (!rows.length) { thead.innerHTML = ''; tbody.innerHTML = '<tr><td class="empty">Empty.</td></tr>'; return; }
   const cols = Object.keys(rows[0]).filter(c => c !== 'id');
@@ -252,6 +287,7 @@ $('#uploadSpec').onclick = async () => {
     status('Spec attached'); await reloadDesign(); renderLibrary();
   } catch (e) { $('#specResult').textContent = e.message; status('Failed'); }
 };
+$('#uploadSample').onclick = loadSampleSpecs;
 $('#uploadNtw').onclick = async () => {
   const f = $('#ntwFile').files[0];
   if (!f) { alert('Choose a .ntw file first.'); return; }
@@ -287,7 +323,8 @@ $('#newDesign').onclick = async () => {
   const name = prompt('Name for the new design?', 'New design');
   if (!name) return;
   const d = await api('/api/designs', { method: 'POST',
-    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, sample_specs: false }) });
   await loadDesignList(d.id); await openDesign(d.id);
 };
 
@@ -295,7 +332,8 @@ $('#newDesign').onclick = async () => {
   let id = await loadDesignList();
   if (!id) {
     const d = await api('/api/designs', { method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'First design' }) });
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'First design', sample_specs: false }) });
     id = await loadDesignList(d.id);
   }
   await openDesign(id);

@@ -42,6 +42,19 @@ BLOCK_HIGH, BLOCK_LOW, BLOCK_RH, BLOCK_RL = 0, 1, 6, 7
 NON_POWERING_LOOP_RESISTANCE = 99.0
 
 
+def _four_points(four: list, params: DesignParameters) -> list:
+    """[High, Low, Rh, Rl] -> [(MHz, dB)] against the design's frequency plan."""
+    if not four or len(four) < 4:
+        return []
+    pairs = [
+        (params.return_low_mhz, abs(four[3])),
+        (params.return_high_mhz, abs(four[2])),
+        (params.forward_low_mhz, abs(four[1])),
+        (params.forward_high_mhz, abs(four[0])),
+    ]
+    return [[f, round(v, 4)] for f, v in pairs if v]
+
+
 def _loss_points(block, params: DesignParameters) -> list:
     """A loss block -> [(MHz, dB per 100 ft)] the engine can interpolate."""
     pairs = [
@@ -101,34 +114,44 @@ def library_from_spec_set(base: str | Path,
         ))
 
     for t in spec.taps:
-        for ports_key, part in sorted(t.parts.items()):
-            try:
-                ports = int(ports_key)
-            except ValueError:
-                continue
-            value = _tap_value_from_part(part)
-            if value is None:
-                continue
+        for ports, port in sorted(t.ports.items()):
+            # tap value and insertion loss are both given at the four design
+            # frequencies, in the same [High, Low, Rh, Rl] order as cables
+            value_pts = _four_points(port.tap_value, params)
+            loss_pts = _four_points(port.insertion, params)
+            nominal = port.tap_value[0] if port.tap_value else (
+                _tap_value_from_part(port.part) or 0.0)
             lib.add(TapType(
                 id=new_id("tap"),
-                name=part,
+                name=port.part,
                 ports=ports,
-                tap_value_db=value,
-                through_loss=[],           # needs ground truth, see open questions
+                tap_value_db=round(nominal, 2),
+                tap_value=value_pts,
+                through_loss=[p for p in loss_pts
+                              if p[0] >= params.forward_low_mhz],
+                return_through_loss=[p for p in loss_pts
+                                     if p[0] <= params.return_high_mhz],
                 source=f"lodedata:{base.name}.tap",
             ))
 
     for p in spec.couplers:
         # a coupler record carries two loss blocks: the thru leg then the tap
         # leg, each in the same ten-value layout the cable file uses
-        legs = [p.values[0:10], p.values[10:20]]
-        losses = [abs(leg[BLOCK_HIGH]) for leg in legs if any(leg)]
+        # the manual is explicit about the order: the Tap leg columns come
+        # first, then the Thru leg columns
+        tap_leg, thru_leg = p.values[0:10], p.values[10:20]
+        losses, names = [], []
+        if any(thru_leg):
+            losses.append(round(abs(thru_leg[BLOCK_HIGH]), 2)); names.append("thru")
+        for _ in range(max(1, p.tap_legs) if any(tap_leg) else 0):
+            losses.append(round(abs(tap_leg[BLOCK_HIGH]), 2)); names.append("tap")
         lib.add(PassiveType(
             id=new_id("psv"),
             name=p.name,
-            kind="power_inserter" if "PI" in p.name.upper() else "splitter",
-            port_losses=[round(v, 2) for v in losses],
-            power_passing=[True] * len(losses),
+            kind=("power_inserter" if "PI" in p.name.upper()
+                  else "coupler" if len(set(losses)) > 1 else "splitter"),
+            port_losses=losses or [0.0],
+            power_passing=[True] * max(1, len(losses)),
             source=f"lodedata:{base.name}.cpr",
         ))
 

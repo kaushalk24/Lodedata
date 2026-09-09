@@ -52,3 +52,8 @@ pre{background:#0f1622;color:#d6e1f2;padding:10px;border-radius:6px;overflow:aut
 .empty{color:var(--muted)}
 code{background:#eef1f5;padding:1px 4px;border-radius:3px}
 .danger{border-color:#d9534f;color:#d9534f}
+
+.needspec{padding:26px 20px;max-width:680px}
+.needspec h2{font-size:16px;margin-bottom:10px}
+.needspec p{margin:0 0 10px;color:var(--muted);white-space:normal;line-height:1.55}
+.needspec b{color:var(--ink)}

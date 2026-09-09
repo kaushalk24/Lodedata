@@ -63,6 +63,7 @@ def save(net: Network) -> Network:
 # --------------------------------------------------------------------------
 class NewDesign(BaseModel):
     name: str = "New design"
+    sample_specs: bool = False      # opt in to the sample library explicitly
 
 
 @app.get("/api/designs")
@@ -75,12 +76,33 @@ def list_designs():
 
 @app.post("/api/designs")
 def create_design(body: NewDesign):
-    net = Network(id=new_id("dsn"), name=body.name, library=starter_library())
-    net.add(Element(id=new_id("el"), type="node", label="Node 1",
-                    part_id="act_Optical_node_4_out",
-                    source_dbmv=50.0, source_tilt_db=10.0))
+    """A new design starts empty.
+
+    Nothing is carried over from a previous design and no equipment is
+    assumed: every level, loss and part number comes from the spec set, so one
+    has to be attached before there is anything to design with.
+    """
+    net = Network(id=new_id("dsn"), name=body.name)
+    if body.sample_specs:
+        net.library = starter_library()
+        net.add(Element(id=new_id("el"), type="node", label="Node 1",
+                        part_id="act_Optical_node_4_out",
+                        source_dbmv=50.0, source_tilt_db=10.0))
     save(net)
     return net.to_dict()
+
+
+@app.post("/api/designs/{design_id}/library/sample")
+def load_sample_specs(design_id: str):
+    """Attach the built-in sample specs, for trying the tool out."""
+    net = load(design_id)
+    report_ = relink_library(net, starter_library())
+    if not net.elements:
+        net.add(Element(id=new_id("el"), type="node", label="Node 1",
+                        part_id="act_Optical_node_4_out",
+                        source_dbmv=50.0, source_tilt_db=10.0))
+    save(net)
+    return {"library": net.library.to_dict(), "relink": report_}
 
 
 @app.get("/api/designs/{design_id}")

@@ -54,13 +54,42 @@ def test_cable_loop_resistance_matches_published_values():
 
 
 @needs_samples
-def test_tap_values_come_from_the_part_numbers():
-    lib = library_from_spec_set(KERMIT)
+def test_tap_port_slots_decode_to_the_value_in_the_part_number():
+    """The strongest check available on the tap layout.
+
+    RMT2008-RF-20 is an 8-port 20 dB tap and RMT2002-RF-23 a 2-port 23 dB one.
+    Reading the tap-value block at each port slot must return exactly those
+    numbers -- which it does, for a vendor whose part numbers were never used
+    to derive the offsets.
+    """
+    lib = library_from_spec_set(WVBECK)
     by_name = {t.name: t for t in lib.taps.values()}
-    assert by_name["MMT2830"].tap_value_db == 30.0
-    assert by_name["MMT2830"].ports == 8
-    assert by_name["MMT2229"].ports == 2
-    assert by_name["MMT2429"].ports == 4
+    for part, ports, value in [("RMT2008-RF-20", 8, 20.0),
+                               ("RMT2002-RF-23", 2, 23.0),
+                               ("RMT2004-RF-17", 4, 17.0)]:
+        tap = by_name[part]
+        assert tap.ports == ports
+        assert tap.tap_value_db == value
+        assert abs(tap.tap_db(860) - value) < 0.01
+
+
+@needs_samples
+def test_tap_insertion_loss_rises_with_port_count():
+    """A tap of the same value costs more through-loss the more ports it has."""
+    lib = library_from_spec_set(WVBECK)
+    by_name = {t.name: t for t in lib.taps.values()}
+    two, four = by_name["RMT2002-RF-23"], by_name["RMT2004-RF-23"]
+    assert four.through_db(860) > two.through_db(860)
+    # insertion loss is far smaller than the tap value
+    assert two.through_db(860) < two.tap_db(860) / 4
+
+
+@needs_samples
+def test_tap_port_slots_hold_across_two_vendors():
+    for spec in (KERMIT, WVBECK):
+        lib = library_from_spec_set(spec)
+        assert {t.ports for t in lib.taps.values()} <= {2, 4, 6, 8}
+        assert len(lib.taps) > 15
 
 
 def test_token_split_ignores_punctuation():
@@ -168,17 +197,37 @@ def test_even_cable_ids_are_aerial_and_odd_are_underground(spec):
 
 
 @needs_samples
-def test_coupler_legs_track_their_part_numbers():
-    lib = library_from_spec_set(KERMIT)
+def test_directional_couplers_decode_to_their_rated_value():
+    """RLDC-8/12/16 must come out as a real DC family.
+
+    Port 0 is the through leg, the rest are tap legs -- the manual gives the
+    Tap columns before the Thru columns in the file.
+    """
+    lib = library_from_spec_set(WVBECK)
     by_name = {p.name: p for p in lib.passives.values()}
-    # a directional coupler family: looser coupling costs more on the tap leg
-    # and less on the through leg
-    tap = [by_name[f"SSP-{n}K"].port_losses[0] for n in (7, 9, 12)]
-    thru = [by_name[f"SSP-{n}K"].port_losses[1] for n in (7, 9, 12)]
-    assert tap == sorted(tap)
-    assert thru == sorted(thru, reverse=True)
-    # the balanced splitter has equal legs
-    assert len(set(by_name["SSP-3K"].port_losses)) == 1
+    for part, rated in [("RLDC-8-15A", 8), ("RLDC-12-15A", 12), ("RLDC-16-15A", 16)]:
+        thru, tap = by_name[part].port_losses[0], by_name[part].port_losses[1]
+        assert abs(tap - rated) < 1.0, (part, tap)
+        assert thru < tap
+    # tighter coupling costs more on the through leg
+    assert by_name["RLDC-8-15A"].port_losses[0] > by_name["RLDC-16-15A"].port_losses[0]
+
+
+@needs_samples
+def test_coupler_ids_and_tap_legs_match_the_parts():
+    from lodedata.specs import load_spec_set
+    spec = load_spec_set(WVBECK)
+    by_name = {c.name: c for c in spec.couplers}
+    # "helpful to use intuitive Coupler IDs, for instance 2 for a 2 way
+    # splitter or 8 for a DC 8"
+    assert by_name["RLS10-2-15A"].code == 2.0
+    assert by_name["RLDC-8-15A"].code == 8.0
+    assert by_name["RLDC-16-15A"].code == 16.0
+    # a 3-way splitter creates two branches, a 2-way one
+    assert by_name["RLS10-3-15A"].tap_legs == 2
+    assert by_name["RLS10-2-15A"].tap_legs == 1
+    # the internal-coupler flag is set on the part that says so
+    assert by_name["INT 2-WAY"].internal
 
 
 @needs_samples

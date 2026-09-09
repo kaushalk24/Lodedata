@@ -2,6 +2,17 @@
 
 Everything here was derived from the sample files supplied with this task:
 
+There are **seven** spec file types, not five: `.PAR`, `.ATV`, `.TAP`, `.CPR`,
+`.CBL`, plus `.PRC` (Pricing) and `.PER` (Performance). The samples supplied
+here cover the first five. A design needs Parameters, Taps, Actives, Couplers
+and Cables, and "your spec files must all have the same name".
+
+The `.atv` file also holds more than the Actives table — Reserve Gain, Power
+Steps, Pads/EQ banks 1–8 and a Configuration Table are further pages. Where the
+Actives table ends is not mapped, so the reader validates each record instead of
+assuming: past the end the fixed stride reads into another page and yields
+levels like 538.97 dB. In both sample sets the real actives occupy slots 7–46.
+
 | file | kind | source |
 |---|---|---|
 | `AL002.ntw` … `AL005.ntw` | network designs | written by *Design 12.11*, licence `LP-13X00J3`, user `vk1091` |
@@ -209,8 +220,10 @@ and is the single highest-value thing to pin down (see open questions).
 | 0 | u8 | `0x6F` record marker |
 | 1 | i32 | packed value code |
 | 5 | char[25] | part number, e.g. `SSP-7K`, `RLDC12-8`, `MDU COUPLER` |
-| 30 | i32[10] | loss block for one leg |
-| 70 | i32[10] | loss block for the other leg |
+| 30 | i32[10] | **Tap** leg loss block |
+| 70 | i32[10] | **Thru** leg loss block |
+| 110 | u8 | tap legs, stored as the count minus one |
+| 113 | u8 | internal-coupler flag |
 
 Same loss-block layout as the cable file — the manual describes "four columns to
 the right of the Thru label … at the forward high, forward low, return high, and
@@ -225,8 +238,13 @@ directional-coupler family:
 | SSP-12K | 13.4 | 2.2 |
 
 Looser coupling costs more on one leg and less on the other, and the balanced
-part has equal legs. Which block the file calls "Thru" is **unconfirmed** — the
-numbers suggest leg A is the tap leg.
+part has equal legs. The manual settles the order: "The next columns labeled
+**Tap** … The four columns to the right of that labeled **Thru**". Decoding
+`WVBeck750` that way gives a textbook directional-coupler family — RLDC-8
+3.5/8.8 dB, RLDC-12 2.9/12.5, RLDC-16 2.9/16.5 — and the coupler ID column
+comes out as the manual describes ("2 for a 2 way splitter or 8 for a DC 8"):
+`RLS10-2-15A` → 2, `RLDC-8-15A` → 8, `RLDC-16-15A` → 16. The 3-way splitter
+reports two tap legs and the part named `INT 2-WAY` has the internal flag set.
 
 The code at +1 is exactly the dB value in the part number for the simple parts
 (`SSP-3K` → 3, `SSP-7K` → 7, `SSP-9K` → 9, `SSP-12K` → 12) but is a packed
@@ -243,10 +261,10 @@ family+value for the rest (`RLDC12-8` → 408, `GNA INT DC-12` → 612,
 | 30 | char[10] | option/kit part, e.g. `RA-KIT\40` |
 | 40 | char[5] | second option part, e.g. `T\40` |
 | 45 | char[10] | (blank in samples) |
-| 59 | i32[4] | **In** — level required at forward High, forward Low, return Rh, return Rl |
+| 59 | i32[4] | **In** — level required at forward High, forward Low, return Rh, return Rl. The manual's own column headings read `In - 860 | In - 54 | In - 42 | In - 5`, matching the frequencies derived independently from the cable ratios |
 | 75 | i32[4] | **Out** — level produced at the same four frequencies |
 | 91 | i32[2] | zero in every sample |
-| 99 | i32[2]×n | **power draw table**: (volts, amps) pairs, ends at a zero entry |
+| 99 | i32[2]×n | **Power Steps**: (volts, amps) pairs, ends at a zero entry |
 
 Confirmed by the manual: the actives file holds "the signal levels required at
 the forward and return inputs, as well as the forward and return outputs
@@ -259,33 +277,58 @@ produced by each active as indicated by the column prefix In or Out", plus
 | MB-750D-H | 12, 11, 21, 21 | 49, 38, 40, 40 | 37 dB | 11 dB |
 | BTN NODE-9 | **99**, 0, 27, 27 | 46, 36, 0, 0 | — | 10 dB |
 
+These are *module* levels, not housing levels: the manual adds roughly 3 dB for
+the input test point, diplex filter and the equalizer's minimum high-channel
+loss to get the housing input minimum that an incoming cable level is checked
+against.
+
 **A forward input of 99 is the "no RF input" sentinel** — the same convention as
 loop resistance 99 on cables. It marks a fibre-fed optical node, and identifies
 parts whose name does not say so (`5F31QSA004-9`).
 
-The trailing table is a **constant-power curve**, which is why the file stores a
-table rather than a single current figure — an active draws more as the applied
-voltage sags:
+The trailing table is the manual's **Power Steps** page, and it is a *step*
+function rather than a curve to interpolate: "from Vmin to V2, it uses A1
+amperes; from V2 to V3, A2 amperes are used". The lowest voltage present is
+Vmin, "the lowest voltage at which the active will operate". It works out as
+constant power, which is why a table is needed at all — an active draws more as
+the applied voltage sags:
 
 | MB-750D-H | 38 V | 45 | 52 | 60 | 70 | 80 | 90 |
 |---|---|---|---|---|---|---|---|
 | amps | 1.12 | 0.96 | 0.83 | 0.72 | 0.62 | 0.54 | 0.48 |
 | watts | 42.6 | 43.2 | 43.2 | 43.2 | 43.4 | 43.2 | 43.2 |
 
-### 3.4 `.tap` — taps (908 bytes)
+### 3.4 `.tap` — taps (908 bytes) — solved
 
-One record holds one tap *value*, with the part numbers for each port count:
+One record holds one tap *value*, with a sub-block per port count. The manual:
+"63 different types of taps may be entered. Each type is available in 2-way,
+4-way, 6-way, and 8-way."  The file allocates 256 slots; the samples use
+indices 0–38.
 
-| offset | field |
+| offset | port count |
 |---|---|
-| 16 | 8-port part number, e.g. `MMT2830` |
-| 134 | 2-port part number, e.g. `MMT2229` |
-| 246 | 4-port part number, e.g. `MMT2429` |
-| 588, 700 | two further part-number slots, unused in the samples |
+| 16 | 8-port |
+| 134 | 2-port |
+| 246 | 4-port |
+| 358 | 6-port |
 
-Within a record there are sub-blocks on a 112/118-byte pitch, each ending in an
-`0xFFFFFFFF` sentinel and carrying an incrementing index byte. Tap through-loss
-and tap-loss values live in these sub-blocks; exact offsets are **unconfirmed**.
+Each slot holds a 14-character part number, then two ten-slot loss blocks in
+the same layout as cables and couplers:
+
+| relative to the part number | field |
+|---|---|
+| +25 | **Tap Value** — loss toward the tap ports |
+| +65 | **Tap Losses** — insertion loss, hard cable in to hard cable out |
+
+Verified against a vendor whose part numbers played no part in deriving the
+offsets: in `WVBeck750`, `RMT2008-RF-20` at the 8-port slot decodes to exactly
+20.0 dB, `RMT2002-RF-23` at the 2-port slot to 23.0, `RMT2004-RF-17` at the
+4-port slot to 17.0. Insertion loss behaves correctly too — the 4-port version
+of a 23 dB tap costs more through-loss (1.2 dB) than the 2-port (0.9 dB).
+
+Not yet located inside the record: the Self Term and Active flags, the Active
+Taps powering table, Tap Swap Options and the Pad/EQ bank pointers, all of
+which the manual says live in this file.
 
 ### 3.5 `.par` — system design parameters
 

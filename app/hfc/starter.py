@@ -1,4 +1,10 @@
-"""A default equipment library so you can key in a design without a spec file.
+"""Sample specs, for learning the tool -- not for real design.
+
+Lode Data ships sample specification files in a SPECS subdirectory and says
+they "are intended to be samples only and, therefore, should not be used for
+actual design".  This is the same idea: something to key a design against
+while you are finding your way around, clearly labelled so nobody mistakes it
+for a real spec set.
 
 Attenuation figures are the published values for the common P3/QR hardline and
 RG-6/RG-11 drop, given at 750 MHz and 55 MHz so the sqrt(f) interpolation has
@@ -74,7 +80,7 @@ _SUPPLIES = [
 
 
 def starter_library() -> Library:
-    lib = Library(name="Standard 750 MHz library")
+    lib = Library(name="Sample specs (not for real design)")
     for name, r, a55, a750, kind in _CABLES:
         lib.add(CableType(
             id=f"cbl_{name.replace(' ', '_').replace('.', 'p')}",
