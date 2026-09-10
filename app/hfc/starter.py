@@ -68,6 +68,13 @@ _ACTIVES = [
 # across the usual operating range rather than stated as a single number.
 _POWER_VOLTAGES = (38.0, 45.0, 52.0, 60.0, 70.0, 80.0, 90.0)
 
+# the manual's default numbering: 11/21/22/31/32/33 are line extenders by
+# cascade position, 41-49 and 61-89 trunk, system and distribution amps
+_ACTIVE_IDS = {
+    "Optical node (4 out)": 61, "Optical node (2 out)": 62,
+    "System amplifier": 41, "Line extender": 11, "Mini bridger": 21,
+}
+
 
 def _power_table(watts: float) -> list:
     return [[v, round(watts / v, 2)] for v in _POWER_VOLTAGES]
@@ -110,6 +117,7 @@ def starter_library() -> Library:
         lib.add(ActiveType(
             id=f"act_{name.replace(' ', '_').replace('(', '').replace(')', '')}",
             name=name, kind=kind, outputs=outs,
+            active_id=_ACTIVE_IDS[name],
             in_forward_high=ins[0], in_forward_low=ins[1],
             in_return_high=ins[2], in_return_low=ins[3],
             out_forward_high=outs_lv[0], out_forward_low=outs_lv[1],

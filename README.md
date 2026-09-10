@@ -61,10 +61,22 @@ bracket of their type (`[n]` normal, `(n)` no footage, `{n}` backfeed,
 `<n>` forwardfeed); a fibre-fed node shows no RF input; cable series 100+ draw
 in magenta; the numbered screen menu carries the real command names.
 
-**Keys.** Arrow keys move the cursor. Type digits to enter a value. `.` commits
-and steps to the next field, so `107 . 2 . 0` enters 107 feet, 2 houses,
-cable 0. `Enter` commits, or opens a picker on the tap, coupler, amp and cable
-columns. `Insert` adds a node, `Delete` removes one, `Esc` abandons an entry.
+**Keying it in.** Equipment is typed at the cell, not picked from a list.
+
+| column | type | meaning |
+|---|---|---|
+| `ftg hc cab lv` | `107 . 2 . 0` | 107 feet, 2 houses, cable 0 — `.` steps to the next field |
+| `tap1..tap4` | `2.23` `4.23` `8.20` | port count and tap value; a bare `23` takes the port count from the house count |
+| `cplr[branch]` | `2` `3` `8` | the Coupler ID — a 2-way splitter, a 3-way, a DC-8 |
+| | `-8` | the same DC with its legs swapped: through (low loss) leg to the branch, tap (high loss) leg downstream |
+| | `--3` or `=3` | through leg to the right-most branch |
+| `amp` | `11` `61` | the Active ID |
+| any | `0` | clears the cell; on a coupler it removes the branch too |
+
+Arrow keys move the cursor, `Enter` commits, `Insert` and `Delete` add and
+remove a node line, `Esc` abandons what you were typing. Typing a code that
+isn't in the spec set is refused with a list of what is — `no 4-port 99 tap in
+the spec set — it has 11, 17, 23, ...`.
 
 ## Layout
 

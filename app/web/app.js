@@ -159,6 +159,10 @@ function renderInfo() {
     `${r.branch}.${r.node}\n` +
     `${r.address || 'No Address'}\n` +
     `${r.cab_name || 'no cable'}\n` +
+    (r.tap_parts && r.tap_parts.length
+      ? `Taps: ${r.tap_parts.join(', ')}\n` : '') +
+    (r.coupler_parts && r.coupler_parts.length
+      ? `Coupler: ${r.coupler_parts.join(', ')}\n` : '') +
     `Distance from previous node:   ${r.ftg}\n` +
     `Total distance to start:       ${r.cumulative_ft}\n` +
     `Housecounts this node:         ${r.hc}\n` +
@@ -230,27 +234,41 @@ function renderMenu() {
 // ---------------------------------------------------------------- editing
 const EDIT_ORDER = ['ftg', 'hc', 'cab', 'lv'];
 
+// Keying is faster than the round trip, so every edit is queued and the saves
+// run strictly in order.  The cursor moves at once, on the keystroke, and a
+// single refresh follows once the queue drains -- otherwise "300 . 4 . 2"
+// races itself and lands the wrong values in the wrong columns.
+let saveChain = Promise.resolve();
+let pendingSaves = 0;
+
+function queueSave(work) {
+  pendingSaves += 1;
+  saveChain = saveChain.then(work).catch(err => {
+    let detail = err.message;
+    try { detail = JSON.parse(detail).detail || detail; } catch (_) {}
+    msg(detail);
+  }).then(() => {
+    pendingSaves -= 1;
+    if (pendingSaves === 0) return doRefresh();
+  });
+  return saveChain;
+}
+
 function curCol() { return columns()[S.col]; }
 function curRow() { return pageRows()[S.row]; }
 
-async function commitBuffer(advance) {
+function commitBuffer(advance) {
   const c = curCol(), r = curRow();
   if (!c || !r || S.buffer === null) return;
   const val = S.buffer.trim();
+  const at = { branch: r.branch, node: r.node };
   S.buffer = null;
   const body = {};
-  if (['ftg', 'hc', 'cab', 'lv', 'tsg', 'amp', 'supply'].includes(c.key)) {
+  if (['ftg', 'hc', 'cab', 'lv', 'tsg', 'supply'].includes(c.key)) {
     const n = val === '' ? 0 : Number(val);
     if (Number.isNaN(n)) { msg('not a number'); renderGrid(); return; }
     if (c.key === 'supply') body.supply_volts = n;
-    else if (c.key === 'amp') {
-      if (!n) { body.clear_amp = true; }
-      else {
-        const part = pickActiveById(n);
-        if (!part) { msg(`no active with ID ${n} in the spec set`); renderGrid(); return; }
-        body.amp = n; body.amp_part = part.id;
-      }
-    } else if (c.key === 'cab') {
+    else if (c.key === 'cab') {
       body.cab = n;
       const part = pickCableById(n);
       body.cab_part = part ? part.id : null;
@@ -260,11 +278,58 @@ async function commitBuffer(advance) {
     body[c.key === 'ampname' ? 'amp_label' : c.key] = val;
   } else { renderGrid(); return; }
 
-  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+  // move first, so the next keystroke lands in the right column
+  if (advance) moveToNextField(); else renderGrid();
+  queueSave(() => api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body) });
-  await refresh();
-  if (advance) moveToNextField();
+    body: JSON.stringify(body) }));
+}
+
+// Taps, couplers and actives are typed at the cell: "4.23" is a 4-port 23 tap,
+// "8" a DC-8, "-8" the same DC with its legs swapped.  The server resolves the
+// code against the attached spec set and says what it could not find.
+const TYPED_COLUMNS = /^(tap\d|cplr\d|amp)$/;
+
+function commitCode() {
+  const c = curCol(), r = curRow();
+  if (!c || !r) return;
+  const code = (S.buffer || '').trim();
+  const at = { branch: r.branch, node: r.node };
+  S.buffer = null;
+  renderGrid();
+
+  if (c.key.startsWith('tap')) {
+    const slot = +c.key.slice(3);
+    queueSave(async () => {
+      const out = await api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}/tap`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot, code }) });
+      msg(out.placed
+        ? `${out.placed.name} — ${out.placed.ports} port, ${out.placed.value_db} dB,`
+          + ` shown as the tap ID ${out.placed.tap_id}`
+        : 'tap cleared');
+    });
+  } else if (c.key.startsWith('cplr')) {
+    const slot = +c.key.slice(4);
+    queueSave(async () => {
+      const out = await api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}/coupler`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot, code }) });
+      if (!out.placed) { msg('coupler and its branch removed'); return; }
+      const p = out.placed;
+      const where = p.through_leg === 0 ? 'through leg downstream'
+                  : p.through_leg === 1 ? 'through leg to this branch, tap leg downstream'
+                  : 'through leg to the right-most branch';
+      msg(`${p.name} — branch ${p.branch}, legs ${p.legs.join(' / ')} dB, ${where}`);
+    });
+  } else {
+    queueSave(async () => {
+      await api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amp_code: code }) });
+      msg(code === '0' || code === '' ? 'active cleared' : 'active placed');
+    });
+  }
 }
 
 function moveToNextField() {
@@ -321,20 +386,34 @@ document.addEventListener('keydown', async ev => {
   else if (k === 'Home') { S.row = 0; }
   else if (k === 'End') { S.row = n - 1; }
   else if (k === '.') {
-    // typing: the field separator. Otherwise the prefix for a branch move.
-    if (S.buffer !== null) { ev.preventDefault(); await commitBuffer(true); return; }
+    ev.preventDefault();
+    // in a tap column the "." separates ports from value: 4.23
+    if (S.buffer !== null && cols[S.col].key.startsWith('tap')) {
+      S.buffer += '.'; renderGrid(); return;
+    }
+    // typing elsewhere: the field separator. Otherwise a branch-move prefix.
+    if (S.buffer !== null) { commitBuffer(true); return; }
     S.dot = true; msg('. — press an arrow or Page key for a branch move');
-    ev.preventDefault(); return;
+    return;
   }
   else if (k === 'Enter') {
     ev.preventDefault();
-    if (S.buffer !== null) { await commitBuffer(false); }
-    else await openCell();
+    if (S.buffer !== null) {
+      if (TYPED_COLUMNS.test(cols[S.col].key)) commitCode();
+      else commitBuffer(false);
+    } else await openCell();
     return;
   }
-  else if (/^[0-9]$/.test(k) || (k === '-' && S.buffer === null)) {
+  else if (/^[0-9]$/.test(k)) {
     const c = cols[S.col];
     if (c && c.edit) { S.buffer = (S.buffer || '') + k; }
+  }
+  else if ((k === '-' || k === '=') && TYPED_COLUMNS.test(cols[S.col].key)) {
+    // "-8" and "--8" (or "=8") choose which leg is the through leg
+    S.buffer = (S.buffer || '') + k;
+  }
+  else if (k === '-' && S.buffer === null && cols[S.col].edit) {
+    S.buffer = '-';
   }
   else if (k === 'Backspace') {
     ev.preventDefault();
@@ -401,7 +480,6 @@ function hasSpecs() {
 }
 const libTable = t => Object.values((S.net && S.net.library[t]) || {});
 const pickCableById = n => libTable('cables')[n] || null;
-const pickActiveById = n => libTable('actives')[n % libTable('actives').length] || null;
 
 function modal(html) {
   $('#modalbox').innerHTML = html;
@@ -531,10 +609,10 @@ function dsummary() {
   }</tbody></table><div class="row"><button id="mClose" class="primary">Close</button></div>`);
 }
 async function recalc() { await refresh(); msg('recalculated'); }
-async function clearCell() {
+function clearCell() {
   const c = curCol(), r = curRow(); if (!c || !r) return;
-  if (c.key.startsWith('tap')) return pickTap(+c.key.slice(3));
-  S.buffer = ''; await commitBuffer(false);
+  S.buffer = '0';
+  if (TYPED_COLUMNS.test(c.key)) commitCode(); else commitBuffer(false);
 }
 async function nameAmp() {
   const r = curRow(); if (!r) return;
@@ -643,6 +721,17 @@ function branchList() {
 
 function showHelp() {
   modal(`<h2>Keys</h2>
+   <p><b>Taps</b> are typed at the cell: <code>2.23</code> a 2-port 23,
+   <code>4.23</code> a 4-port 23, <code>8.20</code> an 8-port 20. A bare
+   <code>23</code> picks the port count from the house count. <code>0</code>
+   clears.</p>
+   <p><b>Couplers</b> are typed as their Coupler ID: <code>2</code> a 2-way
+   splitter, <code>3</code> a 3-way, <code>8</code> a DC-8. A leading
+   <code>-</code> swaps the legs, so <code>-8</code> sends the through
+   (low loss) leg to the branch and the tap (high loss) leg downstream;
+   <code>--3</code> or <code>=3</code> sends it to the right-most branch.
+   <code>0</code> removes the coupler and its branch.</p>
+   <p><b>Actives</b> are typed as their Active ID.</p>
    <p>Arrow keys move the cursor. Type digits to enter a value.
    <b>.</b> commits and steps to the next field, as it does in Entry mode:
    <code>107 . 2 . 0</code> enters 107 feet, 2 houses, cable 0.
@@ -751,6 +840,11 @@ function setMode(m) {
   renderMenu(); renderGrid();
 }
 async function refresh() {
+  if (pendingSaves > 0) return;      // the queue will refresh when it drains
+  return doRefresh();
+}
+
+async function doRefresh() {
   S.scr = await api(`/api/networks/${S.nid}/screen`);
   if (!branchMeta(S.branch)) S.branch = S.scr.branches.length ? S.scr.branches[0].number : 1;
   S.row = Math.max(0, Math.min(S.row, pageRows().length - 1));

@@ -142,6 +142,10 @@ class ActiveType:
     id: str
     name: str
     kind: str = "line_extender"                # node | trunk | bridger | line_extender
+    # The number typed at the amp column.  Taken from the record's slot in the
+    # actives file; the Configuration Table page can rename these, and that
+    # page is not decoded, so a spec set that uses custom IDs may not match.
+    active_id: int = 0
     outputs: int = 1
     # required input levels (dBmV)
     in_forward_high: float = 13.0

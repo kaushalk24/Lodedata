@@ -5,6 +5,7 @@ Run with:  ./run.sh   (python -m uvicorn api:app --app-dir app)
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -18,12 +19,14 @@ from hfc.model import Library, DesignParameters, new_id
 from hfc.plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
                        BRANCH_NORMAL)
 from hfc.screen import build
+from hfc.entry import resolve_tap, resolve_coupler, resolve_active, EntryError
 from hfc.starter import starter_library
 from hfc.reports import level_report, bill_of_materials, powering_report, to_csv
 from hfc.importer import library_from_spec_set, inspect_ntw, relink_library
 
 WEB = Path(__file__).parent / "web"
-DB_PATH = Path(__file__).parent.parent / "data" / "designs.db"
+DB_PATH = Path(os.environ.get("LODEDATA_DB",
+                              Path(__file__).parent.parent / "data" / "designs.db"))
 
 app = FastAPI(title="Design Assistant")
 
@@ -132,6 +135,7 @@ def screen(nid: str):
 class NodeEdit(BaseModel):
     ftg: float | None = None
     through_leg: int | None = None
+    amp_code: str | None = None      # an Active ID typed at the amp column
     hc: int | None = None
     cab: int | None = None
     cab_part: str | None = None
@@ -165,8 +169,17 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
     n = _node(d, branch, node)
     if body.clear_amp:
         n.amp, n.amp_part, n.amp_label = 0, None, ""
+    if body.amp_code is not None:
+        try:
+            part = resolve_active(d.library, body.amp_code)
+        except EntryError as e:
+            raise HTTPException(400, str(e))
+        if part is None:
+            n.amp, n.amp_part = 0, None
+        else:
+            n.amp, n.amp_part = part.active_id or 0, part.id
     for f, v in body.model_dump(exclude_none=True).items():
-        if f == "clear_amp":
+        if f in ("clear_amp", "amp_code"):
             continue
         setattr(n, f, v)
     save(d)
@@ -207,57 +220,95 @@ def delete_node(nid: str, branch: int, branch_node: int = 0, node: int = 0):
 class TapEdit(BaseModel):
     slot: int = 0
     part_id: str | None = None
+    code: str | None = None      # what was typed, e.g. "4.23"
 
 
 @app.put("/api/networks/{nid}/nodes/{branch}/{node}/tap")
 def set_tap(nid: str, branch: int, node: int, body: TapEdit):
     d = load(nid)
     n = _node(d, branch, node)
-    while len(n.taps) <= body.slot:
-        n.taps.append(TapPlacement())
-    if body.part_id is None:
-        n.taps.pop(body.slot)
+    if body.code is not None:
+        try:
+            part = resolve_tap(d.library, body.code, n.hc)
+        except EntryError as e:
+            raise HTTPException(400, str(e))
+    elif body.part_id is None:
+        part = None
     else:
         part = d.library.taps.get(body.part_id)
         if not part:
             raise HTTPException(400, "no such tap in the spec set")
+
+    while len(n.taps) <= body.slot:
+        n.taps.append(TapPlacement())
+    if part is None:
+        n.taps.pop(body.slot)
+    else:
         n.taps[body.slot] = TapPlacement(part_id=part.id, ports=part.ports,
                                          value_db=part.tap_value_db)
     save(d)
-    return n.to_dict()
+    return {"node": n.to_dict(),
+            "placed": None if part is None else
+                      {"name": part.name, "ports": part.ports,
+                       "tap_id": part.tap_id, "value_db": part.tap_value_db}}
 
 
 class CouplerEdit(BaseModel):
     slot: int = 0
     part_id: str | None = None
+    code: str | None = None      # what was typed, e.g. "8" or "-8"
     style: str = BRANCH_NORMAL
 
 
 @app.put("/api/networks/{nid}/nodes/{branch}/{node}/coupler")
 def set_coupler(nid: str, branch: int, node: int, body: CouplerEdit):
-    """Placing a coupler creates the branch it feeds."""
+    """Placing a coupler creates the branch it feeds.
+
+    A leading "-" swaps the legs: the through (low loss) leg goes to the
+    branch and the tap (high loss) leg carries on downstream.
+    """
     d = load(nid)
     n = _node(d, branch, node)
-    if body.part_id is None:
+    through = n.through_leg
+    if body.code is not None:
+        try:
+            part, through = resolve_coupler(d.library, body.code)
+        except EntryError as e:
+            raise HTTPException(400, str(e))
+    elif body.part_id is None:
+        part = None
+    else:
+        part = d.library.passives.get(body.part_id)
+        if not part:
+            raise HTTPException(400, "no such coupler in the spec set")
+
+    if part is None:
         if body.slot < len(n.couplers):
             d.remove_branch(n.couplers[body.slot].branch)
             n.couplers.pop(body.slot)
+            if not n.couplers:
+                n.through_leg = 0
         save(d)
-        return n.to_dict()
-    part = d.library.passives.get(body.part_id)
-    if not part:
-        raise HTTPException(400, "no such coupler in the spec set")
+        return {"node": n.to_dict(), "placed": None}
+
+    # re-typing over an existing coupler replaces it rather than stacking
+    if body.slot < len(n.couplers):
+        d.remove_branch(n.couplers[body.slot].branch)
+        n.couplers.pop(body.slot)
     if len(n.couplers) >= 2:
         raise HTTPException(400, "a node can carry at most two couplers")
+
     child = d.add_branch(branch, node, body.style)
-    try:
-        cid = int(float(getattr(part, "coupler_id", 0) or 0))
-    except (TypeError, ValueError):
-        cid = 0
-    n.couplers.append(CouplerPlacement(part_id=part.id, coupler_id=cid,
+    n.couplers.insert(min(body.slot, len(n.couplers)),
+                      CouplerPlacement(part_id=part.id,
+                                       coupler_id=int(part.coupler_id or 0),
                                        branch=child.number, style=body.style))
+    n.through_leg = through
     save(d)
-    return n.to_dict()
+    return {"node": n.to_dict(),
+            "placed": {"name": part.name, "coupler_id": part.coupler_id,
+                       "legs": part.port_losses, "through_leg": through,
+                       "branch": child.number}}
 
 
 @app.delete("/api/networks/{nid}/branches/{branch}")

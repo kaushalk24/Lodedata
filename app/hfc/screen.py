@@ -39,7 +39,9 @@ class Row:
     amp_label: str = ""
     taps: list = field(default_factory=list)       # rendered strings, e.g. "[26]"
     tap_ports: list = field(default_factory=list)
+    tap_parts: list = field(default_factory=list)  # part numbers, for the panel
     couplers: list = field(default_factory=list)   # e.g. "200[2]"
+    coupler_parts: list = field(default_factory=list)
     cumulative_ft: float = 0.0
     # powering
     volts: float | None = None
@@ -66,6 +68,7 @@ class Row:
             "amp": self.amp, "amp_name": self.amp_name,
             "amp_label": self.amp_label,
             "taps": self.taps, "couplers": self.couplers,
+            "tap_parts": self.tap_parts, "coupler_parts": self.coupler_parts,
             "cumulative_ft": round(self.cumulative_ft, 0),
             "volts": None if self.volts is None else round(self.volts, 2),
             "current": round(self.current, 2),
@@ -165,6 +168,8 @@ def build(design: Design) -> Screen:
                 shown = tap.tap_id or int(round(tap.tap_value_db))
                 row.taps.append(bracket(str(shown), style))
                 row.tap_ports.append(tap.ports)
+                row.tap_parts.append(
+                    f"{tap.name} ({tap.ports} port, {tap.tap_value_db:g} dB)")
                 port_hi = row.levels[p.forward_high_mhz] - tap.tap_db(p.forward_high_mhz)
                 _check_tap(p, row, port_hi)
                 for f in freqs:
@@ -187,6 +192,9 @@ def build(design: Design) -> Screen:
                     cid = cp.coupler_id or (passive.coupler_id if passive else 0)
                     head = f"{cid or ''}{mark}" if i == 0 else ""
                     row.couplers.append(head + bracket(str(cp.branch), style))
+                    if passive and i == 0:
+                        row.coupler_parts.append(
+                            f"{passive.name} legs {' / '.join(str(v) for v in passive.port_losses)} dB")
 
                 def leg(which: int) -> float:
                     return thru_db if which == node.through_leg else tap_db

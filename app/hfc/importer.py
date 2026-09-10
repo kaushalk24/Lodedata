@@ -167,6 +167,7 @@ def library_from_spec_set(base: str | Path,
         lib.add(ActiveType(
             id=new_id("act"),
             name=a.name,
+            active_id=a.slot,
             kind="node" if (fibre_fed or "NODE" in a.name.upper()) else "line_extender",
             in_forward_high=ins[0], in_forward_low=ins[1],
             in_return_high=ins[2], in_return_low=ins[3],
