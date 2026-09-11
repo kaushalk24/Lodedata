@@ -290,3 +290,35 @@ def test_active_power_tables_are_constant_power_curves():
         assert all(abs(w - watts) < 1.5 for w in power), (name, power)
         # draw must rise as the applied voltage sags
         assert part.current_at(45) > part.current_at(90)
+
+
+@needs_samples
+def test_diffing_a_file_against_itself_finds_nothing():
+    from lodedata.diff import compare
+    r = compare(NTW, NTW)
+    assert r["bytes_changed"] == 0
+    assert r["regions"] == []
+
+
+@needs_samples
+def test_diffing_finds_a_single_changed_field(tmp_path):
+    """What a one-edit pair looks like: one small region, nothing else.
+
+    This is the shape of pair that pins a field down -- open a design, change
+    one tap, save under a new name.
+    """
+    from lodedata.diff import compare
+    from lodedata.obfuscation import deobfuscate, obfuscate, PAYLOAD_START
+
+    original = NTW.read_bytes()
+    plain = bytearray(deobfuscate(original[PAYLOAD_START:]))
+    # pretend one two-byte field somewhere in the live data changed
+    spot = next(i for i in range(1000, len(plain) - 2) if plain[i] or plain[i + 1])
+    plain[spot] = (plain[spot] + 7) & 0xFF
+    edited = tmp_path / "edited.ntw"
+    edited.write_bytes(original[:PAYLOAD_START] + obfuscate(bytes(plain)))
+
+    r = compare(NTW, edited)
+    assert r["bytes_changed"] == 1
+    assert len(r["regions"]) == 1
+    assert r["regions"][0].start == spot + PAYLOAD_START

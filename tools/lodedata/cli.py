@@ -7,6 +7,7 @@ from pathlib import Path
 from .header import read_header
 from .obfuscation import deobfuscate, recover_key, NTW_KEY, PAYLOAD_START
 from .specs import load_spec_set
+from .diff import report as diff_report
 
 
 def cmd_info(args):
@@ -33,6 +34,10 @@ def cmd_decode(args):
     nz = sum(1 for b in out[PAYLOAD_START:] if b)
     print(f"wrote {args.out}: {len(out)} bytes, "
           f"{nz} non-zero payload bytes ({100*nz/(len(out)-PAYLOAD_START):.1f}% used)")
+
+
+def cmd_diff(args):
+    print(diff_report(args.before, args.after, limit=args.limit))
 
 
 def cmd_spec(args):
@@ -70,6 +75,13 @@ def main(argv=None):
     p.add_argument("file")
     p.add_argument("out")
     p.set_defaults(func=cmd_decode)
+
+    p = sub.add_parser("diff", help="compare two .ntw files after deobfuscation")
+    p.add_argument("before")
+    p.add_argument("after")
+    p.add_argument("--limit", type=int, default=40,
+                   help="how many changed regions to print")
+    p.set_defaults(func=cmd_diff)
 
     p = sub.add_parser("spec", help="parse a spec set given its base path (no extension)")
     p.add_argument("base")

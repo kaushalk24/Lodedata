@@ -75,6 +75,29 @@ app computes from an imported spec set.
 
 ## 4. The `.ntw` record layout — the one real blocker left
 
+**What kind of file pair actually helps**, now that there is a tool for it
+(`python -m lodedata diff before.ntw after.ntw`):
+
+| pair | what it buys |
+|---|---|
+| two saves differing by **one** known edit | pins that one field exactly — a handful of changed bytes at a known offset |
+| a **before / after rebuild** of the same node | partitions the file: bytes that stay put are topology (nodes, branches, footages, house counts), bytes that move are equipment. Halves the search space |
+| a tiny purpose-built design **plus its report** | absolute ground truth; best of all |
+| an **XLS or text export** of any existing design | a device list and levels to match row by row against the binary |
+| two unrelated designs | nothing useful — measured at 1452 changed regions across 6.8% of the payload |
+
+The four sample designs supplied are unrelated (different designers and
+licences: SRAVIKUMAR/UD-8QQRFV3, RSOMASHEKAR/UD-JPY54G4, vk1091/LP-13X00J3), so
+they cannot be differenced against each other.
+
+A before/after pair built against **different spec sets** is still fine for the
+partition, and is in fact mildly informative: if the same physical part lands on
+a different number in each file, that confirms the field is an index into the
+spec set rather than a stored value. What it cannot do is validate a specific
+index-to-part mapping, since the two spec sets number their parts differently.
+
+
+
 The obfuscation is solved and the payload is readable, but the record layout is
 not mapped, and design files contain no text to bootstrap from.
 
