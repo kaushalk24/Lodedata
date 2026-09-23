@@ -90,8 +90,11 @@ for each tap position: pick the HIGHEST tap value t such that
       Return_required(t) ≤ Max_return(r)            for every return column r (§5)
    and L − thru_leg_t(f) ≥ Req(downstream, f)       (do not starve downstream)
 at a coupler: among couplers with  L − thru_k ≥ Req(thru child)  AND  L − tap_k ≥ Req(branch child)
-      pick the one that MAXIMIZES the smaller of the two margins
-      none feasible → error "cannot select coupler at node b.n" (an amplifier is needed upstream or in a branch)
+      pick the one with the LOWEST thru loss (keeps the most signal on the continuing line)
+      none feeds both → pick the lowest thru loss among those that still feed the branch
+                        (a short thru side shows up as errors at the downstream nodes where it runs out)
+      none feeds the branch → error "cannot select coupler at node b.n" (Lode reports this when
+                        off-screen branches cannot be fed; an amplifier is needed upstream or in the branch)
 ```
 
 ### 3.4 Tap-combination optimization (Lode feature)
