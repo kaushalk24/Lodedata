@@ -139,10 +139,11 @@ function renderGrid() {
       Nothing is loaded when a network is opened and nothing carries over from
       another network: every level, loss, part number and powering figure comes
       from the spec files.<br><br>
-      <span style="color:var(--green)">Spec Edit &rarr; Attach spec set</span>
-      &nbsp;to select a <b>.par .atv .tap .cpr .cbl</b> set,
-      or <span style="color:var(--green)">Spec Edit &rarr; Sample specs</span>
-      to try the program out.</td></tr>`;
+      <span style="color:var(--green)">File &rarr; Project Settings &rarr; Set All Files</span>
+      &nbsp;to select a <b>.par .atv .tap .cpr .cbl</b> set (the sample specs are
+      offered there too), or
+      <span style="color:var(--green)">File &rarr; Open &rarr; Lode Data network (.ntw)</span>
+      to bring in a design with its spec set.</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map((r, i) => {
@@ -703,40 +704,171 @@ async function openReport(kind) {
 }
 
 // ---------------------------------------------------------------- menus
+// The menu bar, item for item as Lode Data 12.11 shows it.  An entry is
+// [label, action] or [label, [submenu...]]; '-' is a separator.  Items this
+// program does not do yet are listed all the same, and say so when picked.
+const NYI = label => () => msg(`${label} is not implemented yet`);
 const MENU_ACTIONS = {
-  file: [['New network', newNetwork], ['Open network', openNetwork],
-         ['Import .ntw', importNtw]],
-  mode: [['Design', () => setMode('design')], ['Entry', () => setMode('entry')],
-         ['Power', () => setMode('power')]],
-  branch: [['Next branch  (Page Down)', () => stepBranch(1)],
-           ['Previous branch  (Page Up)', () => stepBranch(-1)],
-           ['Into the branch on this node  (. \u2192)', enterBranch],
-           ['Back to the parent branch  (. \u2190)', returnToParent],
-           ['Branch list', branchList]],
-  spec: [['Attach spec set', attachSpec], ['Sample specs', sampleSpecs],
-         ['View library', viewLibrary]],
-  reports: [['Level sheet', () => openReport('levels')],
-            ['Bill of Materials', () => openReport('bom')],
-            ['Powering', () => openReport('powering')]],
-  test: [['Test network', test], ['Downstream summary', dsummary]],
-  edit: [['Insert node', insertNode], ['Delete node', deleteNode],
-         ['Delete branch', delBranch]],
-  tools: [['Network Initialization', netInit]],
-  view: [['Recalculate', recalc]],
-  misc: [['Name amplifier', nameAmp], ['Note', notes]],
-  global: [['Network Initialization', netInit]],
-  help: [['Keys', showHelp]],
+  file: [
+    ['New', [['Network', newNetwork]]],
+    ['Open', [['Network...', openNetwork], ['Lode Data network (.ntw)...', importNtw]]],
+    ['Unload', [['Specs', NYI('Unload specs')]]],
+    ['Save Specs', [['All', NYI('Save Specs')]]],
+    ['Save Network', () => msg('saved — every change is saved as it is made')],
+    ['Save Network As...', NYI('Save Network As')],
+    '-',
+    ['Project Settings...', projectSettings],
+    '-',
+    ['Print', [['Level sheet', () => openReport('levels')],
+               ['Bill of Materials', () => openReport('bom')],
+               ['Powering', () => openReport('powering')]]],
+    '-',
+    ['Exit', () => msg('close the browser tab to exit')],
+  ],
+  edit: [
+    ['Mark / Unmark', NYI('Mark')], ['Mark to End of Line', NYI('Mark to End of Line')],
+    ['Unmark to End of Line', NYI('Unmark to End of Line')], ['Swap Mark', NYI('Swap Mark')],
+    ['Copy Marked Area', NYI('Copy Marked Area')], ['Delete Marked Area', NYI('Delete Marked Area')],
+    '-',
+    ['Copy...\tCtrl+C', NYI('Copy')], ['Paste...\tCtrl+V', NYI('Paste')],
+    '-',
+    ['Find/Replace/Mark...\tCtrl+H', NYI('Find/Replace/Mark')],
+    ['Rename Devices...', NYI('Rename Devices')],
+    '-',
+    ['Edit Node Address...', NYI('Edit Node Address')],
+  ],
+  mode: [
+    ['Entry', () => setMode('entry')], ['Design', () => setMode('design')],
+    ['Active Entry', NYI('Active Entry mode')], ['Powering', () => setMode('power')],
+    '-',
+    ['Select Modes...', NYI('Select Modes')],
+  ],
+  tools: [
+    ['Network Init', netInit], ['Clear Branch Labels', NYI('Clear Branch Labels')],
+    ['Clear Amp Name', NYI('Clear Amp Name')], ['Append', NYI('Append')],
+    ['Convert', NYI('Convert')], ['Connect', NYI('Connect')],
+    ['Move Origin', NYI('Move Origin')], ['Force Signals', NYI('Force Signals')],
+    ['Plugins', NYI('Plugins')],
+    '-',
+    ['dB Req', NYI('dB Req')], ['Extended dB Req', NYI('Extended dB Req')],
+    '-',
+    ['Toggle No BOM', NYI('Toggle No BOM')], ['Delete No BOM', NYI('Delete No BOM')],
+    '-',
+    ['Macro Options...', NYI('Macro Options')], ['Run Batch Macro...', NYI('Run Batch Macro')],
+  ],
+  global: [['Cables', NYI('Global Change Cables')], ['Levels', NYI('Global Change Levels')],
+           ['Maps', NYI('Global Change Maps')], ['Map Grid', NYI('Global Change Map Grid')],
+           ['TSG', NYI('Global Change TSG')]],
+  spec: [
+    ['Parameters...', NYI('Parameters editor')], ['Actives...', viewLibrary],
+    ['Taps...', viewLibrary], ['Couplers...', viewLibrary], ['Cables...', viewLibrary],
+    ['Pricing...', NYI('Pricing editor')], ['Performance...', NYI('Performance editor')],
+    ['Control...', NYI('Control editor')],
+  ],
+  test: [['Network', test], ['Powering', test], ['Global Test', NYI('Global Test')],
+         '-', ['Preferences...', NYI('Test preferences')]],
+  misc: [['PCD Cleanup', NYI('PCD Cleanup')], ['Override Current Passing', NYI('Override Current Passing')],
+         ['Enable Dialog Warnings', NYI('Enable Dialog Warnings')], ['Set Import', NYI('Set Import')],
+         ['Update All', NYI('Update All')], ['Project Load Setting', NYI('Project Load Setting')]],
+  reports: [['Multi-Net Downstream Summary...', dsummary],
+            ['Multi-Net PCD List...', NYI('Multi-Net PCD List')],
+            ['Network Tap Report...', NYI('Network Tap Report')],
+            ['Network Tilt Report...', NYI('Network Tilt Report')],
+            ['Multi-Net Network Spec Report', NYI('Multi-Net Network Spec Report')]],
+  view: [['Show Grid', () => { document.body.classList.toggle('nogrid'); }],
+         ['Show Tips', NYI('Show Tips')]],
+  help: [['Contents and Index', showHelp], ["What's New...", NYI("What's New")],
+         ['About Windows...', NYI('About Windows')], ['Key Info...', showHelp],
+         ['About Design Assistant/Viewer...', () => msg('Design Assistant — web replica')]],
 };
-$$('.menubar .mi').forEach(mi => mi.onclick = () => {
-  const items = MENU_ACTIONS[mi.dataset.menu];
-  if (!items) { msg('not implemented'); return; }
-  modal(`<h2>${esc(mi.textContent)}</h2><table><tbody>${
-    items.map((it, i) => `<tr data-i="${i}"><td>${esc(it[0])}</td></tr>`).join('')
-  }</tbody></table><div class="row"><button id="mClose">Close</button></div>`);
-  $$('#modalbox tr[data-i]').forEach(tr => tr.onclick = () => {
-    closeModal(); items[+tr.dataset.i][1]();
+
+function closeMenus() { $$('.dropdown').forEach(d => d.remove()); }
+function dropdown(items, x, y) {
+  const box = document.createElement('div');
+  box.className = 'dropdown';
+  box.style.left = x + 'px'; box.style.top = y + 'px';
+  box.innerHTML = items.map((it, i) => it === '-' ? '<div class="sepr"></div>' : (() => {
+    const [label, act] = it;
+    const [text, key] = label.split('\t');
+    return `<div class="di${Array.isArray(act) ? ' sub' : ''}" data-i="${i}">` +
+      `<span>${esc(text)}</span><span class="k">${esc(key || '')}` +
+      `${Array.isArray(act) ? ' ›' : ''}</span></div>`;
+  })()).join('');
+  document.body.appendChild(box);
+  box.querySelectorAll('.di').forEach(el => {
+    const act = items[+el.dataset.i][1];
+    el.onmouseenter = () => {
+      box.querySelectorAll('.dropdown').forEach(d => d.remove());
+      $$('.dropdown').forEach(d => { if (+d.dataset.level > +(box.dataset.level || 0)) d.remove(); });
+      if (Array.isArray(act)) {
+        const r = el.getBoundingClientRect();
+        const sub = dropdown(act, r.right - 2, r.top);
+        sub.dataset.level = (+(box.dataset.level || 0) + 1);
+      }
+    };
+    el.onclick = e => {
+      e.stopPropagation();
+      if (Array.isArray(act)) return;
+      closeMenus(); act();
+    };
   });
+  return box;
+}
+$$('.menubar .mi').forEach(mi => mi.onclick = e => {
+  e.stopPropagation();
+  const open = $$('.dropdown').length && $('.dropdown').dataset.menu === mi.dataset.menu;
+  closeMenus();
+  if (open) return;
+  const r = mi.getBoundingClientRect();
+  const box = dropdown(MENU_ACTIONS[mi.dataset.menu] || [], r.left, r.bottom);
+  box.dataset.menu = mi.dataset.menu; box.dataset.level = 0;
 });
+document.addEventListener('click', closeMenus);
+
+// File > Project Settings: where a network's spec files are chosen.
+function projectSettings() {
+  const lib = (S.net && S.net.library) || {};
+  const loaded = lib.name || '';
+  const row = (label, file) => `<div class="ps-row"><span>${label}</span>` +
+    `<input type="text" readonly value="${esc(file)}"><button disabled>Browse...</button></div>`;
+  modal(`<h2>Project Settings</h2>
+    <div class="ps">
+      ${row('Network Folder', '')}${row('PCD Folder', '')}
+      <fieldset><legend>Spec Files</legend>
+        <button id="psSetAll">Set All Files</button>
+        <input type="file" id="psFiles" multiple hidden accept=".par,.atv,.tap,.cpr,.cbl,.prc,.per">
+        ${row('Parameters File', loaded && loaded + '.par')}
+        ${row('Actives File', loaded && loaded + '.atv')}
+        ${row('Taps File', loaded && loaded + '.tap')}
+        ${row('Couplers File', loaded && loaded + '.cpr')}
+        ${row('Cables File', loaded && loaded + '.cbl')}
+        ${row('Pricing File', '')}${row('Performance File', '')}${row('Map Grid File', '')}
+      </fieldset>
+      <fieldset><legend>Misc Folders</legend>
+        <button disabled>Set All Folders</button>
+        ${row('Control File Folder', '')}${row('Report File Folder', '')}
+      </fieldset>
+      <p class="ps-note">Set All Files takes one spec set: the .par .atv .tap .cpr .cbl
+      files that share a base name. Or <a href="#" id="psSample">use the sample specs</a>
+      (not for real design).</p>
+    </div>
+    <div class="row"><button class="primary" id="mClose">OK</button>
+      <button id="psCancel">Cancel</button></div>`);
+  $('#psCancel').onclick = closeModal;
+  $('#psSetAll').onclick = () => $('#psFiles').click();
+  $('#psSample').onclick = async e => { e.preventDefault(); closeModal(); await sampleSpecs(); };
+  $('#psFiles').onchange = async () => {
+    const files = $('#psFiles').files;
+    if (!files.length) return;
+    const fd = new FormData(); [...files].forEach(f => fd.append('files', f));
+    const out = await api(`/api/networks/${S.nid}/library/spec`, { method: 'POST', body: fd });
+    closeModal(); await reload();
+    msg(`${out.library.name}: ${Object.keys(out.library.cables).length} cables, ` +
+        `${Object.keys(out.library.taps).length} taps, ` +
+        `${Object.keys(out.library.passives).length} couplers, ` +
+        `${Object.keys(out.library.actives).length} actives`);
+  };
+}
 
 function branchList() {
   const items = S.scr.branches.map(b => ({ n: b.number,

@@ -79,13 +79,13 @@ def page(server):
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.goto(server, wait_until="networkidle")
         pg.wait_for_timeout(600)
-        # attach the spec set: Spec Edit -> Attach spec set
-        pg.click('.mi[data-menu="spec"]')
+        # attach the spec set as Lode Data does it:
+        # File -> Project Settings... -> Set All Files
+        pg.click('.mi[data-menu="file"]')
         pg.wait_for_timeout(250)
-        pg.click('#modalbox tr[data-i="0"]')
+        pg.click('.dropdown .di:has-text("Project Settings")')
         pg.wait_for_timeout(300)
-        pg.set_input_files("#specFiles", files)
-        pg.click("#specGo")
+        pg.set_input_files("#psFiles", files)
         pg.wait_for_timeout(1800)
         pg.errors = errors
         yield pg
@@ -166,3 +166,17 @@ def test_typing_a_negative_coupler_swaps_the_legs_and_makes_a_branch(page):
     assert "Branch 1 of 2" in page.inner_text("#stBranch")
     assert "through leg to this branch" in page.inner_text("#stMsg")
     assert not page.errors
+
+
+def test_the_menu_bar_matches_the_program(page):
+    names = page.eval_on_selector_all(".menubar .mi", "els => els.map(e => e.textContent)")
+    assert names == ["File", "Edit", "Mode", "Tools", "Global Change", "Spec Edit",
+                     "Test", "Misc", "Reports", "View", "Help"]
+    page.click('.mi[data-menu="file"]')
+    page.wait_for_timeout(200)
+    items = page.eval_on_selector_all(".dropdown .di span:first-child",
+                                      "els => els.map(e => e.textContent)")
+    assert items == ["New", "Open", "Unload", "Save Specs", "Save Network",
+                     "Save Network As...", "Project Settings...", "Print", "Exit"]
+    assert not page.errors
+
