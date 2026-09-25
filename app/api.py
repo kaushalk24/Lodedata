@@ -22,7 +22,8 @@ from hfc.screen import build
 from hfc.entry import resolve_tap, resolve_coupler, resolve_active, EntryError
 from hfc.starter import starter_library
 from hfc.reports import level_report, bill_of_materials, powering_report, to_csv
-from hfc.importer import library_from_spec_set, inspect_ntw, relink_library
+from hfc.importer import (library_from_spec_set, inspect_ntw, relink_library,
+                          design_from_ntw)
 
 WEB = Path(__file__).parent / "web"
 DB_PATH = Path(os.environ.get("LODEDATA_DB",
@@ -141,7 +142,7 @@ class NodeEdit(BaseModel):
     cab_part: str | None = None
     lv: int | None = None
     tsg: int | None = None
-    amp: int | None = None
+    amp: str | None = None
     amp_part: str | None = None
     amp_label: str | None = None
     map: str | None = None
@@ -168,16 +169,16 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
     d = load(nid)
     n = _node(d, branch, node)
     if body.clear_amp:
-        n.amp, n.amp_part, n.amp_label = 0, None, ""
+        n.amp, n.amp_part, n.amp_label = "", None, ""
     if body.amp_code is not None:
         try:
             part = resolve_active(d.library, body.amp_code)
         except EntryError as e:
             raise HTTPException(400, str(e))
         if part is None:
-            n.amp, n.amp_part = 0, None
+            n.amp, n.amp_part = "", None
         else:
-            n.amp, n.amp_part = part.active_id or 0, part.id
+            n.amp, n.amp_part = part.active_id or "", part.id
     for f, v in body.model_dump(exclude_none=True).items():
         if f in ("clear_amp", "amp_code"):
             continue
@@ -353,12 +354,39 @@ async def attach_spec(nid: str, files: list[UploadFile] = File(...)):
             "unmatched": report["unmatched"][:40]}
 
 
+SPEC_EXTS = {".par", ".atv", ".tap", ".cpr", ".cbl", ".prc", ".per"}
+
+
 @app.post("/api/import/ntw")
-async def import_ntw(file: UploadFile = File(...)):
+async def import_ntw(file: UploadFile = File(...),
+                     specs: list[UploadFile] = File(default=[])):
+    """Open a Lode Data design as a new network.
+
+    A .ntw refers to equipment by its position in the spec files, so it reads
+    right only against the spec set it was saved with; that set's name is in
+    the file.  Without spec files this just says what the file is and which
+    set it needs.
+    """
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / Path(file.filename).name
         p.write_bytes(await file.read())
-        return inspect_ntw(p)
+        info = inspect_ntw(p)
+        base = None
+        for f in specs:
+            name = Path(f.filename).name
+            if Path(name).suffix.lower() not in SPEC_EXTS:
+                continue
+            (Path(tmp) / name).write_bytes(await f.read())
+            base = Path(tmp) / Path(name).stem
+        if base is None:
+            return {"imported": False, **info}
+        try:
+            d, report = design_from_ntw(p, base)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+    d.id = new_id("ntw")
+    save(d)
+    return {"imported": True, "id": d.id, "name": d.name, "report": report, **info}
 
 
 _REPORTS = {"levels": level_report, "bom": bill_of_materials,

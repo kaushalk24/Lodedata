@@ -18,7 +18,8 @@ than pick from a list.
                      --3    or "=3": through leg to the right-most branch
                      0      clear the cell, removing the branch it created
 
-    amp column       the Active ID from the spec set; 0 clears it
+    amp column       the Active ID from the spec set -- "61", "11H"; 0 clears it.
+                     Alphabetic IDs are case sensitive, as the manual says.
 """
 from __future__ import annotations
 
@@ -117,13 +118,13 @@ def resolve_active(lib: Library, code: str) -> ActiveType | None:
     code = (code or "").strip()
     if code in ("", "0"):
         return None
-    if not re.fullmatch(r"\d+", code):
+    if not re.fullmatch(r"[0-9A-Za-z]+", code):
         raise EntryError(f"'{code}' is not an Active ID")
-    wanted = int(code)
+    wanted = code
     for part in lib.actives.values():
-        if part.active_id == wanted:
+        if str(part.active_id) == wanted:
             return part
-    have = sorted(p.active_id for p in lib.actives.values() if p.active_id)
+    have = sorted(str(p.active_id) for p in lib.actives.values() if p.active_id)
     raise EntryError(
         f"no active with ID {wanted} in the spec set"
         + (f" — it has {', '.join(str(v) for v in have[:20])}" if have else ""))

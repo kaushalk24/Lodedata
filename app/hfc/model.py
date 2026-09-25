@@ -60,6 +60,7 @@ class CableType:
     velocity_pct: float = 87.0
     notes: str = ""
     source: str = "manual"
+    cable_index: int = -1                      # 0-99 in the spec file; the screen shows series*100 + this
 
     def loss_db(self, mhz: float, feet: float) -> float:
         return interpolate_sqrt([tuple(p) for p in self.attenuation], mhz) * feet / 100.0
@@ -81,6 +82,7 @@ class TapType:
     name: str
     ports: int = 4
     tap_id: int = 0                                       # what the screen shows
+    row: int = -1                                         # tap file row, as a design file refers to it
     tap_value_db: float = 26.0                            # measured, for BOM
     tap_value: list = field(default_factory=list)         # [(MHz, dB)] toward the ports
     through_loss: list = field(default_factory=list)      # [(MHz, dB)] insertion
@@ -110,12 +112,22 @@ class PassiveType:
     port_losses: list = field(default_factory=list)   # dB per output port, in port order
     power_passing: list = field(default_factory=list) # bool per output port
     source: str = "manual"
+    # Per-frequency losses, one [(MHz, dB)] table per leg: leg 0 is the
+    # through leg, then the tap legs.  Spec-file couplers carry these; parts
+    # keyed in by hand fall back to port_losses.
+    leg_losses: list = field(default_factory=list)
+    record: int = -1                           # coupler file record, as a design refers to it
+    internal: bool = False                     # an amplifier's own output split
 
     @property
     def ports(self) -> int:
         return len(self.port_losses)
 
-    def port_db(self, port: int) -> float:
+    def port_db(self, port: int, mhz: float | None = None) -> float:
+        if mhz is not None and self.leg_losses:
+            legs = self.leg_losses
+            table = legs[min(port, len(legs) - 1)] if port > 0 else legs[0]
+            return interpolate_sqrt([tuple(p) for p in table], mhz)
         if 0 <= port < len(self.port_losses):
             return float(self.port_losses[port])
         return 0.0
@@ -142,10 +154,11 @@ class ActiveType:
     id: str
     name: str
     kind: str = "line_extender"                # node | trunk | bridger | line_extender
-    # The number typed at the amp column.  Taken from the record's slot in the
-    # actives file; the Configuration Table page can rename these, and that
-    # page is not decoded, so a spec set that uses custom IDs may not match.
-    active_id: int = 0
+    # The Active ID typed at the amp column -- text, since the Configuration
+    # Table allows "11H" as readily as "61".
+    active_id: str = ""
+    index: int = -1                            # actives table index, as a design refers to it
+    fibre_fed: bool = False                    # no RF input: an optical node
     outputs: int = 1
     # required input levels (dBmV)
     in_forward_high: float = 13.0
@@ -188,28 +201,47 @@ class ActiveType:
 
     @property
     def needs_rf_input(self) -> bool:
-        return self.in_forward_high < NO_RF_INPUT
+        return not self.fibre_fed and self.in_forward_high < NO_RF_INPUT
 
-    def current_at(self, volts: float) -> float:
+    def current_at(self, volts: float, mode: str = "constant_wattage") -> float:
         """Current drawn at an applied voltage.
 
-        The manual defines these as *power steps*, not a curve to interpolate:
-        "from Vmin to V2, it uses A1 amperes; from V2 to V3, A2 amperes are
-        used".  So each entry gives the draw from its own voltage up to the
-        next one.
+        ``mode`` is the Parameters file's Power interpolation setting.  In
+        "constant_wattage" actives are constant-power loads: the power steps give the draw at a
+        few voltages, and between them the *power* (volts x amps) is
+        interpolated, then divided by the voltage.  Checked against the AL004
+        Power screen, where this reproduces all 29 currents on branch 4 --
+        e.g. the Ripple node at 85.6 V draws 1.74 A and a Bridger at 86.8 V
+        0.79 A.  Holding the step value instead would show 1.86 and 0.81.
+        Below the lowest step the lowest-voltage draw holds; above the highest,
+        its power does.
         """
         if not self.power_draw:
             return self.current_draw_a
         pts = sorted((float(v), float(a)) for v, a in self.power_draw)
-        if volts < pts[0][0]:
-            return pts[0][1]              # below Vmin: the worst-case draw
-        current = pts[0][1]
-        for v, a in pts:
-            if volts >= v:
-                current = a
-            else:
-                break
-        return current
+        if volts <= pts[0][0]:
+            return pts[0][1]
+        if mode == "step":
+            # "from Vmin to V2 the current from A1 is used", and so on
+            current = pts[0][1]
+            for v, a in pts:
+                if volts >= v:
+                    current = a
+            return current
+        if mode == "linear":
+            if volts >= pts[-1][0]:
+                return pts[-1][1]
+            for (v0, a0), (v1, a1) in zip(pts, pts[1:]):
+                if v0 <= volts <= v1 and v1 > v0:
+                    return a0 + (a1 - a0) * (volts - v0) / (v1 - v0)
+            return pts[-1][1]
+        if volts >= pts[-1][0]:
+            return pts[-1][0] * pts[-1][1] / volts
+        for (v0, a0), (v1, a1) in zip(pts, pts[1:]):
+            if v0 <= volts <= v1 and v1 > v0:
+                watts = v0 * a0 + (v1 * a1 - v0 * a0) * (volts - v0) / (v1 - v0)
+                return watts / volts
+        return pts[-1][1]
 
     @property
     def min_voltage(self) -> float:
@@ -226,6 +258,7 @@ class PowerSupplyType:
     volts: float = 90.0
     amps: float = 15.0
     source: str = "manual"
+    type_id: int = 0                           # the supply type number in the Parameters file
 
 
 @dataclass
@@ -262,6 +295,8 @@ class Library:
                   imported_from=d.get("imported_from", ""))
         for attr, klass in cls._TABLES.items():
             for k, v in (d.get(attr) or {}).items():
+                if attr == "actives" and not isinstance(v.get("active_id", ""), str):
+                    v = dict(v, active_id=str(v["active_id"] or ""))
                 getattr(lib, attr)[k] = klass(**v)
         return lib
 
@@ -275,9 +310,14 @@ class DesignParameters:
     forward_high_mhz: float = 750.0
     return_low_mhz: float = 5.0
     return_high_mhz: float = 42.0
-    # levels the design is checked against
-    min_tap_port_dbmv: float = 0.0
-    max_tap_port_dbmv: float = 15.0
+    # System Levels: per lv 0-15, [min forward high, min forward low,
+    # max return high, max return low] at the tap ports.  A tap outside by
+    # less than the tap margin is marginal (yellow), beyond it red.
+    levels: list = field(default_factory=lambda: [[15.0, 9.0, 45.0, 45.0]])
+    tap_margin_db: float = 0.5
+    # how an active's power steps are read: "step", "linear" or
+    # "constant_wattage" -- the Parameters file's Power interpolation setting
+    power_interpolation: str = "constant_wattage"
     min_amp_input_dbmv: float = 10.0
     return_transmit_dbmv: float = 45.0     # CPE upstream transmit level
     return_target_at_node_dbmv: float = 15.0

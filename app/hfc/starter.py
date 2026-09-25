@@ -71,8 +71,8 @@ _POWER_VOLTAGES = (38.0, 45.0, 52.0, 60.0, 70.0, 80.0, 90.0)
 # the manual's default numbering: 11/21/22/31/32/33 are line extenders by
 # cascade position, 41-49 and 61-89 trunk, system and distribution amps
 _ACTIVE_IDS = {
-    "Optical node (4 out)": 61, "Optical node (2 out)": 62,
-    "System amplifier": 41, "Line extender": 11, "Mini bridger": 21,
+    "Optical node (4 out)": "61", "Optical node (2 out)": "62",
+    "System amplifier": "41", "Line extender": "11", "Mini bridger": "21",
 }
 
 

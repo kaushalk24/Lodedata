@@ -112,11 +112,7 @@ produces bit-mask artefacts.)
   new spec set is meaningful.
 * `0xFFFF` / `0xFFFFFFFF` is the "unset / not connected" sentinel.
 * Numbers are little-endian.
-* **Node records are 1970 bytes.** In AL004 the node footage is a `uint16` at a
-  fixed offset in each record; runs of consecutive records hold the nodes of
-  one run between amplifiers (nodes 1–13, then 14–25 starting at the amp on
-  node 14). The rest of the record layout is being mapped against the Power
-  mode photo — see `docs/open-questions.md`.
+* The network itself — branches of node records — is mapped in section 3.7.
 
 Constraints the manual gives for that mapping, all useful when the tables are
 finally identified:
@@ -290,65 +286,133 @@ against.
 loop resistance 99 on cables. It marks a fibre-fed optical node, and identifies
 parts whose name does not say so (`5F31QSA004-9`).
 
-The trailing table is the manual's **Power Steps** page, and it is a *step*
-function rather than a curve to interpolate: "from Vmin to V2, it uses A1
-amperes; from V2 to V3, A2 amperes are used". The lowest voltage present is
-Vmin, "the lowest voltage at which the active will operate". It works out as
-constant power, which is why a table is needed at all — an active draws more as
-the applied voltage sags:
+The trailing table is the manual's **Power Steps** page. How it is read
+between steps is a Parameters setting — "Power interpolation: Step, Linear or
+Constant Wattage". WV750-2026 runs **constant wattage**: the draw is
+interpolated in watts and divided by the voltage. That reproduces every one of
+the 29 currents on AL004's branch 4 Power screen (e.g. the Ripple node at
+85.6 V draws 1.74 A; holding the 80 V step would give 1.86). The table works
+out as near-constant power, which is why it exists at all:
 
 | MB-750D-H | 38 V | 45 | 52 | 60 | 70 | 80 | 90 |
 |---|---|---|---|---|---|---|---|
 | amps | 1.12 | 0.96 | 0.83 | 0.72 | 0.62 | 0.54 | 0.48 |
 | watts | 42.6 | 43.2 | 43.2 | 43.2 | 43.4 | 43.2 | 43.2 |
 
-### 3.4 `.tap` — taps (908 bytes) — solved
+**Active IDs and the index a design uses.** The actives table starts six
+records into the record area: a design file stores an active as an index `i`,
+and its record is `i + 6`. The Active ID shown in the amp column is *text* —
+the manual allows "numeric or alphabetic", and WV750 has `11H`, `21H` — held in
+the Configuration Table part of the record: eight 18-byte slots from +214, the
+ID 5 bytes into each. Slot 0 is the base unit, the others plug-in variants
+(`FM902B` = `68`, `68N`, `68U`, `68M`, `68S`, `68B`). WV750's default scheme:
+11/21/22/31/32/33 line extenders by cascade position, 11H–33H alternates,
+61 and 41 Bridgers, 63–71 and 78 nodes and fibre receivers (70 = `Ripple`).
 
-One record holds one tap *value*, with a sub-block per port count. The manual:
-"63 different types of taps may be entered. Each type is available in 2-way,
-4-way, 6-way, and 8-way."  The file allocates 256 slots; the samples use
-indices 0–38.
+An In level of 0 on both forward columns (WV750's `Ripple`, `NC4000`) marks a
+fibre-fed node, like the 99 sentinel.
 
-| offset | port count | drawn as |
+### 3.4 `.tap` — taps: 454-byte rows — solved
+
+After the header comes a 129-byte prefix, then **512 rows of 454 bytes** from
+offset 641. A row is one **Tap ID** with a part for each port count:
+
+| row offset | field | drawn as |
 |---|---|---|
-| 16 | 8-port | `<26>` |
-| 134 | 2-port | `/26/` |
-| 246 | 4-port | `[26]` |
-| 358 | 6-port | `{26}` |
+| 0 | i32 ×1e6 Tap ID | |
+| 5 | 2-port part | `/26/` |
+| 117 | 4-port part | `[26]` |
+| 229 | 6-port part | `{26}` |
+| 341 | 8-port part | `<26>` |
 
-The bracket style is how the Design screen identifies the port count, quoted
-from the manual. Beside the port slots, **offset +129 holds the Tap ID** — the
-row's identifying value, which "usually corresponds to the actual tap value"
-and is what the screen prints inside the brackets. It matches the value in the
-2-port part number in every record of both sample spec sets, and the rows
-descend from the highest value, as the manual says they should.
+Each part slot is 112 bytes: the part number, then two ten-slot loss blocks in
+the same layout as cables and couplers — **Tap Value** (toward the ports) at
++25 and **Tap Losses** (insertion) at +65. An all-zero insertion block marks a
+terminating tap: nothing continues past it and the screen shows 0.00 on the
+line below.
 
-Each slot holds a 14-character part number, then two ten-slot loss blocks in
-the same layout as cables and couplers:
+A design stores a tap as **(row, port code)**, port code 0/1/2/3 = 2/4/6/8
+ports. Confirmed on AL004: rows 3, 5, 7, 9, 10 and 11 of WV750-2026 are Tap IDs
+20, 17, 14, 11, 8 and 4, and its Design screen shows exactly `[20]`, `/17/`,
+`/14/`, `/11/`, `/ 8/`, `/ 4/` where the file has those rows. 8-port taps are
+often a row of their own (WV750 has 8-port 18 on row 4, 2/4-port 17 on row 5).
 
-| relative to the part number | field |
-|---|---|
-| +25 | **Tap Value** — loss toward the tap ports |
-| +65 | **Tap Losses** — insertion loss, hard cable in to hard cable out |
+An earlier reading used 908-byte records at 512 with the 8-port part at +16.
+It lined up for 2/4-port parts on even rows only, skipped every odd row and
+paired each 8-port part with the row before it. Corrected here.
 
-Verified against a vendor whose part numbers played no part in deriving the
-offsets: in `WVBeck750`, `RMT2008-RF-20` at the 8-port slot decodes to exactly
-20.0 dB, `RMT2002-RF-23` at the 2-port slot to 23.0, `RMT2004-RF-17` at the
-4-port slot to 17.0. Insertion loss behaves correctly too — the 4-port version
-of a 23 dB tap costs more through-loss (1.2 dB) than the 2-port (0.9 dB).
-
-Not yet located inside the record: the Self Term and Active flags, the Active
-Taps powering table, Tap Swap Options and the Pad/EQ bank pointers, all of
-which the manual says live in this file.
+WV750's six tap families (Tap IDs): MGT 4–24, LEQ\RC pads 30–45 (6-port slot),
+AN-WIFI 104–124, RMT1 204–235, RMT2 404–426.
 
 ### 3.5 `.par` — system design parameters
 
-A single record holding the system-wide settings. Readable content includes a
-byte table (values `0x03`) and an index ramp `0x00…0x20` (33 entries — a
-frequency/channel plan of 33 points **(unconfirmed)**), the string
-`HOUS TO HOUS`, device-class abbreviations (`SGMC`, `GTRM`/`NATOR`), and a list
-of named plans: `TV-60`, `TV-80`, `TV-104`, `TV-106`, `TV-1024`. Field-level
-layout is **not yet mapped**.
+Mapped so far (identical offsets in all three sample spec sets):
+
+| offset | field |
+|---|---|
+| 1134 | i32 ×1e6 tap margin (0.5) |
+| 1154 + 20·lv | System Levels 0–15: min forward high, min forward low, max return high, max return low |
+| 1567 + 25·k | power supply type k+1 name, e.g. `EXISTING  90v` |
+| 2212 + 20·k | power supply type k+1: volts, amps, % of maximum current |
+| 3792 + 10·k | frequency column k (F1–F6, R1–R4): 5-char label, enabled byte |
+
+WV750-2026: frequencies 750 / 54 / 40 / 5; level 0 = 17 / 10 / 45 / 45,
+level 1 = 19 / 12 / 45 / 45; supply 3 = 90 V 15 A. With those levels exactly
+the taps AL004's Design screen shows red come out red.
+
+Not yet located: the Power interpolation setting, tap window, tap selection
+page, NIU settings, backfeed/forwardfeed replacement cables. Readable content
+also includes `HOUS TO HOUS`, `SGMC`, `GTRM`/`NATOR` and the plans
+`TV-60` … `TV-1024`.
+
+### 3.6 `.cpr` record mark
+
+The first byte of a live cable or coupler record is the file's format version
+(major·10 + minor): `0x6F` in an 11.1 file, `0x79` in a 12.1 file. WV750's
+`.cpr` is 12.1, which is why an earlier reader that looked for `0x6F` found no
+couplers in it.
+
+### 3.7 `.ntw` — the network
+
+The payload is the branches in order, each
+
+```
+branch record   1966 bytes
+node records    1970 bytes, or 2504 when the node carries an active
+end record      44 bytes, starting 4 bytes after the last node record
+```
+
+Records are also linked: each starts with its own id, the previous node's id
+(the branch number for a branch's first node) and the next node's id.
+
+Node record, offsets from its id:
+
+| offset | field |
+|---|---|
+| 0 / 4 / 8 | u32 id, previous id (or branch number), next id |
+| 12 | u16 footage |
+| 14 + 21·k | tap slot k (0–3): i32 tap-file row (−1 empty), u8 port code |
+| 98, 102 | u32 branch started here, first and second coupler column |
+| 106 | u8 amp column: actives index when +701 is set, otherwise an in-line device |
+| 112 + 3·k | forward pad, return pad, forward EQ, return EQ (amps only) |
+| 129 | u8 house count |
+| 130 | u16 cable ID as displayed (series·100 + cable file index) |
+| 132 | u8 lv (System Levels row) |
+| 133 | u8 power stop in the span leading to this node |
+| 135 | u8 power supply type (Parameters file) |
+| 701 | u8 active present — the record is then 2504 bytes |
+| 726 | power supply label (`A`) |
+| 981 | Amplifier Definition name (`AL00416`) |
+
+Branch record: +0 id, +4 first node id, +8 u16 node count, +126 u8 coupler
+file record + 1 (the coupler that starts the branch), +131 non-zero when this
+branch takes the through leg (`3-<11><12>`).
+
+Everything above was checked against AL004's screens: all 29 footages, cables,
+house counts, taps, couplers, both amplifiers and their names on branch 4;
+181 homes in total (the node's "Housecounts downstream"); 120 downstream of
+AL00416 (its info box); pads 4 and 14 on AL00416 (its info box says Fwd Pad 4,
+Ret Pad 14). The power stop field is confirmed on one design only.
 
 ---
 

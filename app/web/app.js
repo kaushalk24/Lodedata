@@ -22,7 +22,9 @@ const S = {
 // rows of the branch currently on screen
 function pageRows() {
   if (!S.scr) return [];
-  return S.scr.rows.filter(r => r.branch === S.branch);
+  // the line under the last node (levels through the last tap, and its port
+  // output under the tap columns) is part of the Design screen only
+  return S.scr.rows.filter(r => r.branch === S.branch && (!r.end || S.mode === 'design'));
 }
 function branchMeta(n) {
   return (S.scr && S.scr.branches.find(b => b.number === n)) || null;
@@ -61,8 +63,10 @@ function columns() {
       { key: 'amp', head: 'amp', edit: true },
       { key: 'ampname', head: 'amp ID#', cls: 'l', edit: true },
       { key: 'supply', head: 'supply', edit: true },
+      { key: 'supplypct', head: '%' },
       { key: 'cplr0', head: 'cplr[branch]', cls: 'l', edit: true },
       { key: 'cplr1', head: 'cplr[branch]', cls: 'l', edit: true },
+      { key: 'niu', head: 'NIU' },
     ];
   }
   return [
@@ -79,6 +83,15 @@ function columns() {
 }
 
 function cellText(r, c) {
+  if (r.end) {
+    // the end line: levels, and the last tap's port output under the taps
+    if (c.key.startsWith('lvl:')) return r.levels[+c.key.slice(4)].toFixed(2);
+    if (/^tap\d$/.test(c.key)) {
+      const v = (r.port_levels || [])[+c.key.slice(3)];
+      return v === undefined ? '' : v.toFixed(2);
+    }
+    return '';
+  }
   if (c.key.startsWith('lvl:')) {
     const v = r.levels[+c.key.slice(4)];      // index into the frequency order
     return v === undefined ? '' : v.toFixed(2);
@@ -90,12 +103,15 @@ function cellText(r, c) {
     case 'hc': return r.hc || '';
     case 'cab': return r.cab || (r.cab_name ? r.cab : '');
     case 'lv': return r.lv || '';
-    case 'tsg': return r.tsg || '';
+    // in Design mode the amplifier's name runs on from the amp column
+    case 'tsg': return (S.mode === 'design' && r.amp_label) ? r.amp_label : (r.tsg || '');
     case 'amp': return r.amp || '';
     case 'ampname': return r.amp_label ? `[${r.amp_label}]` : (r.amp_name || '');
     case 'map': return r.map || '';
     case 'loc': return r.loc || '';
-    case 'supply': return r.supply || '';
+    case 'supply': return r.supply ? (r.supply_label || String(r.supply)) : '';
+    case 'supplypct': return r.supply_pct != null ? String(r.supply_pct) : '';
+    case 'niu': return r.volts === null ? '' : 'Y';
     case 'volt': return r.volts === null ? '' : r.volts.toFixed(2);
     case 'current': return r.current ? r.current.toFixed(2) : '0.00';
     case 'tap0': case 'tap1': case 'tap2': case 'tap3':
@@ -138,6 +154,14 @@ function renderGrid() {
       let extra = '';
       if (c.key === 'cab' && r.cab >= 100) extra = ' series1';
       if (c.key === 'ampname') extra = ' amp';
+      if (c.key === 'tsg' && S.mode === 'design' && r.amp_label) extra = ' amp spill';
+      if (/^tap\d$/.test(c.key)) {
+        const k = +c.key.slice(3);
+        const sev = r.end ? (r.port_severity || [])[k] : (r.tap_severity || [])[k];
+        extra += r.end ? ' port' : ' tap';
+        if (sev) extra += ' ' + sev;
+      }
+      if (r.end && c.key.startsWith('lvl:')) extra += ' endlv';
       return `<td class="${c.cls || ''}${cur}${extra}" data-r="${i}" data-c="${j}">${esc(text)}</td>`;
     }).join('');
     return `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;
@@ -406,7 +430,8 @@ document.addEventListener('keydown', async ev => {
   }
   else if (/^[0-9]$/.test(k)) {
     const c = cols[S.col];
-    if (c && c.edit) { S.buffer = (S.buffer || '') + k; }
+    // the end line is a readout, not a node
+    if (c && c.edit && !(curRow() || {}).end) { S.buffer = (S.buffer || '') + k; }
   }
   else if ((k === '-' || k === '=') && TYPED_COLUMNS.test(cols[S.col].key)) {
     // "-8" and "--8" (or "=8") choose which leg is the through leg
@@ -430,6 +455,7 @@ document.addEventListener('keydown', async ev => {
 
 // opening a cell: taps, couplers and actives get a picker
 async function openCell() {
+  if ((curRow() || {}).end) return;
   const c = curCol(), r = curRow();
   if (!c || !r) return;
   if (c.key.startsWith('tap')) return pickTap(+c.key.slice(3));
@@ -533,12 +559,13 @@ async function pickCoupler(slot) {
 
 async function pickActive() {
   const r = curRow();
-  const items = libTable('actives').map(a => ({ id: a.id, label: a.name,
+  const items = libTable('actives').map(a => ({ id: a.id,
+    label: (a.active_id ? a.active_id + '  ' : '') + a.name, aid: a.active_id,
     detail: `${a.kind} · in ${a.in_forward_high}/${a.in_forward_low} · out ${a.out_forward_high}/${a.out_forward_low}` }));
   chooser(`Active for node ${r.branch}.${r.node}`, items, async pick => {
     await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pick ? { amp: 11, amp_part: pick.id } : { clear_amp: true }) });
+      body: JSON.stringify(pick ? { amp_code: pick.aid || '' } : { clear_amp: true }) });
     await refresh();
   });
 }
@@ -816,17 +843,30 @@ function fmtLib(p, c) {
 }
 function importNtw() {
   modal(`<h2>Import a .ntw network file</h2>
-    <p>The payload obfuscation is solved so the file can be read, but the record
-    layout is not mapped yet — .ntw files hold no text, only indices into the
-    spec files. This reports what the file is.</p>
-    <input type="file" id="ntwFile" accept=".ntw">
-    <div class="row"><button class="primary" id="ntwGo">Read</button>
+    <p>A .ntw refers to its equipment by position in the spec files, so pick the
+    spec set it was saved with as well (.par .atv .tap .cpr .cbl). Pick just the
+    .ntw first to see which set it needs.</p>
+    <label>Network file <input type="file" id="ntwFile" accept=".ntw"></label>
+    <label>Spec set <input type="file" id="ntwSpecs" multiple
+      accept=".par,.atv,.tap,.cpr,.cbl,.prc,.per"></label>
+    <div class="row"><button class="primary" id="ntwGo">Import</button>
       <button id="mClose">Cancel</button></div><pre id="ntwOut"></pre>`);
   $('#ntwGo').onclick = async () => {
     const f = $('#ntwFile').files[0]; if (!f) return;
     const fd = new FormData(); fd.append('file', f);
+    for (const s of $('#ntwSpecs').files) fd.append('specs', s);
     const out = await api('/api/import/ntw', { method: 'POST', body: fd });
-    $('#ntwOut').textContent = JSON.stringify(out, null, 2);
+    if (!out.imported) {
+      $('#ntwOut').textContent = `${out.network || f.name}: ${out.branches} branches, ` +
+        `${out.nodes} nodes.\nIt was saved with spec set ${out.spec_set_needed} — ` +
+        `pick those five files and import again.`;
+      return;
+    }
+    const r = out.report;
+    closeModal();
+    await open(out.id);
+    msg(`${r.network}: ${r.branches} branches, ${r.nodes} nodes read against ${r.spec_set}` +
+        (r.unresolved.length ? ` — ${r.unresolved.length} unresolved: ${r.unresolved[0]}` : ''));
   };
 }
 

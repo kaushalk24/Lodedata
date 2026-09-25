@@ -76,9 +76,10 @@ class Node:
     cab_part: str | None = None  # library id of the cable
     lv: int = 0                 # which System Levels set applies here
     tsg: int = 0                # tap selection group, 0 = the file default
-    amp: int = 0                # active ID placed here, 0 = none
+    amp: str = ""               # Active ID placed here, "" = none
     amp_part: str | None = None
     amp_label: str = ""         # from the Amplifier Definition window
+    pads: list = field(default_factory=list)   # fwd pad, ret pad, fwd EQ, ret EQ as stored
     taps: list = field(default_factory=list)      # up to 4 TapPlacement
     couplers: list = field(default_factory=list)  # up to 2 CouplerPlacement
     through_leg: int = THROUGH_DOWNSTREAM
@@ -87,7 +88,9 @@ class Node:
     address: str = ""
     note: str = ""
     supply_volts: float = 0.0   # a power supply placed on this node
-    power_stop: bool = False
+    supply_label: str = ""      # its name, e.g. "A"
+    supply_part: str | None = None
+    power_stop: bool = False    # stops power in the span leading to this node
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -98,6 +101,8 @@ class Node:
     @classmethod
     def from_dict(cls, d: dict) -> "Node":
         d = dict(d)
+        if not isinstance(d.get("amp", ""), str):
+            d["amp"] = str(d["amp"]) if d["amp"] else ""
         d["taps"] = [TapPlacement(**t) for t in d.get("taps") or []]
         d["couplers"] = [CouplerPlacement(**c) for c in d.get("couplers") or []]
         return cls(**d)
@@ -125,6 +130,12 @@ class Branch:
                 style=d.get("style", BRANCH_NORMAL), label=d.get("label", ""))
         b.nodes = [Node.from_dict(n) for n in d.get("nodes") or []]
         return b
+
+
+def _parameters(d: dict) -> DesignParameters:
+    """Stored parameters, ignoring settings this version no longer has."""
+    known = DesignParameters.__dataclass_fields__
+    return DesignParameters(**{k: v for k, v in d.items() if k in known})
 
 
 @dataclass
@@ -218,7 +229,7 @@ class Design:
     def from_dict(cls, d: dict) -> "Design":
         g = cls(id=d.get("id", ""), name=d.get("name", "lode-1"),
                 imported_from=d.get("imported_from", ""),
-                parameters=DesignParameters(**(d.get("parameters") or {})),
+                parameters=_parameters(d.get("parameters") or {}),
                 library=Library.from_dict(d.get("library") or {}),
                 source_dbmv=d.get("source_dbmv", 46.0),
                 source_tilt_db=d.get("source_tilt_db", 10.0),

@@ -23,7 +23,7 @@ def design():
     tap23 = lib.taps["tap_4x23"]
     tap17 = lib.taps["tap_4x17"]
 
-    feeder.nodes[0].amp, feeder.nodes[0].amp_part = 61, node_part.id
+    feeder.nodes[0].amp, feeder.nodes[0].amp_part = "61", node_part.id
     feeder.nodes[0].supply_volts = 90.0
     for ftg, hc, tap in [(500, 4, tap23), (300, 4, tap17)]:
         n = Node(ftg=ftg, hc=hc, cab=2, cab_part=cable.id)
@@ -94,26 +94,26 @@ def test_branch_rows_get_gutter_line_art():
     splitter = d.library.passives["psv_2_way_splitter"]
     d.branches[1].nodes[1].couplers.append(
         CouplerPlacement(part_id=splitter.id, branch=child.number))
-    rows = [r for r in build(d).rows if r.branch == child.number]
+    rows = [r for r in build(d).rows if r.branch == child.number and not r.end]
     assert [r.gutter for r in rows] == ["┌", "│", "└"]
 
 
 def test_powering_drops_voltage_and_draws_constant_power():
     d = design()
-    scr = build(d)
-    assert scr.rows[0].volts == 90.0
-    assert scr.rows[0].current > 0        # the node draws
-    assert scr.rows[-1].volts <= scr.rows[0].volts
+    rows = [r for r in build(d).rows if not r.end]
+    assert rows[0].volts == 90.0
+    assert rows[0].current > 0            # the node draws
+    assert rows[-1].volts <= rows[0].volts
 
 
 def test_a_starved_amplifier_is_flagged_red():
     d = design()
     le = d.library.actives["act_Line_extender"]
     far = Node(ftg=4000, cab=2, cab_part=d.library.cables["cbl_p750_P3"].id,
-               amp=11, amp_part=le.id)
+               amp="11", amp_part=le.id)
     d.branches[1].nodes.append(far)
     d.renumber(d.branches[1])
-    row = build(d).rows[-1]
+    row = [r for r in build(d).rows if not r.end][-1]
     assert row.severity == "red"
     assert any("module input" in m for _, m in row.flags)
 

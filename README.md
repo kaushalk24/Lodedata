@@ -12,29 +12,22 @@ groundwork for an HFC network design application that can read them.
 * The `.ntw` network-file obfuscation: nibble swap plus a fixed 100-byte
   additive keystream, key recovered and verified identical across all sample files. Design payloads
   can be read as plaintext.
-* The equipment spec files (`.cbl`, `.cpr`, `.atv`, `.tap`) — record strides,
-  part-number fields and the `int32 × 1e6` fixed-point number convention.
-  Cable loop-resistance values decode to exactly the published figures for the
-  real Commscope/other cables, which confirms the decode.
-* The cable and coupler loss blocks: ten slots holding losses at the forward
-  High and Low and return Rh and Rl frequencies plus optional extras, confirmed
-  against the manual and by ratio analysis over 62 cables in two spec sets.
+* The equipment spec files (`.cbl`, `.cpr`, `.atv`, `.tap`) — record layouts,
+  part numbers, loss blocks, Tap IDs, Active IDs, and the `int32 × 1e6`
+  fixed-point convention. Cable loop resistance decodes to the published
+  figures for real cables.
+* The `.ntw` network layout: branches, nodes, footage, house count, cable, lv,
+  taps, couplers and leg designations, amplifiers and their names, pads, power
+  supplies. A real design (AL004) imports with every reference resolved.
+* The Parameters file's frequency labels, System Levels, tap margin and power
+  supply table.
+* The calculations, checked against AL004's own screens: Design levels match
+  on every line, Power currents match, Power volts are within 0.02 V.
 
-**Not solved yet** — both blocked on inputs I don't have; see
-[`docs/open-questions.md`](docs/open-questions.md)
-
-* The full `.ntw` record layout. Labels, spec set name and node footage are
-  found; the rest is being mapped against a Power mode screen of the same
-  design.
-* The tap-loss and amplifier-gain field positions — the numbers are readable,
-  their exact meaning needs one screenshot each from the application.
-* The application's screens. `docs.lodedata.com` is blocked by this
-  environment's egress proxy, but much of the manual's **text** was recovered
-  through web search and is written up in
-  [`docs/lode-data-manual-notes.md`](docs/lode-data-manual-notes.md) — it
-  confirmed the cable and coupler loss layout, the cable ID convention and the
-  program's input model. Search returns no images, so the screenshots are still
-  missing.
+**Not solved yet** — see [`docs/open-questions.md`](docs/open-questions.md)
+for each item and the screenshot that would settle it: the `<n>` / `[n]` branch
+brackets, the rest of the Parameters file, pad and EQ values, in-line devices in
+the amp column, and the last 0.02 V of the Power screen.
 
 ## The design tool
 

@@ -27,7 +27,7 @@ pytestmark = pytest.mark.skipif(
 
 
 def _spec_files():
-    # The keying tests type KERMIT750 tap codes (4.23, 8.20); prefer that set.
+    # The keying tests type KERMIT750 tap codes (4.23, 8.21); prefer that set.
     cbls = sorted(SAMPLES.rglob("*.cbl"), key=lambda p: "KERMIT" not in p.name)
     cbl = next(iter(cbls), None)
     if not cbl:
@@ -137,11 +137,11 @@ def test_typing_a_tap_code_places_it_in_the_right_bracket(page):
     assert cell.strip() == "[23]"          # four-port brackets
 
     page.click(f'#grid tbody tr:nth-child(1) td[data-c="{tap1 + 1}"]')
-    _type(page, "8.20")
+    _type(page, "8.21")
     page.keyboard.press("Enter")
     page.wait_for_timeout(900)
     cell = page.inner_text(f'#grid tbody tr:nth-child(1) td[data-c="{tap1 + 1}"]')
-    assert cell.strip().startswith("<") and cell.strip().endswith(">")
+    assert cell.strip() == "<21>"          # eight-port brackets
     assert not page.errors
 
 

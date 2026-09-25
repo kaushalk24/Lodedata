@@ -3,10 +3,9 @@
 Two operations:
 
 * ``library_from_spec_set``  -- read a .cbl/.cpr/.atv/.tap set into a Library.
-* ``inspect_ntw``           -- read what a .ntw design file will currently give
-  up.  The obfuscation is solved so the payload is plaintext, but the record
-  layout is not mapped yet, so this reports the header and payload statistics
-  rather than pretending to import devices.  See docs/open-questions.md.
+* ``inspect_ntw``           -- what a .ntw design file is, and which spec set
+  it needs.
+* ``design_from_ntw``       -- a .ntw read into a Design, against its spec set.
 """
 from __future__ import annotations
 
@@ -22,8 +21,14 @@ from lodedata.header import read_header                    # noqa: E402
 from lodedata.obfuscation import deobfuscate, recover_key, NTW_KEY, PAYLOAD_START  # noqa: E402
 from lodedata import specs as ld_specs                     # noqa: E402
 
+from dataclasses import asdict
+
+from lodedata.network import read_network                  # noqa: E402
+
 from .model import (Library, CableType, TapType, PassiveType, ActiveType,
-                    DesignParameters, new_id)
+                    PowerSupplyType, DesignParameters, new_id)
+from .plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
+                    THROUGH_FIRST, THROUGH_SECOND)
 
 # A loss block is ten int32 fixed-point values, laid out the same way in the
 # cable and coupler files (docs/lode-data-manual-notes.md):
@@ -79,9 +84,31 @@ def _tap_value_from_part(part: str) -> float | None:
     return None
 
 
+def parameters_from_spec_set(base: str | Path,
+                             params: DesignParameters | None = None) -> DesignParameters:
+    """The design frequencies named in the Parameters file, over ``params``."""
+    params = DesignParameters(**asdict(params)) if params else DesignParameters()
+    spec = ld_specs.load_spec_set(Path(base))
+    f = spec.frequencies
+
+    def num(key, default):
+        try:
+            return float(f[key])
+        except (KeyError, ValueError):
+            return default
+    params.forward_high_mhz = num("F1", params.forward_high_mhz)
+    params.forward_low_mhz = num("F2", params.forward_low_mhz)
+    params.return_high_mhz = num("R1", params.return_high_mhz)
+    params.return_low_mhz = num("R2", params.return_low_mhz)
+    if spec.levels and any(any(r) for r in spec.levels):
+        params.levels = spec.levels
+        params.tap_margin_db = spec.tap_margin
+    return params
+
+
 def library_from_spec_set(base: str | Path,
                          params: DesignParameters | None = None) -> Library:
-    """Load ``<base>.cbl/.cpr/.atv/.tap`` into a Library.
+    """Load ``<base>.cbl/.cpr/.atv/.tap/.par`` into a Library.
 
     ``params`` supplies the four design frequencies the spec file's loss
     columns were entered against; they live in the Parameters file, so pass
@@ -102,11 +129,10 @@ def library_from_spec_set(base: str | Path,
         lib.add(CableType(
             id=new_id("cbl"),
             name=c.name,
-            # cable IDs are 0-99 and the parity is the construction type
-            kind="drop" if "RG" in c.name.upper()
-                 else ("hardline" if c.index % 2 == 0 else "hardline"),
+            kind="drop" if "RG" in c.name.upper() else "hardline",
             loop_resistance_ohm_per_1000ft=loop,
             attenuation=_loss_points(c.forward_coeffs, params),
+            cable_index=c.index,
             notes="; ".join(
                 [f"cable ID {c.index} ({'aerial' if c.index % 2 == 0 else 'underground'})"]
                 + notes),
@@ -126,60 +152,156 @@ def library_from_spec_set(base: str | Path,
                 name=port.part,
                 ports=ports,
                 tap_id=t.tap_id or int(round(nominal)),
+                row=t.slot,
                 tap_value_db=round(nominal, 2),
                 tap_value=value_pts,
                 through_loss=[p for p in loss_pts
                               if p[0] >= params.forward_low_mhz],
                 return_through_loss=[p for p in loss_pts
                                      if p[0] <= params.return_high_mhz],
+                # a zero insertion loss marks a terminating tap: nothing
+                # continues past it (the screen shows 0.00 on the next line)
+                self_terminating=not any(abs(v) for v in port.insertion),
                 source=f"lodedata:{base.name}.tap",
             ))
 
     for p in spec.couplers:
-        # a coupler record carries two loss blocks: the thru leg then the tap
-        # leg, each in the same ten-value layout the cable file uses
-        # the manual is explicit about the order: the Tap leg columns come
-        # first, then the Thru leg columns
+        # "the Tap leg columns come first, then the Thru leg columns"
         tap_leg, thru_leg = p.values[0:10], p.values[10:20]
-        losses, names = [], []
-        if any(thru_leg):
-            losses.append(round(abs(thru_leg[BLOCK_HIGH]), 2)); names.append("thru")
-        for _ in range(max(1, p.tap_legs) if any(tap_leg) else 0):
-            losses.append(round(abs(tap_leg[BLOCK_HIGH]), 2)); names.append("tap")
+        legs = max(1, p.tap_legs)
+        thru_pts = _loss_points(thru_leg, params)
+        tap_pts = _loss_points(tap_leg, params)
         lib.add(PassiveType(
             id=new_id("psv"),
             name=p.name,
-            kind=("power_inserter" if "PI" in p.name.upper()
-                  else "coupler" if len(set(losses)) > 1 else "splitter"),
-            coupler_id=int(p.code) if 0 < p.code < 10000 else 0,
-            port_losses=losses or [0.0],
-            power_passing=[True] * max(1, len(losses)),
+            kind=("power_inserter" if abs(tap_leg[BLOCK_HIGH]) >= 99
+                  else "coupler" if abs(tap_leg[BLOCK_HIGH]) != abs(thru_leg[BLOCK_HIGH])
+                  else "splitter"),
+            coupler_id=int(p.code) if 0 < p.code < 100000 else 0,
+            port_losses=[round(abs(thru_leg[BLOCK_HIGH]), 2)]
+                        + [round(abs(tap_leg[BLOCK_HIGH]), 2)] * legs,
+            power_passing=[True] * (legs + 1),
+            leg_losses=[thru_pts] + [tap_pts] * legs,
+            record=p.slot + 1,
+            internal=p.internal,
             source=f"lodedata:{base.name}.cpr",
         ))
 
     for a in spec.actives:
         ins = a.input_levels or [0, 0, 0, 0]
         outs = a.output_levels or [0, 0, 0, 0]
-        nominal = 60.0
-        # an input requirement of 99 is the "no RF input" sentinel, i.e. the
-        # device is fibre fed -- a more reliable marker than the part name
-        fibre_fed = ins[0] >= 99.0
+        # no forward input requirement -- 99, or zero on both forward columns
+        # as the WV750 "Ripple" node has -- marks a fibre-fed device
+        fibre_fed = ins[0] >= 99.0 or (ins[0] == 0 and ins[1] == 0)
         lib.add(ActiveType(
             id=new_id("act"),
             name=a.name,
-            active_id=a.slot,
+            active_id=a.active_id or str(a.slot),
+            index=a.index,
             kind="node" if (fibre_fed or "NODE" in a.name.upper()) else "line_extender",
+            fibre_fed=fibre_fed,
             in_forward_high=ins[0], in_forward_low=ins[1],
             in_return_high=ins[2], in_return_low=ins[3],
             out_forward_high=outs[0], out_forward_low=outs[1],
             out_return_high=outs[2], out_return_low=outs[3],
             power_draw=a.power_draw,
             current_draw_a=next((amps for v, amps in a.power_draw
-                                 if abs(v - nominal) < 6), 0.0),
+                                 if abs(v - 60.0) < 6), 0.0),
             source=f"lodedata:{base.name}.atv",
         ))
 
+    for sup in spec.supplies:
+        lib.add(PowerSupplyType(
+            id=new_id("psu"), name=sup.name, volts=sup.volts, amps=sup.amps,
+            type_id=sup.type_id, source=f"lodedata:{base.name}.par"))
+
     return lib
+
+
+def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
+                    name: str | None = None) -> tuple:
+    """Read a Lode Data design against the spec set it was saved with.
+
+    A design refers to equipment by its position in the spec files -- tap
+    row, coupler record, actives index -- so it only reads right against its
+    own spec set.  Returns ``(design, report)``; the report lists anything the
+    spec set could not resolve rather than guessing.
+    """
+    data = Path(ntw).read_bytes() if not isinstance(ntw, (bytes, bytearray)) else bytes(ntw)
+    plain = data[:PAYLOAD_START] + deobfuscate(data[PAYLOAD_START:])
+    net = read_network(plain)
+
+    params = parameters_from_spec_set(spec_base)
+    lib = library_from_spec_set(spec_base, params)
+    taps = {(t.row, t.ports): t for t in lib.taps.values()}
+    passives = {p.record: p for p in lib.passives.values()}
+    actives = {a.index: a for a in lib.actives.values()}
+    cables = {c.cable_index: c for c in lib.cables.values()}
+    supplies = {s.type_id: s for s in lib.power_supplies.values()}
+
+    report = {"network": net.name, "saved_with": net.spec_names[0] if net.spec_names else "",
+              "spec_set": Path(spec_base).name, "branches": len(net.branches),
+              "nodes": net.node_count, "unresolved": []}
+    if report["saved_with"] and report["saved_with"] != report["spec_set"]:
+        report["unresolved"].append(
+            f"the design was saved with spec set {report['saved_with']}, "
+            f"not {report['spec_set']}: parts are looked up by position")
+
+    def miss(what: str):
+        if len(report["unresolved"]) < 200:
+            report["unresolved"].append(what)
+
+    design = Design(name=name or net.name or "imported", parameters=params,
+                    library=lib, imported_from=f"{net.name}.ntw")
+    for number, nb in sorted(net.branches.items()):
+        pb, pn = nb.parent
+        br = Branch(number=number, parent_branch=pb, parent_node=pn)
+        for i, nn in enumerate(nb.nodes, start=1):
+            node = Node(seq=i, ftg=float(nn.ftg), hc=nn.hc, cab=nn.cable, lv=nn.lv,
+                        power_stop=nn.power_stop, amp_label=nn.label, pads=list(nn.pads))
+            if nn.cable:
+                cable = cables.get(nn.cable % 100)
+                if cable:
+                    node.cab_part = cable.id
+                else:
+                    miss(f"{number}.{i}: cable {nn.cable}")
+            for t in nn.taps:
+                tap = taps.get((t.row, t.ports))
+                if tap:
+                    node.taps.append(TapPlacement(part_id=tap.id, ports=tap.ports,
+                                                  value_db=tap.tap_value_db))
+                else:
+                    miss(f"{number}.{i}: tap row {t.row} ({t.ports}-port)")
+            if nn.active_index:
+                act = actives.get(nn.active_index)
+                if act:
+                    node.amp, node.amp_part = act.active_id, act.id
+                else:
+                    miss(f"{number}.{i}: active index {nn.active_index}")
+            if nn.supply:
+                node.supply_label = nn.supply
+                sup = supplies.get(nn.supply_type)
+                if sup:
+                    node.supply_part, node.supply_volts = sup.id, sup.volts
+                else:
+                    miss(f"{number}.{i}: power supply type {nn.supply_type}")
+            for child in nn.branches:
+                cb = net.branches.get(child)
+                part = passives.get(cb.coupler_record) if cb else None
+                node.couplers.append(CouplerPlacement(
+                    part_id=part.id if part else None,
+                    coupler_id=part.coupler_id if part else 0,
+                    branch=child))
+                if cb and cb.coupler_record and not part:
+                    miss(f"{number}.{i}: coupler record {cb.coupler_record}")
+            # "-" puts the through leg on the left-hand branch, "=" on the right
+            for k, child in enumerate(nn.branches, start=1):
+                cb = net.branches.get(child)
+                if cb and cb.through:
+                    node.through_leg = THROUGH_FIRST if k == 1 else THROUGH_SECOND
+            br.nodes.append(node)
+        design.branches[number] = br
+    return design, report
 
 
 def inspect_ntw(path: str | Path) -> dict:
@@ -207,12 +329,17 @@ def inspect_ntw(path: str | Path) -> dict:
         "live_bytes": nonzero,
         "live_percent": round(100 * nonzero / max(1, len(payload)), 2),
         "keystream_matches_known_key": key_ok,
-        "device_records_imported": 0,
-        "note": ("The payload is readable but the record layout is not mapped "
-                 "yet: .ntw files hold no text, only indices into the spec "
-                 "files, so a known-content sample design is needed to "
-                 "identify the tables. See docs/open-questions.md."),
+        **_network_summary(data[:PAYLOAD_START] + plain),
     }
+
+
+def _network_summary(plain: bytes) -> dict:
+    try:
+        net = read_network(plain)
+    except ValueError as e:
+        return {"network_error": str(e)}
+    return {"network": net.name, "spec_set_needed": net.spec_names[0] if net.spec_names else "",
+            "branches": len(net.branches), "nodes": net.node_count}
 
 
 def _tokens(name: str) -> frozenset:

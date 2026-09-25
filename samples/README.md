@@ -4,6 +4,9 @@ Put real Lode Data files here to test the readers against them.
       KERMIT750-2026.par  .atv  .tap  .cpr  .cbl
       WVBeck750.par  .atv  .tap  .cpr  .cbl
       AL005.ntw
+      AL004-WV750/AL004.ntw + WV750-2026.*   (a design with its own spec set;
+                                              tests/test_ntw.py checks it
+                                              against the screens)
 
 Anything under this directory is found automatically (nested folders are fine),
 and `pytest` then runs the checks that read real spec files. Without them those

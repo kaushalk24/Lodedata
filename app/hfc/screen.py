@@ -34,10 +34,15 @@ class Row:
     cab_name: str = ""
     lv: int = 0
     tsg: int = 0
-    amp: int = 0
+    amp: str = ""
     amp_name: str = ""
     amp_label: str = ""
     taps: list = field(default_factory=list)       # rendered strings, e.g. "[26]"
+    tap_severity: list = field(default_factory=list)  # "", "yellow" or "red" per tap
+    end: bool = False           # the line under a branch's last node
+    port_levels: list = field(default_factory=list)   # that line: last tap's port output
+    port_severity: list = field(default_factory=list)
+    tap_notes: list = field(default_factory=list)  # (severity, message) about taps
     tap_ports: list = field(default_factory=list)
     tap_parts: list = field(default_factory=list)  # part numbers, for the panel
     couplers: list = field(default_factory=list)   # e.g. "200[2]"
@@ -47,6 +52,8 @@ class Row:
     volts: float | None = None
     current: float = 0.0
     supply: float = 0.0
+    supply_label: str = ""
+    supply_pct: int | None = None
     # checks
     flags: list = field(default_factory=list)      # (severity, message)
 
@@ -68,12 +75,17 @@ class Row:
             "amp": self.amp, "amp_name": self.amp_name,
             "amp_label": self.amp_label,
             "taps": self.taps, "couplers": self.couplers,
+            "tap_severity": self.tap_severity, "end": self.end,
+            "port_levels": [round(v, 2) for v in self.port_levels],
+            "port_severity": self.port_severity,
             "tap_parts": self.tap_parts, "coupler_parts": self.coupler_parts,
             "cumulative_ft": round(self.cumulative_ft, 0),
             "volts": None if self.volts is None else round(self.volts, 2),
             "current": round(self.current, 2),
             "supply": self.supply,
-            "flags": [{"severity": s, "message": m} for s, m in self.flags],
+            "supply_label": self.supply_label,
+            "supply_pct": self.supply_pct,
+            "flags": [{"severity": s, "message": m} for s, m in self.flags + self.tap_notes],
             "severity": self.severity,
         }
 
@@ -119,7 +131,9 @@ def build(design: Design) -> Screen:
     def walk(branch: Branch, incoming: dict, depth: int, cum_ft: float,
              gutter_open: bool):
         levels = dict(incoming)
+        last_tap = None
         for idx, node in enumerate(branch.nodes):
+            last_tap = None
             row = Row(freq_order=freqs, branch=branch.number, node=node.seq or idx + 1,
                       depth=depth, ftg=node.ftg, hc=node.hc, cab=node.cab,
                       lv=node.lv, tsg=node.tsg, amp=node.amp,
@@ -170,8 +184,15 @@ def build(design: Design) -> Screen:
                 row.tap_ports.append(tap.ports)
                 row.tap_parts.append(
                     f"{tap.name} ({tap.ports} port, {tap.tap_value_db:g} dB)")
-                port_hi = row.levels[p.forward_high_mhz] - tap.tap_db(p.forward_high_mhz)
-                _check_tap(p, row, port_hi)
+                ports = _tap_ports(p, freqs, row.levels, tap)
+                sev, why = _check_tap(p, node.lv, freqs, ports)
+                row.tap_severity.append(sev)
+                if why:
+                    row.tap_notes.append((sev, f"{shown}: {why}"))
+                last_tap = (tap, ports)
+                if tap.self_terminating:
+                    levels = {f: 0.0 for f in freqs}
+                    continue
                 for f in freqs:
                     thru = tap.through_db(f, reverse=not _is_forward(p, f))
                     levels[f] = levels[f] - thru if _is_forward(p, f) else levels[f] + thru
@@ -184,33 +205,58 @@ def build(design: Design) -> Screen:
             if node.couplers:
                 passive = next((lib.passives.get(c.part_id)
                                 for c in node.couplers if c.part_id), None)
-                thru_db = passive.port_db(0) if passive else 0.0
-                tap_db = passive.port_db(1) if passive else 0.0
                 mark = THROUGH_MARK.get(node.through_leg, "")
+                # one splitter feeding both branches is drawn in one column,
+                # "3-<11><12>"; two separate couplers take a column each
+                shared = (len(node.couplers) == 2 and passive is not None
+                          and node.couplers[0].part_id == node.couplers[1].part_id
+                          and len(passive.port_losses) > 2)
                 for i, cp in enumerate(node.couplers):
                     style = BRANCH_BRACKETS.get(cp.style, "[]")
-                    cid = cp.coupler_id or (passive.coupler_id if passive else 0)
-                    head = f"{cid or ''}{mark}" if i == 0 else ""
-                    row.couplers.append(head + bracket(str(cp.branch), style))
+                    own = lib.passives.get(cp.part_id) or passive
+                    cid = cp.coupler_id or (own.coupler_id if own else 0)
+                    text = bracket(str(cp.branch), style)
+                    if i == 0 or not shared:
+                        row.couplers.append(f"{cid or ''}{mark if i == 0 else ''}{text}")
+                    else:
+                        row.couplers[0] += text
                     if passive and i == 0:
                         row.coupler_parts.append(
                             f"{passive.name} legs {' / '.join(str(v) for v in passive.port_losses)} dB")
 
-                def leg(which: int) -> float:
-                    return thru_db if which == node.through_leg else tap_db
+                def leg(which: int, f: float) -> float:
+                    """Loss on one output: 0 downstream, then each branch column.
+
+                    The through (low-loss) leg goes downstream unless the node
+                    says otherwise -- that is what "-" and "=" mean; every other
+                    output takes a tap leg."""
+                    if not passive:
+                        return 0.0
+                    return passive.port_db(0 if which == node.through_leg else 1, f)
 
                 for i, cp in enumerate(node.couplers, start=1):
                     child = design.branch(cp.branch)
                     if not child:
                         continue
-                    loss = leg(i)
-                    down = {f: (levels[f] - loss if _is_forward(p, f)
-                                else levels[f] + loss) for f in freqs}
+                    down = {f: (levels[f] - leg(i, f) if _is_forward(p, f)
+                                else levels[f] + leg(i, f)) for f in freqs}
                     walk(child, down, depth + 1, cum_ft, True)
-                loss = leg(THROUGH_DOWNSTREAM)
                 for f in freqs:
+                    loss = leg(THROUGH_DOWNSTREAM, f)
                     levels[f] = (levels[f] - loss if _is_forward(p, f)
                                  else levels[f] + loss)
+
+        # the line under the last node: what continues through the last tap,
+        # and under the tap columns that tap's port output
+        end = Row(freq_order=freqs, branch=branch.number, node=len(branch.nodes) + 1,
+                  depth=depth, end=True)
+        end.levels = dict(levels)
+        if last_tap:
+            ports = last_tap[1]
+            end.port_levels = [ports[f] for f in freqs]
+            end.port_severity = [_port_severity(p, branch.nodes[-1].lv, freqs, ports, f)
+                                 for f in freqs]
+        scr.rows.append(end)
 
     feeder = design.branches.get(1)
     if feeder:
@@ -238,22 +284,52 @@ def build(design: Design) -> Screen:
     return scr
 
 
-def _check_tap(p, row: Row, port_hi: float) -> None:
-    """Tap port level against the System Levels window, with the tap margin."""
-    lo, hi = p.min_tap_port_dbmv, p.max_tap_port_dbmv
-    margin = getattr(p, "tap_margin_db", 1.0)
-    if port_hi > hi + margin or port_hi < lo - margin:
-        row.flags.append(("red", f"tap port {port_hi:.2f} dBmV outside "
-                                 f"{lo:g}..{hi:g} dBmV"))
-    elif port_hi > hi or port_hi < lo:
-        row.flags.append(("yellow", f"tap port {port_hi:.2f} dBmV is within the "
-                                    f"tap margin of the {lo:g}..{hi:g} window"))
+def _tap_ports(p, freqs, levels: dict, tap) -> dict:
+    """Level at the tap's ports: forward the line level less the tap value,
+    return the level the drop must deliver, i.e. the line level plus it."""
+    return {f: (levels[f] - tap.tap_db(f)) if _is_forward(p, f) else (levels[f] + tap.tap_db(f))
+            for f in freqs}
+
+
+def _level_row(p, lv: int) -> list:
+    rows = p.levels or [[0.0, 0.0, 99.0, 99.0]]
+    return rows[lv] if 0 <= lv < len(rows) and any(rows[lv]) else rows[0]
+
+
+def _port_severity(p, lv: int, freqs, ports: dict, f: float) -> str:
+    """Against the System Levels for this node's lv: forward outputs must reach
+    the minimum, return inputs stay under the maximum.  Out by less than the
+    tap margin is marginal."""
+    mins = _level_row(p, lv)
+    i = freqs.index(f)
+    limit = mins[i] if i < len(mins) else 0.0
+    if _is_forward(p, f):
+        short = limit - ports[f]
+    else:
+        short = ports[f] - limit
+    if short <= 1e-9:
+        return ""
+    return "yellow" if short <= p.tap_margin_db else "red"
+
+
+def _check_tap(p, lv: int, freqs, ports: dict) -> tuple:
+    worst, why = "", ""
+    for f in freqs:
+        sev = _port_severity(p, lv, freqs, ports, f)
+        if sev and (not worst or sev == "red"):
+            worst = sev
+            limit = _level_row(p, lv)[freqs.index(f)]
+            side = "below the minimum" if _is_forward(p, f) else "above the maximum"
+            why = f"port {ports[f]:.2f} dBmV at {f:g} is {side} {limit:g} (lv {lv})"
+    return worst, why
 
 
 def _gutter(scr: Screen) -> None:
     """The line art down the left edge that shows where branches run."""
     spans: dict = {}
     for i, r in enumerate(scr.rows):
+        if r.end:
+            continue
         spans.setdefault((r.branch, r.depth), [i, i])[1] = i
     for (branch, depth), (first, last) in spans.items():
         if depth == 0 or first == last:
@@ -265,84 +341,125 @@ def _gutter(scr: Screen) -> None:
 
 # --------------------------------------------------------------------------
 def _powering(design: Design, scr: Screen) -> None:
-    lib = design.library
-    by_key = {(r.branch, r.node): r for r in scr.rows}
-    supply = next((n.supply_volts for b in design.branches.values()
-                   for n in b.nodes if n.supply_volts), design.supply_volts)
-    volts = {k: supply for k in by_key}
+    """Voltage and current on every node, the way the Power screen shows them.
 
-    def draw(node: Node, v: float) -> float:
-        if node.amp:
-            part = lib.actives.get(node.amp_part)
+    The plant is a tree of spans.  A node's footage and cable are the span
+    back to the node before it -- or, for the first node of a branch, back to
+    the node carrying its coupler.  A power stop on a node cuts that span.
+    Each power supply feeds whatever it can reach without crossing a stop.
+
+    Actives draw the current their power steps give at the voltage they see,
+    so the solution is iterated: voltages from the supply outward, currents
+    back from the loads.  The drop along a span is its current times the
+    cable's loop resistance.
+
+    Shown per node, as checked against the AL004 Power screen:
+      volt     the voltage at the node
+      current  the current in the span on the supply side of the node --
+               everything powered through it
+    """
+    lib = design.library
+    rows = {(r.branch, r.node): r for r in scr.rows}
+    nodes = {}
+    for b in design.branches.values():
+        for i, n in enumerate(b.nodes, start=1):
+            nodes[(b.number, n.seq or i)] = n
+
+    # span edges: child key -> (parent key, feet, ohms per foot)
+    edges = {}
+    for b in design.branches.values():
+        prev = (b.parent_branch, b.parent_node) if b.parent_branch else None
+        for i, n in enumerate(b.nodes, start=1):
+            key = (b.number, n.seq or i)
+            if prev is not None and prev in nodes and not n.power_stop:
+                cable = lib.cables.get(n.cab_part)
+                loop = cable.loop_resistance_ohm_per_1000ft if cable else 0.0
+                if loop >= 99.0:           # "never power this" cable
+                    prev = key
+                    continue
+                edges[key] = (prev, n.ftg, loop / 1000.0)
+            prev = key
+    adj = {k: [] for k in nodes}
+    for child, (parent, ft, rpf) in edges.items():
+        adj[child].append((parent, ft * rpf, child))
+        adj[parent].append((child, ft * rpf, child))
+
+    def draw(key, volts: float) -> float:
+        n = nodes[key]
+        if n.amp:
+            part = lib.actives.get(n.amp_part)
             if part:
-                return part.current_at(v)
+                return part.current_at(volts, design.parameters.power_interpolation)
         return 0.0
 
-    def accumulate(branch: Branch) -> float:
-        total = 0.0
-        for node in branch.nodes:
-            key = (branch.number, node.seq)
-            row = by_key.get(key)
-            own = draw(node, volts.get(key, supply))
-            sub = 0.0
-            for cp in node.couplers:
-                child = design.branch(cp.branch)
-                if child and not node.power_stop:
-                    sub += accumulate(child)
-            if row is not None:
-                row.current = own + sub
-            total += own + sub
-        # a node's current column carries everything from it downstream
-        running = 0.0
-        for node in reversed(branch.nodes):
-            row = by_key.get((branch.number, node.seq))
-            if row is None:
+    seen = set()
+    for key, n in nodes.items():
+        if not n.supply_volts or key in seen:
+            continue
+        # the area this supply reaches, as a tree rooted at the supply
+        parent, span_ohms, order = {key: None}, {key: 0.0}, [key]
+        i = 0
+        while i < len(order):
+            here = order[i]
+            i += 1
+            for there, ohms, _ in adj[here]:
+                if there not in parent:
+                    parent[there] = here
+                    span_ohms[there] = ohms
+                    order.append(there)
+        seen.update(order)
+        others = [k for k in order if k != key and nodes[k].supply_volts]
+        if others:
+            rows[key].flags.append(("red", "bucking power: another supply in this "
+                                           "area without a power stop between"))
+        volts = {k: n.supply_volts for k in order}
+        current = {}
+        for _ in range(30):
+            current = {k: draw(k, volts[k]) for k in order}
+            for k in reversed(order[1:]):
+                current[parent[k]] += current[k]
+            new = {key: n.supply_volts}
+            for k in order[1:]:
+                new[k] = new[parent[k]] - current[k] * span_ohms[k]
+            done = max(abs(new[k] - volts[k]) for k in order) < 1e-6
+            volts = new
+            if done:
+                break
+        sup = lib.power_supplies.get(n.supply_part)
+        for k in order:
+            r = rows.get(k)
+            if r is None:
                 continue
-            running += row.current
-            row.current = running
-        return total
-
-    def distribute(branch: Branch, v: float):
-        for node in branch.nodes:
-            key = (branch.number, node.seq)
-            row = by_key.get(key)
-            if row is None:
-                continue
-            if node.supply_volts:
-                v = node.supply_volts
-            cable = lib.cables.get(node.cab_part)
-            if cable and node.ftg:
-                v -= row.current * cable.resistance_ohms(node.ftg)
-            volts[key] = v
-            row.volts = v
+            r.volts = volts[k]
+            r.current = current[k]
+            node = nodes[k]
             if node.amp:
                 part = lib.actives.get(node.amp_part)
-                if part and v < part.min_voltage:
-                    row.flags.append(("red", f"{v:.1f} V is below the "
-                                             f"{part.min_voltage:.0f} V minimum "
-                                             f"for {part.name}"))
-            for cp in node.couplers:
-                child = design.branch(cp.branch)
-                if child and not node.power_stop:
-                    distribute(child, v)
-
-    feeder = design.branches.get(1)
-    if not feeder:
-        return
-    for _ in range(POWERING_PASSES):
-        accumulate(feeder)
-        distribute(feeder, supply)
+                if part and volts[k] < part.min_voltage:
+                    r.flags.append(("red", f"{volts[k]:.1f} V is below the "
+                                           f"{part.min_voltage:.0f} V minimum "
+                                           f"for {part.name}"))
+        r = rows.get(key)
+        if r is not None:
+            r.supply = n.supply_volts
+            r.supply_label = n.supply_label
+            if sup and sup.amps:
+                r.supply_pct = round(100 * current[key] / sup.amps)
+                if current[key] > sup.amps:
+                    r.flags.append(("red", f"excess current draw: {current[key]:.2f} A "
+                                           f"on a {sup.amps:g} A supply"))
 
 
 def _totals(design: Design, scr: Screen) -> None:
-    taps = sum(len(r.taps) for r in scr.rows)
+    rows = [r for r in scr.rows if not r.end]
+    taps = sum(len(r.taps) for r in rows)
     scr.totals = {
         "branches": len(design.branches),
-        "nodes": len(scr.rows),
+        "nodes": len(rows),
         "taps": taps,
-        "actives": sum(1 for r in scr.rows if r.amp),
-        "homes": sum(r.hc for r in scr.rows),
-        "footage": round(sum(r.ftg for r in scr.rows)),
-        "errors": sum(1 for r in scr.rows if r.severity == "red"),
-        "warnings": sum(1 for r in scr.rows if r.severity == "yellow"),
+        "actives": sum(1 for r in rows if r.amp),
+        "homes": sum(r.hc for r in rows),
+        "footage": round(sum(r.ftg for r in rows)),
+        "errors": sum(1 for r in rows if r.severity == "red"),
+        "warnings": sum(1 for r in rows if r.severity == "yellow"),
     }
