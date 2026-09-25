@@ -30,8 +30,9 @@ remains is listed below.
   both spec sets. Applied.
 * **Coupler losses.** Two loss blocks per record, same layout as cables.
   Applied.
-* **Why `.ntw` files hold no text.** The manual confirms spec files define every
-  piece of equipment; the design file only references them.
+* **What text a `.ntw` holds.** Only names and labels (spec set name, network
+  name, node/active labels); equipment is referenced by spec ID. The earlier
+  "no text" finding was a decoding mistake (a missed nibble swap).
 
 ## 1. Screenshots — the remaining documentation gap
 
@@ -99,7 +100,7 @@ index-to-part mapping, since the two spec sets number their parts differently.
 
 
 The obfuscation is solved and the payload is readable, but the record layout is
-not mapped, and design files contain no text to bootstrap from.
+only partly mapped (node footage and labels found, see `docs/file-formats.md`).
 
 Fastest unlock, by a distance: **build a deliberately tiny design and send me
 the file plus its report.** A power supply, one amplifier, one span of `.500P3`

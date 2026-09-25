@@ -94,7 +94,7 @@ design work. Directories are set per project under **File → Project Settings**
 
 This confirms the split seen in the binaries: a design file carries topology
 and indices, and the spec set carries every part and parameter. It is why a
-`.ntw` contains no text at all.
+`.ntw` holds only labels and names as text; parts are referenced by spec ID.
 
 ## 2. Cables **[applied]**
 

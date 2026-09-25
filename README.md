@@ -9,8 +9,8 @@ groundwork for an HFC network design application that can read them.
 
 * The 512-byte header shared by every Lode Data file — magic, format version,
   authoring app version, licence id and user id.
-* The `.ntw` network-file obfuscation: a fixed 100-byte **additive** keystream,
-  key recovered and verified identical across all sample files. Design payloads
+* The `.ntw` network-file obfuscation: nibble swap plus a fixed 100-byte
+  additive keystream, key recovered and verified identical across all sample files. Design payloads
   can be read as plaintext.
 * The equipment spec files (`.cbl`, `.cpr`, `.atv`, `.tap`) — record strides,
   part-number fields and the `int32 × 1e6` fixed-point number convention.
@@ -23,9 +23,9 @@ groundwork for an HFC network design application that can read them.
 **Not solved yet** — both blocked on inputs I don't have; see
 [`docs/open-questions.md`](docs/open-questions.md)
 
-* The `.ntw` record layout (design files contain no text, only indices into the
-  spec files, so there is nothing to bootstrap from without a known-content
-  sample).
+* The full `.ntw` record layout. Labels, spec set name and node footage are
+  found; the rest is being mapped against a Power mode screen of the same
+  design.
 * The tap-loss and amplifier-gain field positions — the numbers are readable,
   their exact meaning needs one screenshot each from the application.
 * The application's screens. `docs.lodedata.com` is blocked by this

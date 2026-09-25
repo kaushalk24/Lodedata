@@ -322,3 +322,18 @@ def test_diffing_finds_a_single_changed_field(tmp_path):
     assert r["bytes_changed"] == 1
     assert len(r["regions"]) == 1
     assert r["regions"][0].start == spot + PAYLOAD_START
+
+
+AL004_PAIR = _find("AL004-WV750/AL004.ntw")
+
+
+@pytest.mark.skipif(AL004_PAIR is None, reason="AL004 + WV750-2026 pair not in samples")
+def test_ntw_decodes_the_labels_and_spec_name_shown_on_screen():
+    from lodedata.obfuscation import open_ntw
+    _, plain = open_ntw(AL004_PAIR)
+    # both amplifiers on the Power mode screen, and the attached spec set
+    assert b"AL00416\0" in plain
+    assert b"AL00419\0" in plain
+    assert plain[:10] == b"WV750-2026"
+    # node 1 footage (476 ft) sits in the first 1970-byte node record
+    assert int.from_bytes(plain[77001 - 512:77001 - 510], "little") == 476

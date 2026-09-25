@@ -63,16 +63,17 @@ siblings, i.e. the actives table was authored separately and shipped alongside.
 
 ## 2. `.ntw` payload obfuscation — solved
 
-Everything after the header is scrambled with a **fixed 100-byte additive
-keystream**:
+Everything after the header is scrambled byte by byte: the two **nibbles of
+each plaintext byte are swapped**, then a **fixed 100-byte keystream is added**:
 
 ```
-cipher[i] = (plain[i] + KEY[i % 100]) & 0xFF
-plain[i]  = (cipher[i] - KEY[i % 100]) & 0xFF
+cipher[i] = (nibswap(plain[i]) + KEY[i % 100]) & 0xFF
+plain[i]  = nibswap((cipher[i] - KEY[i % 100]) & 0xFF)
+nibswap(x) = ((x << 4) | (x >> 4)) & 0xFF
 ```
 
 The key is a constant compiled into the application. It is byte-identical in all
-four sample files despite different licences, users, sizes and designs:
+sample files despite different licences, users, sizes and designs:
 
 ```
 5d7e57377b74352c3915272eca57591d29175c4f2384292d30371140762b4651
@@ -85,34 +86,37 @@ How it was recovered: a design file is mostly untouched pre-allocated table
 space, i.e. plaintext zeros, so the ciphertext there *is* the keystream. The
 longest run satisfying `c[i] == c[i+100]` is ~8 000 bytes and hands over the key
 directly. `lodedata.obfuscation.recover_key()` re-derives it from any file and
-all four samples agree.
+all samples agree. Phase is 0 relative to offset 512.
 
-The cipher is **additive, not XOR**. This matters and it is the trap in this
-format: XOR-decoding with the same key also turns the padding into zeros, so it
-looks right, but every real field comes out as a bit-mask artefact
-(`0x01/0x03/0x07/0x0f/…`) because `key ^ (key−1)` is a mask. Subtracting instead
-turns those same bytes into clean `0xFFFF` ("empty" sentinels) and clean
-fixed-point numbers. Phase is 0 relative to offset 512; all 100 phases were
-tested and only phase 0 produces a low-entropy result.
+The nibble swap is invisible on zeros (`nibswap(0) == 0`), which is why a plain
+"subtract the key" decode looked right at first: padding came out clean and the
+sentinels came out as `0xFFFF`, but every real value was nibble-swapped
+garbage. It was found with known plaintext from the AL004 design and its Power
+mode screen: with the swap, the amplifier labels `AL00416` / `AL00419` and the
+node-1 footage `476` decode exactly. (XOR with the same key is also wrong — it
+produces bit-mask artefacts.)
 
 ### What the decoded payload looks like
 
 * 96–97 % of the payload is zeros — the tables are pre-allocated far beyond what
-  a given design uses. `AL002.ntw` is 951 KB and holds ~40 KB of live data.
-* **There are no text strings anywhere in a `.ntw` file.** Verified over all 100
-  key phases. Part numbers are therefore stored as *indices into the spec files*,
-  not as names — which is exactly why a design cannot be opened without its spec
-  set, and why re-pointing a design at a new spec set is a meaningful operation.
-  The manual confirms the split: spec files "define every piece of equipment used
-  by the Design Assistant and every operating parameter of the program".
+  a given design uses.
+* **Text is stored in clear** once decoded (fixed-width, NUL padded):
+  * the spec set name five times at a 261-byte stride from payload start
+    (`WV750-2026`, one per spec file type), and again five times further on;
+  * `Untitled` three times, and the network name (`AL004`) twice;
+  * the **labels** typed against nodes/actives (`AL00401` … `AL00432`,
+    `AL004A`).
+* Part numbers are **not** stored as names, so equipment is referenced by the
+  spec's numeric IDs (cable ID, coupler ID, tap ID, active ID). That is why a
+  design cannot be opened without a spec set, and why re-pointing a design at a
+  new spec set is meaningful.
 * `0xFFFF` / `0xFFFFFFFF` is the "unset / not connected" sentinel.
-* Numbers are little-endian and follow the same 1e6 fixed-point convention as the
-  spec files.
-* Structure found so far: a 261-byte-stride block near the start whose first five
-  records are an identical 10-byte value (a password or checksum block
-  **(unconfirmed)**), then tables with strides around 21 bytes (3-byte entries of
-  `int16 + byte`, `-1` when unused) and larger device tables. Full record layout
-  is **not yet mapped** — see `docs/open-questions.md`.
+* Numbers are little-endian.
+* **Node records are 1970 bytes.** In AL004 the node footage is a `uint16` at a
+  fixed offset in each record; runs of consecutive records hold the nodes of
+  one run between amplifiers (nodes 1–13, then 14–25 starting at the amp on
+  node 14). The rest of the record layout is being mapped against the Power
+  mode photo — see `docs/open-questions.md`.
 
 Constraints the manual gives for that mapping, all useful when the tables are
 finally identified:

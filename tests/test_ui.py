@@ -27,7 +27,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def _spec_files():
-    cbl = next(iter(sorted(SAMPLES.rglob("*.cbl"))), None)
+    # The keying tests type KERMIT750 tap codes (4.23, 8.20); prefer that set.
+    cbls = sorted(SAMPLES.rglob("*.cbl"), key=lambda p: "KERMIT" not in p.name)
+    cbl = next(iter(cbls), None)
     if not cbl:
         return []
     return [str(cbl.with_suffix("." + e)) for e in ("par", "atv", "tap", "cpr", "cbl")

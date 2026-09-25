@@ -1,14 +1,19 @@
 """Deobfuscation of the .ntw network-file payload.
 
-Everything after the 512-byte header is scrambled with a fixed 100-byte
-additive keystream:
+Everything after the 512-byte header is scrambled byte by byte: each
+plaintext byte has its two nibbles swapped, then a fixed 100-byte
+keystream is added:
 
-    cipher[i] = (plain[i] + KEY[i % 100]) & 0xFF
+    cipher[i] = (nibswap(plain[i]) + KEY[i % 100]) & 0xFF
+    plain[i]  = nibswap((cipher[i] - KEY[i % 100]) & 0xFF)
 
 The key is a constant baked into the application -- it is byte-for-byte
 identical in every sample file, regardless of licence, user or design.
 It was recovered from the long stretches of untouched (all-zero)
-pre-allocated table space that every design file contains.
+pre-allocated table space that every design file contains (nibswap(0)
+is 0, so zeros alone never reveal the swap).  The swap was found from
+known plaintext: the amplifier labels (``AL00416``) and footages shown
+on screen for the AL004 design.
 """
 
 NTW_KEY = bytes.fromhex(
@@ -20,17 +25,27 @@ NTW_KEY = bytes.fromhex(
 KEY_LEN = len(NTW_KEY)          # 100
 PAYLOAD_START = 512
 
+_NIB = bytes(((i << 4) | (i >> 4)) & 0xFF for i in range(256))
+# One 256-entry translate table per key position, both directions.
+_DEC = [bytes(_NIB[(b - k) & 0xFF] for b in range(256)) for k in NTW_KEY]
+_ENC = [bytes((_NIB[b] + k) & 0xFF for b in range(256)) for k in NTW_KEY]
+
+
+def _apply(data: bytes, tables, phase: int) -> bytes:
+    out = bytearray(len(data))
+    for r in range(KEY_LEN):
+        out[r::KEY_LEN] = data[r::KEY_LEN].translate(tables[(r + phase) % KEY_LEN])
+    return bytes(out)
+
 
 def deobfuscate(payload: bytes, phase: int = 0) -> bytes:
     """Turn the raw bytes that follow the header into plain records."""
-    k = NTW_KEY
-    return bytes((b - k[(i + phase) % KEY_LEN]) & 0xFF for i, b in enumerate(payload))
+    return _apply(payload, _DEC, phase)
 
 
 def obfuscate(plain: bytes, phase: int = 0) -> bytes:
     """Inverse of :func:`deobfuscate` -- for writing files back out."""
-    k = NTW_KEY
-    return bytes((b + k[(i + phase) % KEY_LEN]) & 0xFF for i, b in enumerate(plain))
+    return _apply(plain, _ENC, phase)
 
 
 def open_ntw(path) -> tuple[bytes, bytes]:
