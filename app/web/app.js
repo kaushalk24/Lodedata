@@ -775,15 +775,23 @@ async function selectTap(slot) {
           data-id="${t.id}">${esc(label(t))}</span>` : ''}</span>`;
       }).join('')}</div>`).join('')}</div>
       <div class="row"><button id="stOk" class="primary">OK</button><button id="mClose">Cancel</button></div></div>`);
-    $$('.sttab').forEach(el => el.onclick = () => { tab = +el.dataset.n; draw(); });
+    $$('.sttab').forEach(el => el.onclick = () => { tab = +el.dataset.n; mark(); });
     $$('.stitem').forEach(el => {
-      el.onclick = () => { sel = el.dataset.id; tab = byId[sel].ports; draw(); };
+      // a click only moves the highlight: redrawing or scrolling here would
+      // put the second click of a double-click on another tap
+      el.onclick = () => { sel = el.dataset.id; tab = byId[sel].ports; mark(); };
       el.ondblclick = () => place(el.dataset.id);
     });
     $('#stOk').onclick = () => sel && place(sel);
-    const on = $('.stitem.sel'); if (on) on.scrollIntoView({ block: 'center' });
+  };
+  // the highlighted tap, and the tab showing its port count
+  const mark = (scroll) => {
+    $$('.sttab').forEach(el => el.classList.toggle('on', +el.dataset.n === tab));
+    $$('.stitem').forEach(el => el.classList.toggle('sel', el.dataset.id === sel));
+    const on = $('.stitem.sel'); if (scroll && on) on.scrollIntoView({ block: 'center' });
   };
   draw();
+  mark(true);
   // arrows move within the chosen port count; Enter takes the highlighted tap
   const column = () => out.candidates.filter(t => t.ports === tab);
   const keys = ev => {
@@ -792,7 +800,7 @@ async function selectTap(slot) {
       const list = column(); if (!list.length) return;
       const i = list.findIndex(t => t.id === sel);
       const j = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + (ev.key === 'ArrowDown' ? 1 : -1)));
-      sel = list[j].id; draw(); ev.preventDefault(); ev.stopPropagation();
+      sel = list[j].id; mark(true); ev.preventDefault(); ev.stopPropagation();
     } else if (ev.key === 'Enter' && sel) { ev.preventDefault(); ev.stopPropagation(); place(sel); }
   };
   document.addEventListener('keydown', keys, true);

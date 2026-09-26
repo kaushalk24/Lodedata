@@ -112,4 +112,4 @@ Power currents and volts match on all 29 lines of branch 4.
 Questions 1, 2, 3, 4, 5 and the Parameters file are closed. Waiting on the user
 for the open points in items 7 and 8 of `docs/open-questions.md` (the
 expanded display's open points in item 7,
-the Alter prompts on other columns, Select Tap's tabs).
+the Alter prompts on other columns).

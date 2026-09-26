@@ -243,3 +243,32 @@ def test_expanded_display_draws_the_amplifier_and_its_block(page):
     text = page.eval_on_selector_all("#grid tbody td.xtext", "els => els.map(e => e.textContent)")
     assert "       0-0-0 8-7-0   127886" in text
     assert not page.errors
+
+
+def test_double_clicking_a_tap_in_select_tap_replaces_the_slots_tap(page):
+    """A double-click in Select Tap places that tap in the cursor's slot,
+    replacing the one there (the user: "gets placed or replaced when we
+    double click on the tap").  AL004 6.8 holds {43}; take {44}."""
+    pair = SAMPLES / "AL004-WV750"
+    if not (pair / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "AL004.ntw"))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("WV750-2026.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    page.evaluate("gotoBranch(6, 8); S.col = columns().findIndex(c => c.key === 'tap0'); renderGrid();")
+    page.wait_for_timeout(300)
+    _type(page, "0")
+    page.keyboard.press("Home")
+    page.wait_for_timeout(600)
+    # the tab follows the tap in the slot: {43} is a 6-port
+    assert page.inner_text(".sttab.on") == "6 Port"
+    assert page.inner_text(".stitem.sel") == "{43}"
+    page.dblclick('.stitem:text-is("{44}")')
+    page.wait_for_timeout(800)
+    assert page.evaluate("document.getElementById('modal').hidden")
+    row = page.evaluate("S.scr.rows.find(r => r.branch === 6 && r.node === 8)")
+    assert row["taps"] == ["<44>"]
+    assert not page.errors

@@ -145,8 +145,10 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    toggles the expanded display, Esc closes a window. `0` on a tap prompts
    "Enter desired tap {# of ports}.{ID #}:    [home] for list"; Home opens
    Select Tap (a line per tap-file row, parts by port count, tabs 2/4/6/8
-   Port, 6-port drawn `{n}`). Entry mode keys values directly. Open: the
-   Alter prompt on other columns, and what the Select Tap tabs do.
+   Port, 6-port drawn `{n}`). The tab marks the port count of the tap
+   highlighted; double-clicking a tap places it in the cursor's slot,
+   replacing any tap there (the user; `tests/test_ui.py`). Entry mode keys
+   values directly. Open: the Alter prompt on other columns.
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
 10. **Parameters — mapped.** Every setting on the six tabs is located and
