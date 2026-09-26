@@ -192,6 +192,7 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
 
 class InsertNode(BaseModel):
     after: int = 0          # node seq to insert after; 0 appends
+    before: int = 0         # or the node seq to insert above
 
 
 @app.post("/api/networks/{nid}/branches/{branch}/nodes")
@@ -200,7 +201,10 @@ def insert_node(nid: str, branch: int, body: InsertNode):
     b = d.branch(branch)
     if not b:
         raise HTTPException(404, "branch not found")
-    at = len(b.nodes) if not body.after else body.after
+    if body.before:
+        at = max(0, min(body.before - 1, len(b.nodes)))
+    else:
+        at = len(b.nodes) if not body.after else body.after
     b.nodes.insert(at, Node())
     d.renumber(b)
     save(d)

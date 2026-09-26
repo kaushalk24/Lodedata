@@ -390,7 +390,7 @@ const MENUS = {
     [['.0', 'Break', null], ['.1', 'Join', null], ['.2', 'BkFeed', null],
      ['.3', 'UnBkFd', null], ['.4', 'XFd2A', null], ['.5', 'MoveCpl', null],
      ['.6', 'XWillWk', null], ['.7', 'SetMDU', null], ['.8', 'RotTap', null],
-     ['.9', 'Copy', null], ['.+', 'Name', nameAmp]],
+     ['.9', 'Copy', null], ['.+', 'Name', () => ampDefinition()]],
     [['..0', 'SpcVw', null], ['..1', 'Xspec', null], ['..2', 'FwdFd', null],
      ['..3', 'UnFFd', null], ['..4', 'BrLabel', null], ['..5', 'Dsmry', dsummary],
      ['..6', 'Clear', clearCell], ['..7', 'CAwBF', null], ['..8', 'XCAmp', null],
@@ -618,6 +618,18 @@ document.addEventListener('keydown', async ev => {
     if (S.buffer !== null && cols[S.col].key.startsWith('tap')) {
       S.buffer += '.'; renderGrid(); return;
     }
+    // Design, after 0 Alter: ftg hc cab lv are keyed as one, "." moving on to
+    // the next still keying; a field left empty keeps its value
+    const i = EDIT_ORDER.indexOf(cols[S.col].key);
+    if (S.buffer !== null && S.mode === 'design' && i >= 0) {
+      if (S.buffer.trim() !== '') commitBuffer(i === EDIT_ORDER.length - 1);
+      else if (i === EDIT_ORDER.length - 1) { S.buffer = null; moveToNextField(); }
+      if (i < EDIT_ORDER.length - 1) {
+        S.col = cols.findIndex(x => x.key === EDIT_ORDER[i + 1]);
+        S.buffer = ''; msg(`Alter ${cols[S.col].head}:`); renderGrid();
+      }
+      return;
+    }
     // typing elsewhere: the field separator. Otherwise a branch-move prefix.
     if (S.buffer !== null) { commitBuffer(true); return; }
     S.dot = true; msg('. — press an arrow or Page key for a branch move');
@@ -649,7 +661,13 @@ document.addEventListener('keydown', async ev => {
     else if (S.buffer === '') S.buffer = null;
   }
   else if (k === 'Escape') { if (S.buffer !== null) msg(''); S.buffer = null; S.dot = false; }
-  else if (k === 'Insert') { ev.preventDefault(); await insertNode(); return; }
+  else if (k === 'Insert') {
+    ev.preventDefault();
+    // Design: Insert adds a line above the cursor's, ". Insert" one below
+    if (S.mode === 'design') { const below = !!S.dot; S.dot = false; await insertRow(below); }
+    else await insertNode();
+    return;
+  }
   else if (k === 'Delete') { ev.preventDefault(); await deleteNode(); return; }
   else return;
   ev.preventDefault();
@@ -853,6 +871,48 @@ async function insertNode() {
     body: JSON.stringify({ after: r ? r.node : 0 }) });
   await refresh(); S.row = Math.min(S.row + 1, pageRows().length - 1); renderGrid();
   msg('node inserted');
+}
+// Design: a line with 0 footage above the cursor's (Insert) or below it
+// (". Insert"); the cursor stays on its node, so each press adds another
+async function insertRow(below) {
+  const r = curRow(); if (!r || r.end) return;
+  await api(`/api/networks/${S.nid}/branches/${r.branch}/nodes`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(below ? { after: r.node } : { before: r.node }) });
+  await refresh();
+  if (!below) S.row = Math.min(S.row + 1, pageRows().length - 1);
+  renderGrid();
+}
+// ".+ Name" with the cursor on an amplifier: the Amplifier Definition window.
+// The name belongs to the amplifier: it shows in tap1 until a tap is placed
+// there and stays with the amplifier either way.  Two actives cannot share
+// a name -- a name already in use is refused with a warning.
+function ampDefinition() {
+  const r = curRow(), c = curCol();
+  if (!r || r.end || !c || c.key !== 'amp' || !r.amp_info || r.amp_info.name === undefined) return;
+  modal(`<div class="ampdef"><div class="adtitle">Amplifier Definition</div>
+    <div class="adrow"><span class="adlab">Power Supply:</span><span>${esc(r.amp_info.supply || '')}</span></div>
+    <div class="adrow"><span class="adlab">Amp ID:</span><input id="adName" value="${esc(r.amp_label || '')}"></div>
+    <div class="row"><button id="adOk">OK</button></div>
+    <div class="adstatus">Enter Amplifier name.</div></div>`);
+  const input = $('#adName');
+  input.focus(); input.select();
+  const ok = async () => {
+    const name = input.value;
+    const other = name && S.scr.rows.find(x => !x.end && x.amp_info && x.amp_info.name !== undefined
+      && x.amp_label === name && !(x.branch === r.branch && x.node === r.node));
+    if (other) {
+      alert(`Amp ID ${name} is already used at ${other.branch}.${other.node}.`);
+      input.focus(); input.select(); return;
+    }
+    closeModal();
+    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amp_label: name }) });
+    await refresh();
+  };
+  $('#adOk').onclick = ok;
+  input.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); ok(); } };
 }
 async function deleteNode() {
   const r = curRow(); if (!r) return;

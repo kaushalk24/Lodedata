@@ -203,6 +203,12 @@ class Design:
     def renumber(self, branch: Branch) -> None:
         for i, node in enumerate(branch.nodes, start=1):
             node.seq = i
+            # a branch hangs from the node carrying its coupler, wherever
+            # an inserted or deleted line has moved that node to
+            for c in node.couplers:
+                child = self.branches.get(c.branch)
+                if child is not None:
+                    child.parent_node = i
 
     # ------------------------------------------------------------------
     def validate(self) -> list:

@@ -272,3 +272,111 @@ def test_double_clicking_a_tap_in_select_tap_replaces_the_slots_tap(page):
     row = page.evaluate("S.scr.rows.find(r => r.branch === 6 && r.node === 8)")
     assert row["taps"] == ["<44>"]
     assert not page.errors
+
+
+def _open_al004(page):
+    pair = SAMPLES / "AL004-WV750"
+    if not (pair / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "AL004.ntw"))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("WV750-2026.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+
+
+def _goto(page, branch, node, col):
+    page.evaluate(f"gotoBranch({branch}, {node}); S.col = columns().findIndex(c => c.key === '{col}'); renderGrid();")
+    page.wait_for_timeout(300)
+
+
+def _row(page, branch, node):
+    return page.evaluate(f"S.scr.rows.find(r => r.branch === {branch} && r.node === {node} && !r.end)")
+
+
+def test_design_alter_keys_ftg_hc_cab_lv_as_one(page):
+    """0 on ftg starts keying; "." moves on to hc, cab, lv still keying."""
+    _open_al004(page)
+    _goto(page, 34, 2, "ftg")
+    _type(page, "0150.2.401")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1200)
+    r = _row(page, 34, 2)
+    assert (r["ftg"], r["hc"], r["cab"]) == (150, 2, 401)
+    # a field left empty keeps its value
+    _goto(page, 34, 5, "ftg")
+    _type(page, "0.3")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1200)
+    r = _row(page, 34, 5)
+    assert (r["ftg"], r["hc"]) == (273, 3)
+    assert not page.errors
+
+
+def test_amplifier_definition_names_the_amplifier(page):
+    """". +" on an amplifier's amp column: the name shows in tap1, a name
+    another amplifier has is refused with a warning, and a tap placed in
+    tap1 hides the name without taking it from the amplifier."""
+    _open_al004(page)
+    _goto(page, 34, 6, "amp")
+    _type(page, ".+")
+    page.wait_for_timeout(300)
+    assert page.inner_text(".ampdef .adtitle") == "Amplifier Definition"
+    assert "B" in page.inner_text(".ampdef .adrow")
+    assert page.input_value("#adName") == "AL00411"
+    assert page.inner_text(".ampdef .adstatus") == "Enter Amplifier name."
+    warnings = []
+    page.once("dialog", lambda d: (warnings.append(d.message), d.accept()))
+    page.fill("#adName", "AL00410")               # 34.3's
+    page.click("#adOk")
+    page.wait_for_timeout(500)
+    assert warnings and "AL00410" in warnings[0]
+    assert not page.evaluate("document.getElementById('modal').hidden")
+    assert _row(page, 34, 6)["amp_label"] == "AL00411"
+    page.fill("#adName", "A-1/b#2")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1000)
+    assert page.evaluate("document.getElementById('modal').hidden")
+    assert _row(page, 34, 6)["amp_label"] == "A-1/b#2"
+    tap1 = _col(page, "tap1")
+    cell = lambda: page.evaluate(
+        f"Array.from(document.querySelectorAll('#grid tbody tr')).find(tr => tr.children[1]"
+        f" && tr.children[1].textContent.trim() === '6').children[{tap1} + 1].textContent.trim()")
+    assert cell() == "A-1/b#2"
+    # a 2-port 4 tap keyed into tap1: "0 2 . 4"
+    _goto(page, 34, 6, "tap0")
+    _type(page, "02.4")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1200)
+    r = _row(page, 34, 6)
+    assert r["taps"] == ["/ 4/"]
+    assert cell() == "/ 4/"
+    assert r["amp_label"] == "A-1/b#2" and r["amp_info"]["name"] == "A-1/b#2"
+    assert not page.errors
+
+
+def test_insert_adds_zero_footage_lines_above_and_below(page):
+    """Insert adds a line above the cursor's, ". Insert" one below; each
+    press adds another.  4.4 carries branch 6's coupler."""
+    _open_al004(page)
+    before = page.evaluate("S.scr.rows.filter(r => r.branch === 4 && !r.end).length")
+    block = _row(page, 6, 9)["block"]
+    _goto(page, 4, 4, "ftg")
+    page.keyboard.press("Insert")
+    page.wait_for_timeout(800)
+    page.keyboard.press("Insert")
+    page.wait_for_timeout(800)
+    _type(page, ".")
+    page.keyboard.press("Insert")
+    page.wait_for_timeout(800)
+    rows = page.evaluate("S.scr.rows.filter(r => r.branch === 4 && !r.end)")
+    assert len(rows) == before + 3
+    assert [r["ftg"] for r in rows[:8]] == [476, 155, 134, 0, 0, 121, 0, 156]
+    assert rows[5]["couplers"] == ["12<6>"]
+    # the cursor stayed on the coupler's line
+    assert page.evaluate("curRow().node") == 6
+    # branch 6 still hangs from it, and nothing downstream moved
+    assert page.evaluate("S.scr.branches.find(b => b.number === 6).parent_node") == 6
+    assert _row(page, 6, 9)["block"] == block
+    assert not page.errors

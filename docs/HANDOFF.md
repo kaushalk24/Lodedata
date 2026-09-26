@@ -103,6 +103,9 @@ Power currents and volts match on all 29 lines of branch 4.
   is reproduced exactly (`tests/test_ntw.py`).
 * Levels print to the hundredth, halves up: AL004 34.7 shows 21.115 as
   21.12 and 37.865 as 37.87 (`as_shown` in `app/hfc/screen.py`).
+* Design keying from the user: `0` then `.` runs ftg → hc → cab → lv;
+  `. +` on an amplifier opens Amplifier Definition (unique names); `Insert`
+  adds a 0-ft line above, `. Insert` below. See open-questions item 8.
 * Keys: in Design the digits are the screen menu; `0` Alters (tap prompt
   "Enter desired tap {# of ports}.{ID #}: [home] for list", Home = Select
   Tap), `5` Test, `/` expanded display, Esc closes. Entry types directly.
@@ -112,4 +115,4 @@ Power currents and volts match on all 29 lines of branch 4.
 Questions 1, 2, 3, 4, 5 and the Parameters file are closed. Waiting on the user
 for the open points in items 7 and 8 of `docs/open-questions.md` (the
 expanded display's open points in item 7,
-the Alter prompts on other columns).
+the details item 8 lists as not yet known).

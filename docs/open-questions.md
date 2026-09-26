@@ -148,7 +148,23 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    Port, 6-port drawn `{n}`). The tab marks the port count of the tap
    highlighted; double-clicking a tap places it in the cursor's slot,
    replacing any tap there (the user; `tests/test_ui.py`). Entry mode keys
-   values directly. Open: the Alter prompt on other columns.
+   values directly. From the user, all built and tested:
+   * `0` on ftg, hc, cab or lv starts keying; `.` moves on to the next of
+     the four, still keying (`0 150 . 2 . 401`). A tap is keyed the same
+     way: `0 2 . 4` is a 2-port 4, `0 8 . 18` an 8-port 18.
+   * `. +` with the cursor on an amplifier's amp column opens Amplifier
+     Definition (Power Supply, Amp ID, OK; status line "Enter Amplifier
+     name."). The name shows in tap1; a tap placed in tap1 shows instead,
+     and the name stays the amplifier's. Any characters; a name another
+     active has is refused with a warning.
+   * `Insert` adds a 0-ft line above the cursor's, `. Insert` one below;
+     every press adds another.
+   Not yet known (the replica's choice in brackets): the warning's wording
+   (`Amp ID X is already used at b.n.`) and whether the window stays open
+   after it (it does); whether names compare ignoring case (they don't);
+   the Feedermaker Networks box (left out); what an inserted line's cable
+   is (none); where `.` goes after lv (the next line's ftg, as before);
+   where the cursor goes after Insert (it stays on its node).
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
 10. **Parameters — mapped.** Every setting on the six tabs is located and
