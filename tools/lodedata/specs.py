@@ -414,11 +414,21 @@ PAR_MISC_PARTS = 578            # char[25] x3: HTH connectors, splices, terminat
 PAR_HOUSING_PARTS, PAR_HOUSINGS = 728, 13   # char[25] each; min size u8 at 1063 + k
 PAR_HOUSING_SIZE = 1063
 PAR_STRAND_SERIES = 1053        # bit n: cable series n00 is a strand/trench type
-PAR_POINTS_AMP, PAR_POINTS_LE, PAR_POINTS_PS = 1057, 1058, 1062
+# Underground Housings points, u8 each
+PAR_POINTS = {"equalizer": 1056, "amplifier": 1057, "line_extender": 1058, "tap": 1059,
+              "tap_8_port": 1060, "coupler": 1061, "power_supply": 1062}
+PAR_NIU = 1098                  # i32 x5 in the tab's order
+NIU_FIELDS = ("system_penetration", "offhook", "ring", "additional_line", "offhook_limit")
 PAR_CROSSOVER, PAR_RETURN_CROSSOVER = 1118, 1122
-PAR_INTERPOLATION = 1474        # 2 = Constant Wattage
+PAR_MAX_LE_CASCADE, PAR_LINES_PER_FORM = 1126, 1130
+PAR_BACKFEED_CABLE, PAR_FWDFEED_CABLE = 1146, 1470
+PAR_INTERPOLATION = 1474        # 0 Step, 1 Linear, 2 Constant Wattage
+PAR_OVERVOLTAGE = 1478          # u8, 1 = On
 PAR_MAX_AMPS = 1486             # i32 x6 in the tab's order
 PAR_EXTRA_LEVELS, PAR_EXTRA_LEVEL_STRIDE = 2976, 24   # Min F3 of level lv at +24*lv
+PAR_MAX_TAP_CASCADE = 3909      # u8
+PAR_OVER_EQUALIZATION = 3911    # u8, 1 = Allow Over Equalization ticked
+PAR_TILTS, PAR_TILT_STRIDE = 6002, 16   # Max/Min Tilt Fwd, Max/Min Tilt Ret per level
 INTERPOLATION = {0: "step", 1: "linear", 2: "constant_wattage"}
 MAX_AMPS_THROUGH = ("power_inserter", "amplifier", "bridger_port", "coupler",
                     "line_extender", "tap")
@@ -434,9 +444,12 @@ def read_parameters(data: bytes) -> dict:
     housings TV-60 4 ... TV-1024 27; points amplifier 16, line extender 11,
     power supply 30; max crossover 3.00, max return crossover 99.00; the tap
     windows 12 / 16 (750 / 54) and 16 / 16 (40 / 5), which sit in the
-    frequency table; and Min 550 of 15 / 17 on levels 0 / 1.
+    frequency table; and Min 550 of 15 / 17 on levels 0 / 1.  A test copy
+    saved with distinct values placed the rest: NIU, the cascades, lines per
+    form, replacement cables, overvoltage, over-equalization, the tilts and
+    the other points.
     """
-    if len(data) < 3900:
+    if len(data) < PAR_TILTS + PAR_TILT_STRIDE * 16:
         return {}
     fx = lambda o: round(_fx(struct.unpack_from("<i", data, o)[0]), 3)
     mask = struct.unpack_from("<H", data, PAR_STRAND_SERIES)[0]
@@ -460,10 +473,19 @@ def read_parameters(data: bytes) -> dict:
         "misc_parts": {k: _name(data[PAR_MISC_PARTS + 25 * i:PAR_MISC_PARTS + 25 * i + 25])
                        for i, k in enumerate(("hth_connectors", "splices", "terminators"))},
         "housings": housings,
-        "points": {"amplifier": data[PAR_POINTS_AMP], "line_extender": data[PAR_POINTS_LE],
-                   "power_supply": data[PAR_POINTS_PS]},
+        "points": {k: data[o] for k, o in PAR_POINTS.items()},
+        "niu": {k: fx(PAR_NIU + 4 * i) for i, k in enumerate(NIU_FIELDS)},
         "max_crossover": fx(PAR_CROSSOVER),
         "max_return_crossover": fx(PAR_RETURN_CROSSOVER),
+        "max_le_cascade": int(fx(PAR_MAX_LE_CASCADE)),
+        "max_tap_cascade": data[PAR_MAX_TAP_CASCADE],
+        "lines_per_form": int(fx(PAR_LINES_PER_FORM)),
+        "replacement_cables": {"backfeed": int(fx(PAR_BACKFEED_CABLE)),
+                               "fwd_feed": int(fx(PAR_FWDFEED_CABLE))},
+        "allow_over_equalization": bool(data[PAR_OVER_EQUALIZATION]),
+        "overvoltage_check": bool(data[PAR_OVERVOLTAGE]),
+        "tilts": [[fx(PAR_TILTS + PAR_TILT_STRIDE * lv + 4 * j) for j in range(4)]
+                  for lv in range(16)],
         "tap_windows": windows,
         "min_f3": [fx(PAR_EXTRA_LEVELS + PAR_EXTRA_LEVEL_STRIDE * lv) for lv in range(16)],
     }

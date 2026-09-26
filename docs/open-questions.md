@@ -79,12 +79,12 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 8. **Keystrokes** — a screen recording (Win + Alt + R) of keying a few nodes.
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
-10. **Parameters fields not yet proven** (file-formats 3.5): the ones WV750
-    holds as zero or as the first choice (Distance Units, Signal Display, NIU,
-    EQ Placement, Replacement Cables, Lines per Form, the cascades, Allow Over
-    Equalization, Optimization, the three Enforce/Flag boxes, Overvoltage,
-    Pre Load, Transformers, the tilt columns, Freqs. for Active EQ
-    Selection), which of the 5-point sizes sits where, and which 15 A limit
-    is which. One test copy of the .par with distinct values settles all of
-    them. Also: does Strand/Trench Types decide `<n>` for 5xx cable as it
-    does for 1xx? (No AL004 branch runs on 5xx alone.)
+10. **Parameters fields not yet proven** (file-formats 3.5). The test copy
+    placed NIU, points, cascades, lines per form, replacement cables,
+    overvoltage, over-equalization, tilts and the amperage limits. Left:
+    eight fields that all saved as 1 (or 1 → 2) — Distance Units, Signal
+    Display, Show Count Types, 800 Series, EQ Placement, Optimization,
+    Enforce Tap Window, Flag Hi/Lo Tilt — over 1138, 1142, 1482, 1510, 3904,
+    3914, 6001, 6514. A chain of saves reverting one field at a time settles
+    them. Also: does Strand/Trench Types decide `<n>` for 5xx cable as it does
+    for 1xx? (No AL004 branch runs on 5xx alone.)

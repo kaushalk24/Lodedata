@@ -19,7 +19,7 @@ from hfc.importer import design_from_ntw, library_from_spec_set   # noqa: E402
 from hfc.screen import build                                      # noqa: E402
 from lodedata.obfuscation import open_ntw                         # noqa: E402
 from lodedata.network import read_network                         # noqa: E402
-from lodedata.specs import read_taps, read_actives, load_spec_set  # noqa: E402
+from lodedata.specs import read_taps, read_actives, load_spec_set, read_parameters  # noqa: E402
 
 SAMPLES = Path(os.environ.get("LODEDATA_SAMPLES", ROOT / "samples"))
 PAIR = SAMPLES / "AL004-WV750"
@@ -180,7 +180,29 @@ def test_parameters_read_back_as_the_spec_edit_tabs_show_them():
     # Underground Housings
     assert [(h["part"], h["min_points"]) for h in p["housings"]] == [
         ("TV-60", 4), ("TV-80", 6), ("TV-104", 11), ("TV-106", 17), ("TV-1024", 27)]
-    assert p["points"] == {"amplifier": 16, "line_extender": 11, "power_supply": 30}
+    assert p["points"] == {"equalizer": 5, "amplifier": 16, "line_extender": 11, "tap": 5,
+                           "tap_8_port": 5, "coupler": 5, "power_supply": 30}
+    assert (p["max_le_cascade"], p["max_tap_cascade"], p["lines_per_form"]) == (3, 0, 0)
+    assert p["allow_over_equalization"] and not p["overvoltage_check"]
+
+
+PARTEST = SAMPLES / "partest" / "paratest.par"
+
+
+@pytest.mark.skipif(not PARTEST.exists(), reason="the user's test copy of the .par")
+def test_a_test_copy_with_distinct_values_places_every_field():
+    # WV750-2026.par re-saved by the user with one distinct value per field
+    p = read_parameters(PARTEST.read_bytes())
+    assert p["points"] == {"equalizer": 9, "amplifier": 16, "line_extender": 11, "tap": 6,
+                           "tap_8_port": 7, "coupler": 8, "power_supply": 30}
+    assert list(p["niu"].values()) == [1.0, 2.0, 3.0, 4.0, 5.0]
+    assert (p["max_crossover"], p["max_return_crossover"]) == (3.25, 99.0)
+    assert (p["max_le_cascade"], p["max_tap_cascade"], p["lines_per_form"]) == (4, 6, 44)
+    assert p["replacement_cables"] == {"backfeed": 7, "fwd_feed": 9}
+    assert not p["allow_over_equalization"] and p["overvoltage_check"]
+    assert p["power_interpolation"] == "linear"
+    assert list(p["max_amps_through"].values()) == [16.0, 15.1, 15.2, 15.3, 15.4, 12.0]
+    assert p["tilts"][0] == [1.1, 2.2, 3.3, 4.4] and p["tilts"][1] == [0.0] * 4
 
 
 # ------------------------------------------------------------ calculations
