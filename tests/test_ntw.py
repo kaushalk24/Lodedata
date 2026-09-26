@@ -310,3 +310,20 @@ def test_branch_1_matches_the_screen(screen):
     assert [r.amp for r in rows[:1]] == ["70"] and rows[0].amp_label == "AL004"
     assert [r.fixed for r in rows[:5]] == [False, True, True, True, True]
     assert [c for r in rows for c in r.couplers] == ["570<2>", "570[3]", "570[4]", "570[5]"]
+
+
+def test_a_feed_stops_being_one_when_its_span_no_longer_matches():
+    # The user changed 11.1 from 105 ft (4.16's span) to 106 in Lode Data:
+    # 4.14 then showed 3-[11]<12>, and branch 11 these numbers
+    design = design_from_ntw(NTW, SPEC)[0]
+    design.branch(11).nodes[0].ftg = 106
+    scr = build(design)
+    assert [r for r in _rows(scr, 4) if r.node == 14][0].couplers == ["3-[11]<12>"]
+    rows = [r for r in scr.rows if r.branch == 11]
+    got = [tuple(round(r.levels[f], 2) for f in scr.frequencies) for r in rows]
+    assert got == [(41.21, 33.33, 25.59, 25.17), (36.97, 31.79, 27.01, 26.29),
+                   (29.65, 27.69, 30.93, 29.87), (0.0, 0.0, 0.0, 0.0)]
+    # the 8-port tap on 11.2 is drawn <15> on the Design screen
+    assert [t for r in rows for t in r.taps] == ["/17/", "<15>", "[ 8]"]
+    assert [round(v, 2) for v in rows[-1].port_levels] == [21.55, 20.59, 38.13, 37.17]
+    assert rows[-1].port_severity == [""] * 4

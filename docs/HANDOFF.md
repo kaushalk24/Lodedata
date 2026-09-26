@@ -29,7 +29,7 @@ The user is a Lode Data designer. What they want:
 
 * Windows: double-click `run.bat`. Linux: `./run.sh`. Both start
   `uvicorn api:app --app-dir app` on port 8000.
-* `python -m pytest -q` → 95 tests. The browser tests use Playwright with
+* `python -m pytest -q` → 96 tests. The browser tests use Playwright with
   `/opt/pw-browsers/chromium`.
 * The sample-based tests **skip unless the sample files are present**:
   * `samples/AL004-WV750/AL004.ntw`
@@ -84,16 +84,17 @@ Power currents match on all 29 lines of branch 4. Power volts are within
   * voltage drop = current × cable loop resistance
   * a node's current is the current in the span on its supply side
   * a power stop cuts the span leading into its node
-* Coupler brackets (hypothesis, fits 16 of 16 branches seen; nothing in the
-  file stores it): `<n>` if the branch has no footage on non-1xx cable and its
-  first span matches a span already at the coupler's pole (what BkFeed/FwdFd
-  copy), otherwise `[n]`. Branch 1's `570[3]` broke the older 1xx-only rule.
+* Coupler brackets (nothing in the file stores them): `<n>` if the branch has
+  no footage on non-1xx cable and its first span matches a span already at
+  the coupler's pole (what BkFeed/FwdFd copy), otherwise `[n]`. Fits all 16
+  seen, and confirmed by experiment: 11.1 changed 105 → 106 turned 4.14 into
+  `3-[11]<12>`.
+* Taps: 8-port is `<n>` on the Design screen, `{n}` in the preview box.
 
 ## Next step
 
-Branch 1 came back `570<2> 570[3] 570[4] 570[5]`: `[3]` broke the 1xx rule and
-the footage-matching rule replaced it (open question 1). Waiting on the user
-for the test that separates "compares footages" from other explanations: on a
-copy of AL004, change 11.1's footage 105 → 106 and screenshot branch 4 around
-node 14. The prediction is `3-[11]<12>`; unchanged `3-<11><12>` breaks it.
-When question 1 closes, carry on with item 2 in `docs/open-questions.md`.
+Open question 1's mechanism is confirmed and question 2 is closed. The last
+piece of 1: a **branch 6 Design screenshot**, for the bracket on 6.1's coupler.
+The prediction is `100<7>`; `100[7]` would mean the span match looks only at
+the coupler's own branch, not up through a 0-ft branch start. Then carry on
+with item 3 (power volts) in `docs/open-questions.md`.
