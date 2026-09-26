@@ -141,19 +141,42 @@ def build(design: Design) -> Screen:
 
     starts, feeders = {}, {}      # per branch: levels out of its coupler, coupler name
 
-    # A branch with no mileage footage -- nothing, or only 1xx cable -- is
-    # drawn <n>, one with mileage [n].  Fits all twelve branches seen on
-    # AL004's screens (12<6>, 100[9], 3-<11><12>, 2[17], 1<18>, 16<19>,
-    # 100[20], 3[21]<24>, 8[22], 108[10]).
-    def mileage(number: int) -> float:
-        b = design.branch(number)
-        return sum(n.ftg for n in b.nodes
-                   if n.cab // 100 not in p.non_mileage_series) if b else 0.0
+    # Nothing in the file marks a branch <n> or [n].  What fits all sixteen
+    # seen on AL004's screens (branch 1: 570<2> 570[3] 570[4] 570[5];
+    # branch 4: 12<6> 100[9] 3-<11><12> 2[17] 1<18> 16<19> 100[20]
+    # 3[21]<24> 8[22]; branch 9: 108[10]): a branch is drawn <n> when it
+    # adds no mileage -- no footage, or only 1xx cable -- and its first span
+    # runs along a span already at the coupler's pole, the span BkFeed or
+    # FwdFd copies (6 starts on 4's 121 backward, 11 on its 105 forward, 12
+    # on its 99 backward).  Branch 3 is all 1xx too, but its pole is branch
+    # 1's, which has no spans, so it is [3].
+    def mileage(b: Branch) -> float:
+        return sum(n.ftg for n in b.nodes if n.cab // 100 not in p.non_mileage_series)
+
+    def spans_at(number: int, k: int) -> set:
+        """Footages of the spans at node k's pole: the nearest behind and
+        ahead on its branch, and, while k sits at its branch's start, those
+        at the parent's pole as well."""
+        found = set()
+        while (b := design.branch(number)) is not None:
+            spans = [n.ftg for n in b.nodes]
+            back = next((f for f in reversed(spans[:k]) if f), 0)
+            ahead = next((f for f in spans[k:] if f), 0)
+            found |= {back, ahead} - {0}
+            if back:
+                break
+            number, k = b.parent_branch, b.parent_node
+        return found
 
     def branch_style(cp) -> str:
         if cp.style != BRANCH_NORMAL:
             return BRANCH_BRACKETS.get(cp.style, "[]")
-        return "[]" if mileage(cp.branch) > 0 else "<>"
+        b = design.branch(cp.branch)
+        if b is None:
+            return "<>"
+        first = next((n.ftg for n in b.nodes if n.ftg), 0)
+        fed = not first or first in spans_at(b.parent_branch, b.parent_node)
+        return "<>" if mileage(b) == 0 and fed else "[]"
 
     def walk(branch: Branch, incoming: dict, depth: int, cum_ft: float,
              gutter_open: bool):

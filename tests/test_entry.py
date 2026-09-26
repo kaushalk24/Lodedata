@@ -163,4 +163,7 @@ def test_a_branch_with_mileage_footage_is_drawn_square():
     child.nodes[0].ftg, child.nodes[0].cab = 120, 410      # series 4: mileage
     assert build(d).rows[0].couplers[0] == "8[2]"
     child.nodes[0].cab = 110                               # series 1: parallel
+    d.branches[1].nodes[1].ftg = 120                       # along the parent's span
     assert build(d).rows[0].couplers[0] == "8<2>"
+    d.branches[1].nodes[1].ftg = 150                       # a route of its own, as
+    assert build(d).rows[0].couplers[0] == "8[2]"          # AL004's 570[3]

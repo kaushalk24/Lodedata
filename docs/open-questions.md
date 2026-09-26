@@ -1,8 +1,8 @@
 # What is still needed
 
 State after the second AL004 pass: a real design (AL004 + WV750-2026) imports
-completely, and every number on the Design-screen screenshots of branches 4, 6,
-9, 11, 18, 19, 21 and 22 is reproduced, along with the info boxes.
+completely, and every number on the Design-screen screenshots of branches 1, 4,
+6, 9, 11, 18, 19, 21 and 22 is reproduced, along with the info boxes.
 
 ## Reproduced exactly
 
@@ -28,12 +28,28 @@ completely, and every number on the Design-screen screenshots of branches 4, 6,
 
 ## Open, in the order to settle them
 
-1. **`<n>` versus `[n]` on couplers.** Nothing in the file marks it. The rule
-   that fits all twelve branches seen: `[n]` when the branch has footage on
-   mileage cable, `<n>` when it has none — only 1xx cable (the manual's
-   backfeed/parallel category) or no footage at all. It predicts branch 1 as
-   `570<2> 570<3> 570[4] 570[5]` and branch 9 as `108[10] … <13> [40] <43> <41>`.
-   A screenshot of branch 1 confirms or breaks it.
+1. **`<n>` versus `[n]` on couplers.** Nothing in the file marks it (see
+   file-formats 3.7); the program derives it. The branch 1 screenshot shows
+   `570<2> 570[3] 570[4] 570[5]`, which broke the old rule ("`<n>` when the
+   branch has no footage on non-1xx cable"): branch 3 is 1134 ft, all on
+   cable 100, yet `[3]`.
+
+   What sets 3 apart from `<6>`, `<11>`, `<12>` (also all 1xx) is where its
+   spans go. `BkFeed` (`.2`) and `FwdFd` (`..2`) copy the parent's spans, and
+   6, 11 and 12 start on exactly such a copy: 6 on branch 4's 121 backward,
+   11 on its 105 forward, 12 on its 99 backward. Branch 3 hangs off branch 1,
+   which has no spans at all. The rule now in `screen.py`, which fits all
+   sixteen branches seen: `<n>` when the branch adds no mileage (no footage,
+   or only 1xx cable) **and** its first span matches a span already at the
+   coupler's pole (following a 0-ft branch start up to the parent's pole).
+   It differs from the old rule only on branch 3.
+
+   Still unproven: whether the program really compares footages, or uses
+   something else that happens to separate 3 from 11 (e.g. "the parent has
+   footage"). The test: on a copy of AL004, change 11.1's footage from 105 to
+   106 and look at 4.14 — a footage rule turns `3-<11><12>` into `3-[11]<12>`.
+   Also open: whether `{n}` (backfeed) is ever drawn; 6 and 12 run backward
+   and show `<`.
 2. **8-port tap brackets.** The Design screen drew the 6-port-slot pad as
    `<43>`. No 8-port tap has been seen on the main screen yet (the preview box
    draws 8-port as `{n}`). Branch 22 node 5 and branch 11 node 2 carry 8-port

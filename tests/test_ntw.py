@@ -299,3 +299,14 @@ def test_coupler_column_matches_the_screen(screen):
     assert got == ["12<6>", "100[9]", "3-<11><12>", "2[17]", "1<18>", "16<19>",
                    "100[20]", "3[21]<24>", "8[22]"]
     assert _rows(screen, 9)[0].couplers == ["108[10]"]
+
+
+def test_branch_1_matches_the_screen(screen):
+    # Design screen of branch 1: the node, then four 570 couplers.  Branch 3
+    # is all 1xx cable yet drawn [3] -- it does not start along a parent span
+    rows = [r for r in screen.rows if r.branch == 1]
+    got = [tuple(round(r.levels[f], 2) for f in screen.frequencies) for r in rows]
+    assert got == [(0.0, 0.0, 0.0, 0.0)] + [(49.0, 38.0, 17.0, 17.0)] * 5
+    assert [r.amp for r in rows[:1]] == ["70"] and rows[0].amp_label == "AL004"
+    assert [r.fixed for r in rows[:5]] == [False, True, True, True, True]
+    assert [c for r in rows for c in r.couplers] == ["570<2>", "570[3]", "570[4]", "570[5]"]

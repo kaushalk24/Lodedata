@@ -419,9 +419,17 @@ Node record, offsets from its id:
 | 726 | power supply label (`A`) |
 | 981 | Amplifier Definition name (`AL00416`) |
 
-Branch record: +0 id, +4 first node id, +8 u16 node count, +126 u8 coupler
-file record + 1 (the coupler that starts the branch), +131 non-zero when this
-branch takes the through leg (`3-<11><12>`).
+Branch record: +0 id of the node carrying its coupler (0 for branch 1), +4
+first node id, +8 u16 node count, +126 u8 coupler file record + 1 (the coupler
+that starts the branch), +131 non-zero when this branch takes the through leg
+(`3-<11><12>`). End record: the last node's next id, then the last node's id.
+Both checked on all 45 AL004 branches.
+
+**No branch type is stored.** `<n>` against `[n]` (forwardfeed/backfeed against
+normal) is not in the branch record, the coupler's node, the branch's nodes,
+the end record, or any per-branch byte, bit or list anywhere in the file:
+AL004's branches 2 `<2>` and 3 `[3]` have byte-identical branch records and
+coupler nodes apart from ids. The program derives it — see open question 1.
 
 Everything above was checked against AL004's screens: all 29 footages, cables,
 house counts, taps, couplers, both amplifiers and their names on branch 4;

@@ -29,7 +29,7 @@ The user is a Lode Data designer. What they want:
 
 * Windows: double-click `run.bat`. Linux: `./run.sh`. Both start
   `uvicorn api:app --app-dir app` on port 8000.
-* `python -m pytest -q` → 94 tests. The browser tests use Playwright with
+* `python -m pytest -q` → 95 tests. The browser tests use Playwright with
   `/opt/pw-browsers/chromium`.
 * The sample-based tests **skip unless the sample files are present**:
   * `samples/AL004-WV750/AL004.ntw`
@@ -59,8 +59,8 @@ The user is a Lode Data designer. What they want:
 ## Where it stands
 
 AL004 imports with every reference resolved: 45 branches, 275 nodes. The
-Design screen matches every screenshot number on branches 4, 6, 9, 11, 18, 19,
-21 and 22, including:
+Design screen matches every screenshot number on branches 1, 4, 6, 9, 11, 18,
+19, 21 and 22, including:
 
 * end-of-branch lines and tap port outputs
 * tap colours
@@ -84,11 +84,16 @@ Power currents match on all 29 lines of branch 4. Power volts are within
   * voltage drop = current × cable loop resistance
   * a node's current is the current in the span on its supply side
   * a power stop cuts the span leading into its node
-* Coupler brackets (hypothesis, fits 12 of 12 branches seen): `[n]` if the
-  branch has footage on non-1xx cable, otherwise `<n>`.
+* Coupler brackets (hypothesis, fits 16 of 16 branches seen; nothing in the
+  file stores it): `<n>` if the branch has no footage on non-1xx cable and its
+  first span matches a span already at the coupler's pole (what BkFeed/FwdFd
+  copy), otherwise `[n]`. Branch 1's `570[3]` broke the older 1xx-only rule.
 
 ## Next step
 
-Waiting on the user for a **branch 1 Design screenshot**. The prediction is
-`570<2> 570<3> 570[4] 570[5]`; if it matches, open question 1 is closed. Then
-carry on with item 2 in `docs/open-questions.md`.
+Branch 1 came back `570<2> 570[3] 570[4] 570[5]`: `[3]` broke the 1xx rule and
+the footage-matching rule replaced it (open question 1). Waiting on the user
+for the test that separates "compares footages" from other explanations: on a
+copy of AL004, change 11.1's footage 105 → 106 and screenshot branch 4 around
+node 14. The prediction is `3-[11]<12>`; unchanged `3-<11><12>` breaks it.
+When question 1 closes, carry on with item 2 in `docs/open-questions.md`.
