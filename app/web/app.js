@@ -139,6 +139,35 @@ function cellText(r, c) {
 }
 
 // ---------------------------------------------------------------- render
+// "/" in Design toggles the expanded display: under each node its four tap
+// slots (port levels, or dashes), then the level it passes on, then a blank.
+function toggleExpanded() { S.expanded = !S.expanded; renderGrid(); }
+
+function expandedLines(r, cols) {
+  const cell = (c, text, cls) => `<td class="${c.cls || ''} ${cls || ''}">${esc(text)}</td>`;
+  const line = (fill) => `<tr class="xline"><td class="gutter">${esc(r.gutter && r.gutter !== '└' ? '│' : '')}</td>` +
+    cols.map(c => fill(c)).join('') + '<td></td></tr>';
+  const lines = [];
+  for (let k = 0; k < 4; k++) {
+    const lv = (r.tap_levels || [])[k];
+    const sev = (r.tap_port_severity || [])[k] || [];
+    lines.push(line(c => {
+      if (c.key.startsWith('lvl:')) {
+        const i = +c.key.slice(4);
+        return lv ? cell(c, lv[i].toFixed(2), 'xport ' + (sev[i] || '')) : cell(c, '-', 'xdash');
+      }
+      // which number this is -- the tap slot or its homes -- is not yet known
+      if (c.key === 'ftg' && lv) return cell(c, `(${k + 1})`, 'xcyan');
+      return cell(c, '');
+    }));
+  }
+  const out = r.out_levels || [];
+  lines.push(line(c => c.key.startsWith('lvl:') && out.length
+    ? cell(c, out[+c.key.slice(4)].toFixed(2), 'xout') : cell(c, '')));
+  lines.push(line(c => cell(c, '')));
+  return lines.join('');
+}
+
 function renderGrid() {
   const cols = columns();
   const rows = pageRows();
@@ -187,7 +216,8 @@ function renderGrid() {
       if (r.end && c.key.startsWith('lvl:')) extra += ' endlv';
       return `<td class="${c.cls || ''}${cur}${extra}" data-r="${i}" data-c="${j}">${esc(text)}</td>`;
     }).join('');
-    return `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;
+    const main = `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;
+    return S.expanded && S.mode === 'design' && !r.end ? main + expandedLines(r, cols) : main;
   }).join('');
 
   $$('#grid tbody td[data-r]').forEach(td => td.onclick = () => {
@@ -318,12 +348,12 @@ const MENUS = {
     [['0', 'Alter', alter], ['1', 'Jump', jump], ['2', 'Forward', null],
      ['3', 'Carry', carry], ['4', 'Fwd2A', null], ['5', 'Test', test],
      ['6', 'WillWrk', null], ['7', 'AutoCpl', null], ['8', 'Recalc', recalc],
-     ['9', 'Toggle', null], ['/', 'Distance', distance]],
+     ['9', 'Toggle', null], ['./', 'Distance', distance]],
     [['.0', 'Break', null], ['.1', 'Join', null], ['.2', 'BkFeed', null],
      ['.3', 'UnBkFd', null], ['.4', 'XFd2A', null], ['.5', 'MoveCpl', null],
      ['.6', 'XWillWk', null], ['.7', 'SetMDU', null], ['.8', 'RotTap', null],
      ['.9', 'Copy', null], ['.+', 'Name', nameAmp]],
-    [['..0', 'SpcVvv', null], ['..1', 'Xspec', null], ['..2', 'FwdFd', null],
+    [['..0', 'SpcVw', null], ['..1', 'Xspec', null], ['..2', 'FwdFd', null],
      ['..3', 'UnFFd', null], ['..4', 'BrLabel', null], ['..5', 'Dsmry', dsummary],
      ['..6', 'Clear', clearCell], ['..7', 'CAwBF', null], ['..8', 'XCAmp', null],
      ['..9', 'LckDStr', null], ['..+', 'Notes', notes]],
@@ -341,12 +371,12 @@ const MENUS = {
     [['0', 'Alter', alter], ['1', 'Jump', jump], ['2', 'Clear', clearCell],
      ['3', 'CarryPS', null], ['4', 'Recalc', recalc], ['5', 'Test', test],
      ['6', 'Locate', null], ['7', 'BOM', () => openReport('bom')],
-     ['8', 'Calc', recalc], ['9', 'NodeNIU', null], ['/', 'Distance', distance]],
+     ['8', 'Calc', recalc], ['9', 'NodeNIU', null], ['./', 'Distance', distance]],
     [['.0', 'Break', null], ['.1', 'Join', null], ['.2', 'ApArea', null],
      ['.3', 'CarryLE', null], ['.4', 'Report', () => openReport('powering')],
      ['.5', 'CarCplr', null], ['.6', 'TstArea', null], ['.7', 'Loc Mnu', null],
      ['.8', 'NIUtest', null], ['.9', 'Br NIU', null], ['.+', 'Name', nameAmp]],
-    [['..0', 'SpcVvv', null], ['..1', 'Xspec', null], ['..2', 'Append', null],
+    [['..0', 'SpcVw', null], ['..1', 'Xspec', null], ['..2', 'Append', null],
      ['..3', 'Unapnd', null], ['..4', 'Trans', null], ['..7', 'SetMDU', null],
      ['..+', 'Notes', notes], ['..9', 'DS NIU', null]],
   ],
@@ -523,8 +553,27 @@ document.addEventListener('keydown', async ev => {
     else stepBranch(1);
     return;
   }
+  else if (k === 'Home' && S.buffer !== null && cols[S.col].key.startsWith('tap')) {
+    ev.preventDefault(); selectTap(+cols[S.col].key.slice(3)); return;
+  }
   else if (k === 'Home') { S.row = 0; }
   else if (k === 'End') { S.row = n - 1; }
+  else if (S.mode !== 'entry' && S.buffer === null && /^[0-9+\/]$/.test(k)) {
+    // Design and Power: "0 Alter", "5 Test", ".2 BkFeed", "..5 Dsmry" ...
+    ev.preventDefault();
+    const dots = S.dot || 0; S.dot = false;
+    if (k === '/' && !dots) { if (S.mode === 'design') toggleExpanded(); return; }
+    runMenuKey('.'.repeat(dots) + k);
+    return;
+  }
+  else if (k === '.' && S.mode !== 'entry' && S.buffer === null) {
+    // "." and ". ." lead the second and third screen-menu rows, and ". →"
+    // style branch moves
+    ev.preventDefault();
+    S.dot = Math.min(2, (S.dot || 0) + 1);
+    msg(S.dot === 1 ? '.' : '. .');
+    return;
+  }
   else if (k === '.') {
     ev.preventDefault();
     // in a tap column the "." separates ports from value: 4.23
@@ -561,7 +610,7 @@ document.addEventListener('keydown', async ev => {
     if (S.buffer) S.buffer = S.buffer.slice(0, -1);
     else if (S.buffer === '') S.buffer = null;
   }
-  else if (k === 'Escape') { S.buffer = null; S.dot = false; }
+  else if (k === 'Escape') { if (S.buffer !== null) msg(''); S.buffer = null; S.dot = false; }
   else if (k === 'Insert') { ev.preventDefault(); await insertNode(); return; }
   else if (k === 'Delete') { ev.preventDefault(); await deleteNode(); return; }
   else return;
@@ -659,6 +708,58 @@ async function pickTap(slot) {
     }, 'Tap values are drawn in the bracket style of their port count: /2/ [4] {6} <8>');
 }
 
+const SELECT_BRACKETS = { 2: '//', 4: '[]', 6: '{}', 8: '<>' };
+async function selectTap(slot) {
+  const r = curRow(); if (!r) return;
+  const out = await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/tap/${slot}/candidates`);
+  const rows = new Map();
+  for (const t of out.candidates) {
+    if (!rows.has(t.row)) rows.set(t.row, {});
+    rows.get(t.row)[t.ports] = t;
+  }
+  const byId = Object.fromEntries(out.candidates.map(t => [t.id, t]));
+  let sel = out.current, tab = sel ? byId[sel].ports : 2;
+  const label = t => SELECT_BRACKETS[t.ports][0] + String(t.tap_id).padStart(2) + SELECT_BRACKETS[t.ports][1];
+  const place = async id => {
+    closeModal(); S.buffer = null;
+    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/tap`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot, part_id: id }) });
+    await refresh();
+  };
+  const draw = () => {
+    modal(`<div class="seltap"><div class="sttitle">Select Tap</div>
+      <div class="sttabs">${[2, 4, 6, 8].map(n =>
+        `<span class="sttab${n === tab ? ' on' : ''}" data-n="${n}">${n} Port</span>`).join('')}</div>
+      <div class="stlist">${[...rows.values()].map(parts => `<div class="stline">${[2, 4, 6, 8].map(n => {
+        const t = parts[n];
+        return `<span class="stcell">${t ? `<span class="stitem ${t.severity || 'green'}${t.id === sel ? ' sel' : ''}"
+          data-id="${t.id}">${esc(label(t))}</span>` : ''}</span>`;
+      }).join('')}</div>`).join('')}</div>
+      <div class="row"><button id="stOk" class="primary">OK</button><button id="mClose">Cancel</button></div></div>`);
+    $$('.sttab').forEach(el => el.onclick = () => { tab = +el.dataset.n; draw(); });
+    $$('.stitem').forEach(el => {
+      el.onclick = () => { sel = el.dataset.id; tab = byId[sel].ports; draw(); };
+      el.ondblclick = () => place(el.dataset.id);
+    });
+    $('#stOk').onclick = () => sel && place(sel);
+    const on = $('.stitem.sel'); if (on) on.scrollIntoView({ block: 'center' });
+  };
+  draw();
+  // arrows move within the chosen port count; Enter takes the highlighted tap
+  const column = () => out.candidates.filter(t => t.ports === tab);
+  const keys = ev => {
+    if ($('#modal').hidden) { document.removeEventListener('keydown', keys, true); return; }
+    if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+      const list = column(); if (!list.length) return;
+      const i = list.findIndex(t => t.id === sel);
+      const j = i < 0 ? 0 : Math.max(0, Math.min(list.length - 1, i + (ev.key === 'ArrowDown' ? 1 : -1)));
+      sel = list[j].id; draw(); ev.preventDefault(); ev.stopPropagation();
+    } else if (ev.key === 'Enter' && sel) { ev.preventDefault(); ev.stopPropagation(); place(sel); }
+  };
+  document.addEventListener('keydown', keys, true);
+}
+
 async function pickCoupler(slot) {
   const r = curRow();
   const items = libTable('passives').map(p => ({ id: p.id, label: p.name,
@@ -722,7 +823,24 @@ async function delBranch() {
   gotoBranch(parent && parent.parent_branch ? parent.parent_branch : 1);
   msg('branch deleted');
 }
-function alter() { openCell(); }
+// 0 Alter: the cell takes a typed value, Enter keeps it, Esc drops it.  On a
+// tap the status line reads as the program's does, and Home lists the taps.
+const ALTER_PROMPT = { tap: 'Enter desired tap {# of ports}.{ID #}:    [home] for list' };
+function alter() {
+  const r = curRow(), c = curCol();
+  if (!r || !c || r.end || !c.edit) { msg('nothing to alter here'); return; }
+  S.buffer = '';
+  // only the tap prompt is known from the program; the others are placeholders
+  msg(c.key.startsWith('tap') ? ALTER_PROMPT.tap : `Alter ${c.head}:`);
+  renderGrid();
+}
+// a screen-menu key as typed: "5", ".2", "..5", "./"
+function runMenuKey(key) {
+  for (const row of MENUS[S.mode] || [])
+    for (const [k, label, fn] of row)
+      if (k === key) { if (fn) fn(); else msg(`${k} ${label} — not implemented yet`); return true; }
+  return false;
+}
 function jump() {
   const v = prompt('Jump to node (branch.node)', `${S.branch}.1`); if (!v) return;
   const [b, n] = v.split('.').map(Number);

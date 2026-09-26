@@ -104,7 +104,10 @@ def _type(page, text):
 
 
 def test_typing_footage_house_count_and_cable_lands_in_the_right_columns(page):
-    """The bug this file exists for: fields must not race each other."""
+    """The bug this file exists for: fields must not race each other.  Strand
+    data is keyed in Entry mode, "1 0 7 . 2 . 0 ENTER" as the manual has it."""
+    page.select_option("#selMode", "entry")
+    page.wait_for_timeout(200)
     page.click(f'#grid tbody tr:nth-child(1) td[data-c="{_col(page, "ftg")}"]')
     page.wait_for_timeout(150)
     _type(page, "300.4.2")
@@ -124,12 +127,15 @@ def test_typing_footage_house_count_and_cable_lands_in_the_right_columns(page):
     assert row["hc"] == "4"
     assert row["cab"] == "2"
     assert not page.errors
+    page.select_option("#selMode", "design")
 
 
 def test_typing_a_tap_code_places_it_in_the_right_bracket(page):
     tap1 = _col(page, "tap1")
     page.click(f'#grid tbody tr:nth-child(1) td[data-c="{tap1}"]')
     page.wait_for_timeout(150)
+    _type(page, "0")                       # Alter
+    assert "Enter desired tap {# of ports}.{ID #}:" in page.inner_text("#stMsg")
     _type(page, "4.23")
     page.keyboard.press("Enter")
     page.wait_for_timeout(900)
@@ -137,7 +143,7 @@ def test_typing_a_tap_code_places_it_in_the_right_bracket(page):
     assert cell.strip() == "[23]"          # four-port brackets
 
     page.click(f'#grid tbody tr:nth-child(1) td[data-c="{tap1 + 1}"]')
-    _type(page, "8.21")
+    _type(page, "08.21")
     page.keyboard.press("Enter")
     page.wait_for_timeout(900)
     cell = page.inner_text(f'#grid tbody tr:nth-child(1) td[data-c="{tap1 + 1}"]')
@@ -148,7 +154,7 @@ def test_typing_a_tap_code_places_it_in_the_right_bracket(page):
 def test_an_unknown_tap_is_refused_with_what_the_spec_has(page):
     tap1 = _col(page, "tap1")
     page.click(f'#grid tbody tr:nth-child(1) td[data-c="{tap1 + 2}"]')
-    _type(page, "4.99")
+    _type(page, "04.99")
     page.keyboard.press("Enter")
     page.wait_for_timeout(900)
     assert "no 4-port 99 tap" in page.inner_text("#stMsg")
@@ -158,7 +164,7 @@ def test_an_unknown_tap_is_refused_with_what_the_spec_has(page):
 def test_typing_a_negative_coupler_swaps_the_legs_and_makes_a_branch(page):
     cplr = _col(page, "cplr[branch]")
     page.click(f'#grid tbody tr:nth-child(1) td[data-c="{cplr}"]')
-    _type(page, "-8")
+    _type(page, "0-8")
     page.keyboard.press("Enter")
     page.wait_for_timeout(1000)
     cell = page.inner_text(f'#grid tbody tr:nth-child(1) td[data-c="{cplr}"]').strip()
@@ -178,5 +184,33 @@ def test_the_menu_bar_matches_the_program(page):
                                       "els => els.map(e => e.textContent)")
     assert items == ["New", "Open", "Unload", "Save Specs", "Save Network",
                      "Save Network As...", "Project Settings...", "Print", "Exit"]
+    assert not page.errors
+
+
+def test_design_keys_are_the_screen_menu(page):
+    # 5 Test opens the Test Results window, Esc closes it; / toggles the
+    # expanded display; 0 then Home on a tap opens Select Tap
+    tap1 = _col(page, "tap1")
+    page.click(f'#grid tbody tr:nth-child(1) td[data-c="{tap1}"]')
+    _type(page, "5")
+    page.wait_for_timeout(300)
+    assert "Design Assistant Test Results -" in page.inner_text(".testres .trtitle")
+    page.keyboard.press("Escape")
+    assert page.evaluate("document.getElementById('modal').hidden")
+    _type(page, "/")
+    page.wait_for_timeout(200)
+    assert page.eval_on_selector_all("#grid tbody tr.xline", "els => els.length") >= 6
+    _type(page, "/")
+    page.wait_for_timeout(200)
+    assert page.eval_on_selector_all("#grid tbody tr.xline", "els => els.length") == 0
+    page.click(f'#grid tbody tr:nth-child(1) td[data-c="{tap1}"]')
+    _type(page, "0")
+    page.keyboard.press("Home")
+    page.wait_for_timeout(600)
+    assert page.inner_text(".seltap .sttitle") == "Select Tap"
+    tabs = page.eval_on_selector_all(".sttab", "els => els.map(e => e.textContent)")
+    assert tabs == ["2 Port", "4 Port", "6 Port", "8 Port"]
+    assert page.eval_on_selector_all(".stitem", "els => els.length") > 0
+    page.keyboard.press("Escape")
     assert not page.errors
 

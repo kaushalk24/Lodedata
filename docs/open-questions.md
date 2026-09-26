@@ -60,23 +60,45 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    EQ `SCS4`, return pad 7, EQ `2`; the file has pads 8 / 7 and EQ indexes
    2 / 1 — so the return EQ shown is index + 1 both times, and the forward EQ
    is a name from a table. Needs: Spec Edit → Actives, Pads/EQs Bank tabs.
-5. **Port output colours on the end line.** On branch 6 the 750 and 54 port
-   values (21.63, 24.81) are yellow although they are within System Levels;
-   the rule behind that is not known. Branch 11's end line (21.55, 20.59,
-   38.13, 37.17, with 11.1 at 106 ft) and branch 4's (21.44, 22.41, 36.28,
-   35.32) are all green, so it is not a plain threshold on the value. The
-   same unknown yellow is on 6.8's `<43>` (LEQ\RC PAD 13, port levels 26.54
-   26.82 39.23 36.85 — within System Levels); the replica draws it green.
-   Lead from the System Levels tab: the tap windows (750: 12, 54: 16; 40: 16,
-   5: 16). Read as "a port may be at most min + window" (lv 0: 29 at 750, 26
-   at 54), `<43>`'s 26.82 at 54 is the only port above its window among all
-   13 taps seen, and it is the only unexplained yellow tap. But it does not
-   explain branch 6's yellow 21.63 / 24.81, and Enforce Tap Window is off.
-   Not applied until confirmed.
+5. **Tap and port colours — closed.** The user's recording of Test (screen
+   menu 5) lists 37 problems on AL004; the replica produces the same 37 lines,
+   word for word, from three checks on each tap's port levels, compared to
+   the hundredth:
+   * **below min / above max** against System Levels for the node's lv —
+     yellow within the tap margin, red beyond;
+   * **over window** — a forward port above its minimum plus the tap window
+     (750: 12, 54: 16) — yellow. `<43>` at 6.8: 26.82 at 54 is 0.82 over;
+   * **crossover** — forward low above forward high by more than Max.
+     Crossover (3.00) — yellow on both. 6.9: 24.81 − 21.63 = 3.18, which is
+     the end line's yellow 21.63 / 24.81.
+
+   A tap is drawn in its worst colour, each port value in its own. The
+   cursor on a yellow tap fills yellow. Select Tap colours candidates by the
+   first two checks only (`[11]` and `/ 8/` are crossed over at 6.8 yet
+   green there).
+
+   Still open: is a return port below max − return window ever flagged? (No
+   AL004 return port is under 29, the lowest is 29.21.) And is the crossover
+   threshold the Max. Crossover setting or a fixed 3? (All AL004 crossovers
+   are ≤ 2.67 or ≥ 3.18.)
 6. **The "ntw map AL004" file** mentioned earlier has not arrived.
-7. **The small 3-option dialog** in the videos, and the multi-line node view
-   (the manual says `/` toggles an expanded display).
-8. **Keystrokes** — a screen recording (Win + Alt + R) of keying a few nodes.
+7. **Expanded display (`/`) — mostly answered.** Seven lines to a node: the
+   node line; four tap-slot lines (port levels coloured per value, or dashes)
+   with a cyan `(1)` under ftg; the level passed on (grey); a blank. Open:
+   what `(1)` counts (slot number? homes?), what the passed-on line shows at
+   a coupler node, and the cyan block at the cursor's node — the first line
+   is the amplifier box's five distances then cable loss at 750 from the
+   previous active, (split?), and the network start
+   (`[1015 1901 1015 1015 1901 15.56 15.56 28.67]` at 6.9); the second line
+   (`1-0-0 0-0-0 1 894`) is unknown. The small 3-option dialog in the old
+   videos is still unidentified.
+8. **Keystrokes — partly answered.** Design mode's digits are the screen
+   menu (`0 Alter`, `5 Test`, `.2 BkFeed`, `..5 Dsmry`; `./ Distance`), `/`
+   toggles the expanded display, Esc closes a window. `0` on a tap prompts
+   "Enter desired tap {# of ports}.{ID #}:    [home] for list"; Home opens
+   Select Tap (a line per tap-file row, parts by port count, tabs 2/4/6/8
+   Port, 6-port drawn `{n}`). Entry mode keys values directly. Open: the
+   Alter prompt on other columns, and what the Select Tap tabs do.
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
 10. **Parameters — mapped.** Every setting on the six tabs is located and

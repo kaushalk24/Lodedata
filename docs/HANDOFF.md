@@ -29,7 +29,7 @@ The user is a Lode Data designer. What they want:
 
 * Windows: double-click `run.bat`. Linux: `./run.sh`. Both start
   `uvicorn api:app --app-dir app` on port 8000.
-* `python -m pytest -q` → 100 tests. The browser tests use Playwright with
+* `python -m pytest -q` → 103 tests. The browser tests use Playwright with
   `/opt/pw-browsers/chromium`.
 * The sample-based tests **skip unless the sample files are present**:
   * `samples/AL004-WV750/AL004.ntw`
@@ -96,10 +96,17 @@ Power currents and volts match on all 29 lines of branch 4.
 * "Mileage" for the bracket rule = footage on a series ticked under
   Parameters → Strand/Trench Types (WV750: 000 200 300 400).
 * Taps: 8-port is `<n>` on the Design screen, `{n}` in the preview box.
+* Tap test (Test, screen menu 5): below min / above max (yellow within the
+  tap margin, red beyond), over window (forward, yellow), crossover (> Max.
+  Crossover, yellow); levels compared to the hundredth. AL004's 37-line list
+  is reproduced exactly (`tests/test_ntw.py`).
+* Keys: in Design the digits are the screen menu; `0` Alters (tap prompt
+  "Enter desired tap {# of ports}.{ID #}: [home] for list", Home = Select
+  Tap), `5` Test, `/` expanded display, Esc closes. Entry types directly.
 
 ## Next step
 
-Open questions 1, 2 and 3 are closed and the Parameters file is fully mapped
-(item 10). Next: the yellow in item 5 — the user will answer it (tap window
-lead: `<43>`'s 26.82 at 54 is above min 10 + window 16). Then item 4,
-Pads/EQ.
+Questions 1, 2, 3, 5 and the Parameters file are closed. Waiting on the user
+for the open points in items 5, 7 and 8 of `docs/open-questions.md` (return
+window, crossover threshold, the expanded display's `(1)` and cyan block,
+the Alter prompts on other columns, Select Tap's tabs). Then item 4, Pads/EQ.

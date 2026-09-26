@@ -47,6 +47,9 @@ class Row:
     port_severity: list = field(default_factory=list)
     tap_notes: list = field(default_factory=list)  # (severity, message) about taps
     tap_port_severity: list = field(default_factory=list)  # per tap, per column
+    tap_inputs: list = field(default_factory=list)  # level entering each tap slot (not sent)
+    after_taps: dict = field(default_factory=dict)  # level after the last tap (not sent)
+    out_levels: dict = field(default_factory=dict)  # level carried on to the next node
     tap_ports: list = field(default_factory=list)
     tap_parts: list = field(default_factory=list)  # part numbers, for the panel
     couplers: list = field(default_factory=list)   # e.g. "200[2]"
@@ -85,6 +88,8 @@ class Row:
             "taps": self.taps, "couplers": self.couplers,
             "tap_severity": self.tap_severity, "end": self.end,
             "tap_port_severity": self.tap_port_severity,
+            "out_levels": [round(self.out_levels[f], 2) for f in self.freq_order]
+                          if self.out_levels else [],
             "tap_levels": [[round(v, 2) for v in t] for t in self.tap_levels],
             "power_stop": self.power_stop,
             "port_levels": [round(v, 2) for v in self.port_levels],
@@ -241,6 +246,7 @@ def build(design: Design) -> Screen:
                 tap = lib.taps.get(slot.part_id)
                 if not tap:
                     continue
+                row.tap_inputs.append(dict(levels))
                 style = TAP_BRACKETS.get(tap.ports, "[]")
                 # the Design screen shows the Tap ID, integer part only
                 shown = tap.tap_id or int(round(tap.tap_value_db))
@@ -266,6 +272,7 @@ def build(design: Design) -> Screen:
                     thru = tap.through_db(f, reverse=not _is_forward(p, f))
                     levels[f] = levels[f] - thru if _is_forward(p, f) else levels[f] + thru
 
+            row.after_taps = dict(levels)
             scr.rows.append(row)
 
             # couplers start branches, walked where their coupler sits.
@@ -316,6 +323,7 @@ def build(design: Design) -> Screen:
                     loss = leg(THROUGH_DOWNSTREAM, f)
                     levels[f] = (levels[f] - loss if _is_forward(p, f)
                                  else levels[f] + loss)
+            row.out_levels = dict(levels)
 
         # the line under the last node: what continues through the last tap,
         # and under the tap columns that tap's port output
@@ -652,3 +660,29 @@ def _totals(design: Design, scr: Screen) -> None:
         "errors": sum(1 for r in rows if r.severity == "red"),
         "warnings": sum(1 for r in rows if r.severity == "yellow"),
     }
+
+
+def tap_candidates(design: Design, branch: int, node: int, slot: int) -> dict:
+    """Every tap in the spec set, tested as if placed in this slot -- what the
+    Select Tap window colours (AL004 6.8: /11/ [11] / 8/ [ 8] green, / 4/ and
+    the LEQ pads yellow).  The slot's input is the level after whatever
+    precedes it on the line.  The window colours by the level checks only:
+    [11] and / 8/ are crossed over there (3.08, 3.18) yet shown green."""
+    scr = build(design)
+    p, freqs = design.parameters, scr.frequencies
+    row = next((r for r in scr.rows if (r.branch, r.node) == (branch, node) and not r.end), None)
+    if row is None:
+        return {"candidates": [], "current": None}
+    levels = row.tap_inputs[slot] if slot < len(row.tap_inputs) else row.after_taps
+    b = design.branch(branch)
+    current = b.nodes[node - 1].taps[slot].part_id \
+        if b and slot < len(b.nodes[node - 1].taps) else None
+    out = []
+    for tap in sorted(design.library.taps.values(), key=lambda t: (t.row, t.ports)):
+        ports = _tap_ports(p, freqs, levels, tap)
+        _, errors = _tap_checks(p, row.lv, freqs, ports)
+        sev = _worst([v for v, m in errors if not m.startswith("Crossover")])
+        out.append({"id": tap.id, "row": tap.row, "ports": tap.ports,
+                    "tap_id": tap.tap_id, "name": tap.name, "severity": sev})
+    return {"candidates": out, "current": current}
+

@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from hfc.model import Library, DesignParameters, new_id
 from hfc.plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
                        BRANCH_NORMAL)
-from hfc.screen import build
+from hfc.screen import build, tap_candidates
 from hfc.entry import resolve_tap, resolve_coupler, resolve_active, EntryError
 from hfc.starter import starter_library
 from hfc.reports import level_report, bill_of_materials, powering_report, to_csv
@@ -222,6 +222,12 @@ class TapEdit(BaseModel):
     slot: int = 0
     part_id: str | None = None
     code: str | None = None      # what was typed, e.g. "4.23"
+
+
+@app.get("/api/networks/{nid}/nodes/{branch}/{node}/tap/{slot}/candidates")
+def tap_choices(nid: str, branch: int, node: int, slot: int):
+    """The Select Tap window: every tap, tested in this slot."""
+    return tap_candidates(load(nid), branch, node, slot)
 
 
 @app.put("/api/networks/{nid}/nodes/{branch}/{node}/tap")
