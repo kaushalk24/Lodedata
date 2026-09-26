@@ -117,6 +117,21 @@ def parameters_from_spec_set(base: str | Path,
     return params
 
 
+# where each column's losses sit among a bank row's twelve values: a pad's dB
+# Loss, an EQ's Loss at the high and low design frequency of its direction
+_BANK_LOSSES = ((0,), (7,), (1, 2), (8, 9))
+
+
+def _pad_eq(bank, column: int) -> list:
+    """[prefix, labels, losses] of one Fwd Pad / Ret Pad / Fwd EQ / Ret EQ
+    column, both lists by the value a design stores."""
+    if bank is None:
+        return ["", [], []]
+    labels = bank.labels[column]
+    losses = [[bank.values[v][i] for i in _BANK_LOSSES[column]] for v in range(len(labels))]
+    return [bank.prefixes[column], labels, losses]
+
+
 def library_from_spec_set(base: str | Path,
                          params: DesignParameters | None = None) -> Library:
     """Load ``<base>.cbl/.cpr/.atv/.tap/.par`` into a Library.
@@ -219,8 +234,7 @@ def library_from_spec_set(base: str | Path,
             power_draw=a.power_draw,
             current_draw_a=next((amps for v, amps in a.power_draw
                                  if abs(v - 60.0) < 6), 0.0),
-            pad_eq=[[banks[n].prefixes[c], banks[n].labels[c]] if n in banks else ["", []]
-                    for c, n in enumerate(a.banks)],
+            pad_eq=[_pad_eq(banks.get(n), c) for c, n in enumerate(a.banks)],
             source=f"lodedata:{base.name}.atv",
         ))
 

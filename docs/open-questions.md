@@ -61,16 +61,12 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    row's label: the info box the label, the expanded display prefix + label
    (file-formats 3.4c). Every pad and EQ on the six amplifiers seen reads
    back as shown (`tests/test_ntw.py`).
-   Still open: (a) 34.6's forward names keep the label's leading spaces
-   (`SPB-  16`, `SEQ-750-   4`) where every other name trims them — its node
-   record differs from 34.3's only in ids, footage and the values
-   themselves; is it the same after reopening the file? (b) Which byte of
-   each bank pair is forward. (c) How the program picks them (for designing
-   later): the forward EQ is the row whose tilt is nearest what the active
-   needs, (In 750 − In 54) − (input 750 − input 54), on all 27 LEs and
-   bridgers in AL004; the pad is ⌊input 750 − In 750⌋ on 17 of them and a
-   little lower on the rest (6.1, before an `SCS4`, three lower), so the
-   EQ's own loss comes off first — the other bank values are not mapped.
+   The pair order is proven by the user's edited spec (BRIDGER 61's Ret
+   Pad → 2 moved byte +4). 34.6's `SPB-  16` was the program's own state:
+   after reopening it shows `SPB-16`, and the spec saved in that session
+   carries exactly 34.6's four labels trimmed. How the program picks pads
+   and EQs is solved too (file-formats 3.4c) — the replica uses it for an
+   amplifier with none stored, i.e. one placed in the replica.
 5. **Tap and port colours — closed.** The user's recording of Test (screen
    menu 5) lists 37 problems on AL004; the replica produces the same 37 lines,
    word for word, from three checks on each tap's port levels, compared to

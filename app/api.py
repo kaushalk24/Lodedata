@@ -170,7 +170,10 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
     n = _node(d, branch, node)
     if body.clear_amp:
         n.amp, n.amp_part, n.amp_label = "", None, ""
+        n.pads = []
     if body.amp_code is not None:
+        # a newly placed amplifier's pads and EQs are the program's pick
+        n.pads = []
         try:
             part = resolve_active(d.library, body.amp_code)
         except EntryError as e:

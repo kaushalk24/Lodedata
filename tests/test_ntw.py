@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / "app"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from hfc.importer import design_from_ntw, library_from_spec_set   # noqa: E402
-from hfc.screen import build, as_shown                            # noqa: E402
+from hfc.screen import build, as_shown, choose_pads_eqs           # noqa: E402
 from lodedata.obfuscation import open_ntw                         # noqa: E402
 from lodedata.network import read_network                         # noqa: E402
 from lodedata.specs import read_taps, read_actives, load_spec_set, read_parameters  # noqa: E402
@@ -646,6 +646,42 @@ def test_actives_use_the_banks_the_actives_tab_shows():
     b = spec.banks[0]
     assert b.prefixes == ["SPB-", "SPB-", "SEQ-750-", "MEQ-42-"]
     assert spec.banks[4].prefixes == ["NPB-", "NPB-", "CE-120-", "MEQ-85-"]
+
+
+def test_the_program_picks_every_stored_pad_and_eq(screen):
+    """All 27 LEs and bridgers: pads and EQs as the program chose them."""
+    design = design_from_ntw(NTW, SPEC)[0]
+    rows = {(r.branch, r.node): r for r in screen.rows if not r.end}
+    checked = 0
+    for (b, n), r in rows.items():
+        nd = design.branch(b).nodes[n - 1]
+        part = design.library.actives.get(nd.amp_part)
+        if not nd.amp or part is None or part.fibre_fed:
+            continue
+        assert choose_pads_eqs(part, r.levels, design.parameters) == nd.pads[:4], (b, n)
+        checked += 1
+    assert checked == 27
+
+
+def test_an_amplifier_without_stored_pads_shows_the_programs_pick():
+    design = design_from_ntw(NTW, SPEC)[0]
+    for b in design.branches.values():
+        for nd in b.nodes:
+            nd.pads = []
+    rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
+    for key, want in PADS_EQS.items():
+        a = rows[key].amp_info
+        assert (a["fwd_pad"], a["ret_pad"], a["fwd_eq"], a["ret_eq"]) == want, key
+
+
+def test_the_return_pad_bank_is_the_fifth_byte():
+    """The user set BRIDGER 61's Ret Pad bank to 2 and saved (act.atv)."""
+    edited = SAMPLES / "partest" / "act.atv"
+    if not edited.exists():
+        pytest.skip("act.atv not in samples/partest")
+    banks = {a.index: a.banks for a in read_actives(edited.read_bytes())}
+    assert banks[13] == [1, 2, 1, 1]
+    assert banks[42] == [1, 1, 1, 1]
 
 
 def test_power_supply_info(screen):

@@ -396,6 +396,40 @@ def _active_kind(part) -> str:
     return ""
 
 
+def choose_pads_eqs(part, levels: dict, p) -> list:
+    """The pads and EQs the program picks for an active, as stored values:
+    forward pad, return pad, forward EQ, return EQ.
+
+    The EQ is the bank row whose tilt is nearest the one needed -- forward,
+    the active's In tilt less the tilt arriving; return, the tilt the level
+    needed here asks for.  The pad is then the largest that still leaves,
+    after it and the EQ's loss, the input at the active's In levels
+    (forward) and its Out at the levels needed here (return), at both
+    frequencies.  Reproduces all 27 amplifiers of AL004, 108 values.
+    """
+    (_, _, fpad), (_, _, rpad), (_, _, feq), (_, _, req) = [
+        (c + [[], [], []])[:3] for c in part.pad_eq]
+    hi, lo = levels[p.forward_high_mhz], levels[p.forward_low_mhz]
+    rh, rl = levels[p.return_high_mhz], levels[p.return_low_mhz]
+    slack = 1e-9
+
+    def nearest(eqs, tilt):
+        return min(range(len(eqs)), key=lambda v: abs((eqs[v][1] - eqs[v][0]) - tilt), default=0)
+
+    def largest(pads, fits):
+        return max((v for v in range(len(pads)) if fits(pads[v][0])), default=0)
+
+    fe = nearest(feq, (part.in_forward_high - part.in_forward_low) - (hi - lo))
+    re_ = nearest(req, rh - rl)
+    f_loss = feq[fe] if feq else [0.0, 0.0]
+    r_loss = req[re_] if req else [0.0, 0.0]
+    fp = largest(fpad, lambda db: hi - db - f_loss[0] >= part.in_forward_high - slack
+                 and lo - db - f_loss[1] >= part.in_forward_low - slack)
+    rp = largest(rpad, lambda db: part.out_return_high - db - r_loss[0] >= rh - slack
+                 and part.out_return_low - db - r_loss[1] >= rl - slack)
+    return [fp, rp, fe, re_]
+
+
 def _amp_info(design: Design, scr: Screen) -> None:
     """What the info box shows with the cursor on an amplifier, and the cyan
     block the expanded display (`/`) draws under a node.
@@ -501,9 +535,13 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # the stored values index the active's Pads/EQs Banks: the info box
         # shows the label, the expanded display the prefix and label
         # (AL00416: forward EQ 16 -> "12", SEQ-750-12)
+        stored = nd.pads[:4]
+        if not stored and part and len(part.pad_eq) == 4 and not fibre:
+            # none stored -- an amplifier placed here: the program picks them
+            stored = choose_pads_eqs(part, r.levels, design.parameters)
         shown_as = []
-        for c, v in enumerate((nd.pads + [0, 0, 0, 0])[:4]):
-            prefix, labels = part.pad_eq[c] if part and len(part.pad_eq) == 4 else ("", [])
+        for c, v in enumerate((stored + [0, 0, 0, 0])[:4]):
+            prefix, labels = part.pad_eq[c][:2] if part and len(part.pad_eq) == 4 else ("", [])
             label = labels[v].strip() if 0 <= v < len(labels) else str(v)
             shown_as.append((label, prefix + label))
         (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as

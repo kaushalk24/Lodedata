@@ -74,10 +74,10 @@ ATV_CONFIG_BASE = 214
 ATV_CONFIG_STRIDE = 18
 ATV_CONFIG_SLOTS = 8
 # Before the name, the banks the Actives tab's Fwd Pad / Ret Pad / Fwd EQ /
-# Ret EQ columns name, one byte each, less one: the EQ pair at +1, +2 and
-# the pad pair at +3, +4 (WV750: FM901e-B shows pads 2 2, EQs 1 1 and
-# stores 0 0 1 1).  Every WV750 active has the same bank forward and
-# return, so which byte of a pair is forward is not proven.
+# Ret EQ columns name, one byte each, less one: forward and return EQ at
+# +1, +2, forward and return pad at +3, +4.  WV750: FM901e-B shows pads 2 2,
+# EQs 1 1 and stores 0 0 1 1; setting BRIDGER 61's Ret Pad to 2 moved +4
+# alone.  The EQ pair is taken to run the same way.
 ATV_EQ_BANKS, ATV_PAD_BANKS = 1, 3
 
 
@@ -381,8 +381,10 @@ def read_inline(data: bytes) -> list:
 # pad, forward EQ, return EQ (WV750 bank 1: SPB- SPB- SEQ-750- MEQ-42-; bank
 # 4, the nodes': NODE-; bank 5, the FM902s': NPB- NPB- CE-120- MEQ-85-).
 # A row is its four labels, char[5] each and right-aligned as stored
-# ("   8"), at +0, +5 (pads) and +58, +63 (EQs), with twelve numbers
-# between; a column ends at a row labelled FLAG.  Row 0 is VOID; a design
+# ("   8"), at +0, +5 (pads) and +58, +63 (EQs), and between them the
+# bank tabs' twelve numbers: forward pad dB Loss; forward EQ Loss at F1, F2,
+# F3-F6 (750, 54, 550, ...); return pad dB Loss; return EQ Loss at R1-R4
+# (40, 5, ...).  A column ends at a row labelled FLAG.  Row 0 is VOID; a design
 # stores row - 1, so AL004's AL00416,
 # forward EQ 16, is row 17, "  12" -- what its info box shows.
 ATV_BANKS, ATV_BANK_COUNT, ATV_BANK_STRIDE = 93884, 8, 8816
@@ -395,7 +397,7 @@ class PadEqBank:
     number: int
     prefixes: list       # forward pad, return pad, forward EQ, return EQ
     labels: list         # per column, the labels by stored value (row 1 on)
-    values: list         # per row from row 1, the twelve numbers
+    values: list         # per row from row 1: fwd pad, fwd EQ F1-F6, ret pad, ret EQ R1-R4
 
 
 def _label(raw: bytes) -> str:

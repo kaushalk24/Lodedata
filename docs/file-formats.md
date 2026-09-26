@@ -377,7 +377,7 @@ char[11] each — forward pad, return pad, forward EQ, return EQ.
 |---|---|---|
 | 0 | char[5] | forward pad label, right-aligned as stored (`"   8"`) |
 | 5 | char[5] | return pad label |
-| 10 | i32[12] ×1e6 | values: +10 the forward pad's value (its label, 0–21); a forward EQ's tilt is +18 − +14 (the `SCS` cable simulators are +14, the EQs +18) |
+| 10 | i32[12] ×1e6 | the bank tabs' numbers: forward pad dB Loss; forward EQ Loss at 750, 54, 550, F4, F5, F6; return pad dB Loss; return EQ Loss at 40, 5, R3, R4 |
 | 58 | char[5] | forward EQ label |
 | 63 | char[5] | return EQ label |
 
@@ -389,10 +389,27 @@ part as prefix + label: WV750 bank 1 is `SPB-`, `SPB-`, `SEQ-750-`,
 all six amplifiers whose pads the screens show.
 
 Each active names its banks in the four bytes before its name, less one:
-+1, +2 the EQ banks and +3, +4 the pad banks (FM901e-B: pads 2 2, EQs 1 1 on
-the Actives tab, stored 0 0 1 1). Every WV750 active reads back as its
-Actives tab row. Its actives use the same bank forward and return, so which
-byte of each pair is forward is not proven.
++1 forward EQ, +2 return EQ, +3 forward pad, +4 return pad (FM901e-B: pads
+2 2, EQs 1 1 on the Actives tab, stored 0 0 1 1; setting BRIDGER 61's Ret Pad
+to 2 changed +4 alone). Every WV750 active reads back as its Actives tab
+row. The EQ pair is taken to run forward then return like the pads.
+
+**How the program picks them** — reproduces all 27 LEs and bridgers of
+AL004, 108 stored values:
+
+* EQ: the row whose tilt is nearest the one needed. Forward, tilt is Loss-54
+  − Loss-750 (an `SCS` cable simulator's is negative) and the need is the
+  active's In-750 − In-54 less the input's 750 − 54. Return, tilt is Loss-5
+  − Loss-40 and the need is the level needed here at 40 less at 5.
+* Pad: the largest that still leaves, after it and the EQ's loss, the input
+  at or above In-750 and In-54 (forward), or the active's Out-40 and Out-5
+  at or above the levels needed here (return).
+
+A spec saved from the editor after the Design screen has shown a pad or EQ
+writes that label trimmed (`"  16"` → `"16"`) — on AL004, exactly 34.6's
+four, the ones that first showed with their spaces (`SPB-  16`) and trimmed
+after reopening — evidently the program trims a label in its own memory
+once it has used it. The replica always shows them trimmed.
 
 WV750's banks: 1 the LEs and bridgers (`SPB-`/`SEQ-750-`/`MEQ-42-`), 2 the
 FM901e and FML1G7J pads (`NPB-`), 3 the WiFi units, 4 the nodes (`NODE-`),

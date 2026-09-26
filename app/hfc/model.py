@@ -178,7 +178,8 @@ class ActiveType:
     current_draw_a: float = 1.0                # used when no table is present
     min_operating_voltage: float = 42.0
     # forward pad, return pad, forward EQ, return EQ: [part-number prefix,
-    # labels by the value a design stores] from the Pads/EQs Bank each uses
+    # labels, losses], both by the value a design stores, from the Pads/EQs
+    # Bank each uses (a pad's dB; an EQ's loss at its high, low frequency)
     pad_eq: list = field(default_factory=list)
     source: str = "manual"
 
