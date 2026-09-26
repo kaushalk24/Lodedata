@@ -103,6 +103,12 @@ def parameters_from_spec_set(base: str | Path,
     if spec.levels and any(any(r) for r in spec.levels):
         params.levels = spec.levels
         params.tap_margin_db = spec.tap_margin
+    par = spec.parameters
+    if par:
+        # General Parameters -> Strand/Trench Types: a series left unticked
+        # (WV750: 100, 500-900) is not mileage
+        params.non_mileage_series = [n for n in range(10) if n not in par["strand_series"]]
+        params.power_interpolation = par["power_interpolation"]
     return params
 
 

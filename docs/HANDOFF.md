@@ -67,8 +67,7 @@ Design screen matches every screenshot number on branches 1, 4, 6, 9, 11, 18,
 * the coupler column
 * the info boxes (tap, coupler preview, power supply, amplifier)
 
-Power currents match on all 29 lines of branch 4. Power volts are within
-0.02 V: the calculated drop is about 0.5 % too high, currently unexplained.
+Power currents and volts match on all 29 lines of branch 4.
 
 ## Rules learned from the user's screens
 
@@ -81,7 +80,8 @@ Power currents match on all 29 lines of branch 4. Power volts are within
   * `3=`: the thru leg goes to the second branch.
 * Power:
   * current is constant-wattage, interpolated between the power steps
-  * voltage drop = current × cable loop resistance
+  * voltage drop = current × span resistance, the span's resistance being
+    whole milliohms, truncated (feet × µΩ/ft // 1000)
   * a node's current is the current in the span on its supply side
   * a power stop cuts the span leading into its node
 * Coupler brackets (nothing in the file stores them): `<n>` if the branch has
@@ -90,12 +90,13 @@ Power currents match on all 29 lines of branch 4. Power volts are within
   copy), otherwise `[n]`. Confirmed by experiment (11.1 changed 105 → 106
   turned 4.14 into `3-[11]<12>`) and by 6.1's `100[7]`.
 * Cable ID 0 is a real cable (index 0), not "none".
+* "Mileage" for the bracket rule = footage on a series ticked under
+  Parameters → Strand/Trench Types (WV750: 000 200 300 400).
 * Taps: 8-port is `<n>` on the Design screen, `{n}` in the preview box.
 
 ## Next step
 
-Open questions 1 and 2 are closed. Next is item 3, power volts: ask for
-**Spec Edit → Parameters**, a screenshot of each tab — the drop is ~0.5 % too
-high (86.76 V against 86.78 V at AL00415) and the setting behind it is
-probably there, along with the backfeed/forwardfeed replacement cables
-(`.par` 3900 holds 100 / 101, both spec sets).
+Open questions 1, 2 and 3 are closed and the Parameters file is mapped
+(file-formats 3.5). Waiting on the user for: (a) a test copy of the .par with
+distinct values in the unproven fields (item 10), and (b) evidence for the
+yellow in item 5 (tap window lead). Then item 4, Pads/EQ.

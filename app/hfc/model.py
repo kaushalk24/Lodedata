@@ -334,8 +334,9 @@ class DesignParameters:
     # less than the tap margin is marginal (yellow), beyond it red.
     levels: list = field(default_factory=lambda: [[15.0, 9.0, 45.0, 45.0]])
     tap_margin_db: float = 0.5
-    # cable series (the hundreds of a cable ID) not counted as mileage --
-    # 1xx is where backfeeds and parallel cable go, per the manual
+    # cable series (the hundreds of a cable ID) not counted as mileage: the
+    # ones not ticked under the Parameters file's Strand/Trench Types
+    # (WV750: 000 200 300 400 ticked, so 1xx and 5xx-9xx are not mileage)
     non_mileage_series: list = field(default_factory=lambda: [1])
     # how an active's power steps are read: "step", "linear" or
     # "constant_wattage" -- the Parameters file's Power interpolation setting

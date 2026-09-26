@@ -153,6 +153,36 @@ def test_supplies_and_frequencies_come_from_the_parameters_file():
     assert (s3.volts, s3.amps) == (90.0, 15.0)
 
 
+def test_parameters_read_back_as_the_spec_edit_tabs_show_them():
+    # Spec Edit -> Parameters on WV750-2026.par, all six tabs
+    spec = load_spec_set(SPEC)
+    p = spec.parameters
+    # General Parameters
+    assert p["strand_series"] == [0, 2, 3, 4]
+    assert p["misc_parts"] == {"hth_connectors": "HOUS TO HOUS", "splices": "SGMC",
+                               "terminators": "GTRM"}
+    assert (p["max_crossover"], p["max_return_crossover"]) == (3.0, 99.0)
+    # System Levels
+    assert spec.tap_margin == 0.5
+    assert spec.levels[:2] == [[17.0, 10.0, 45.0, 45.0], [19.0, 12.0, 45.0, 45.0]]
+    assert p["min_f3"][:2] == [15.0, 17.0]                   # Min. 550
+    assert {k: v for k, v in p["tap_windows"].items() if v} == \
+        {"F1": 12.0, "F2": 16.0, "R1": 16.0, "R2": 16.0}
+    # Tap Selection
+    assert [p["tap_type_by_ports"][n] for n in range(1, 8)] == [2, 2, 4, 4, 8, 8, 8]
+    assert all(p["ports_by_homes"][n] == n for n in range(1, 27))
+    # Powering
+    assert p["power_interpolation"] == "constant_wattage"
+    assert list(p["max_amps_through"].values()) == [16.0, 15.0, 15.0, 15.0, 15.0, 12.0]
+    assert [(s.type_id, s.name, s.volts, s.amps, s.rating) for s in spec.supplies] == [
+        (1, "EXISTING STDBY", 60.0, 15.0, 85.0), (2, "EXISTING STDBY", 60.0, 15.0, 90.0),
+        (3, "EXISTING  90v", 90.0, 15.0, 90.0), (4, "NEW APLHA 90V PS", 90.0, 15.0, 85.0)]
+    # Underground Housings
+    assert [(h["part"], h["min_points"]) for h in p["housings"]] == [
+        ("TV-60", 4), ("TV-80", 6), ("TV-104", 11), ("TV-106", 17), ("TV-1024", 27)]
+    assert p["points"] == {"amplifier": 16, "line_extender": 11, "power_supply": 30}
+
+
 # ------------------------------------------------------------ calculations
 def test_design_levels_match_the_screen(screen):
     rows = _rows(screen, 4)
@@ -202,10 +232,12 @@ def test_power_screen_currents(screen):
 
 
 def test_power_screen_volts(screen):
-    # within 0.03 V everywhere; see docs/open-questions.md for the residual
-    rows = _rows(screen, 4)
-    worst = max(abs(r.volts - v) for r, v in zip(rows, B4_VOLTS))
-    assert worst < 0.03
+    # every volt exactly as shown, which needs each span's resistance
+    # truncated to whole milliohms
+    assert [round(r.volts, 2) for r in _rows(screen, 4)] == B4_VOLTS
+    # the map tag of AL00415 (6.1, at 4.4's pole): 86.78 V, 0.79 A
+    tag = next(r for r in screen.rows if (r.branch, r.node) == (6, 1))
+    assert (round(tag.volts, 2), round(tag.current, 2)) == (86.78, 0.79)
 
 
 def test_each_supply_carries_its_area(screen):

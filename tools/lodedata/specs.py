@@ -299,7 +299,9 @@ def read_taps(data: bytes) -> list:
 
 
 # --------------------------------------------------------------------------
-# parameters: only the power supply table is mapped so far
+# parameters (Spec Edit -> Parameters).  Every offset below was checked
+# against screenshots of all six tabs of WV750-2026.par; see
+# docs/file-formats.md 3.5 for what is proven and what is not.
 # --------------------------------------------------------------------------
 @dataclass
 class SupplySpec:
@@ -307,12 +309,12 @@ class SupplySpec:
     name: str
     volts: float
     amps: float
-    rating: float         # third column, 85 or 90 in every sample (efficiency %?)
+    rating: float         # the Powering tab's "% Capacity" column
 
 
 PAR_SUPPLY_NAMES, PAR_SUPPLY_NAME_STRIDE = 1567, 25
 PAR_SUPPLY_TABLE, PAR_SUPPLY_STRIDE = 2212, 20
-PAR_SUPPLY_SLOTS = 8
+PAR_SUPPLY_SLOTS = 25          # the Powering tab lists ID 1-25
 
 
 PAR_FREQUENCIES, PAR_FREQUENCY_STRIDE = 3792, 10
@@ -389,7 +391,8 @@ def read_levels(data: bytes) -> dict:
 
 
 def read_supplies(data: bytes) -> list:
-    """Power supply types 1-8: name, output volts and rated amps."""
+    """Power supply types 1-25: name, voltage rating, current rating and
+    % capacity -- the Powering tab's table."""
     out = []
     for k in range(PAR_SUPPLY_SLOTS):
         o = PAR_SUPPLY_TABLE + PAR_SUPPLY_STRIDE * k
@@ -403,6 +406,67 @@ def read_supplies(data: bytes) -> list:
                               volts=round(volts, 2), amps=round(amps, 2),
                               rating=round(rating, 2)))
     return out
+
+
+PAR_TAP_TYPE_BY_PORTS = 512     # u8[33]: ports 0-32 -> tap port code (0/1/2/3 = 2/4/6/8)
+PAR_PORTS_BY_HOMES = 545        # u8[33]: homes 0-32 -> number of ports
+PAR_MISC_PARTS = 578            # char[25] x3: HTH connectors, splices, terminators
+PAR_HOUSING_PARTS, PAR_HOUSINGS = 728, 13   # char[25] each; min size u8 at 1063 + k
+PAR_HOUSING_SIZE = 1063
+PAR_STRAND_SERIES = 1053        # bit n: cable series n00 is a strand/trench type
+PAR_POINTS_AMP, PAR_POINTS_LE, PAR_POINTS_PS = 1057, 1058, 1062
+PAR_CROSSOVER, PAR_RETURN_CROSSOVER = 1118, 1122
+PAR_INTERPOLATION = 1474        # 2 = Constant Wattage
+PAR_MAX_AMPS = 1486             # i32 x6 in the tab's order
+PAR_EXTRA_LEVELS, PAR_EXTRA_LEVEL_STRIDE = 2976, 24   # Min F3 of level lv at +24*lv
+INTERPOLATION = {0: "step", 1: "linear", 2: "constant_wattage"}
+MAX_AMPS_THROUGH = ("power_inserter", "amplifier", "bridger_port", "coupler",
+                    "line_extender", "tap")
+
+
+def read_parameters(data: bytes) -> dict:
+    """The Parameters tabs, as far as they are proven.
+
+    WV750-2026 reads back as its screens show it: strand/trench types 000,
+    200, 300, 400; Power Interpolation Constant Wattage (2); maximum amperage
+    through 16 / 15 / 15 / 15 / 15 / 12; ports 1-2 -> 2-port, 3-4 -> 4-port,
+    5 and up -> 8-port; homes n -> n ports; HOUS TO HOUS / SGMC / GTRM;
+    housings TV-60 4 ... TV-1024 27; points amplifier 16, line extender 11,
+    power supply 30; max crossover 3.00, max return crossover 99.00; the tap
+    windows 12 / 16 (750 / 54) and 16 / 16 (40 / 5), which sit in the
+    frequency table; and Min 550 of 15 / 17 on levels 0 / 1.
+    """
+    if len(data) < 3900:
+        return {}
+    fx = lambda o: round(_fx(struct.unpack_from("<i", data, o)[0]), 3)
+    mask = struct.unpack_from("<H", data, PAR_STRAND_SERIES)[0]
+    windows = {}
+    for k, key in enumerate(PAR_FREQUENCY_NAMES):
+        windows[key] = fx(PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k + 6)
+    housings = []
+    for k in range(PAR_HOUSINGS):
+        name = _name(data[PAR_HOUSING_PARTS + 25 * k:PAR_HOUSING_PARTS + 25 * k + 25])
+        if name:
+            housings.append({"number": k + 1, "part": name,
+                             "min_points": data[PAR_HOUSING_SIZE + k]})
+    return {
+        # series 800/900 are assumed to be bits 8-9; both are clear in every sample
+        "strand_series": [n for n in range(10) if mask >> n & 1],
+        "power_interpolation": INTERPOLATION.get(data[PAR_INTERPOLATION], "constant_wattage"),
+        "max_amps_through": {k: fx(PAR_MAX_AMPS + 4 * i) for i, k in enumerate(MAX_AMPS_THROUGH)},
+        "tap_type_by_ports": {n: (2, 4, 6, 8)[data[PAR_TAP_TYPE_BY_PORTS + n] & 3]
+                              for n in range(1, 33)},
+        "ports_by_homes": {n: data[PAR_PORTS_BY_HOMES + n] for n in range(1, 33)},
+        "misc_parts": {k: _name(data[PAR_MISC_PARTS + 25 * i:PAR_MISC_PARTS + 25 * i + 25])
+                       for i, k in enumerate(("hth_connectors", "splices", "terminators"))},
+        "housings": housings,
+        "points": {"amplifier": data[PAR_POINTS_AMP], "line_extender": data[PAR_POINTS_LE],
+                   "power_supply": data[PAR_POINTS_PS]},
+        "max_crossover": fx(PAR_CROSSOVER),
+        "max_return_crossover": fx(PAR_RETURN_CROSSOVER),
+        "tap_windows": windows,
+        "min_f3": [fx(PAR_EXTRA_LEVELS + PAR_EXTRA_LEVEL_STRIDE * lv) for lv in range(16)],
+    }
 
 
 # --------------------------------------------------------------------------
@@ -429,6 +493,7 @@ class SpecSet:
     frequencies: dict = field(default_factory=dict)
     levels: list = field(default_factory=list)
     tap_margin: float = 0.0
+    parameters: dict = field(default_factory=dict)
     parameters_raw: bytes = b""
 
     def to_dict(self) -> dict:
@@ -460,6 +525,7 @@ def load_spec_set(base: str | Path) -> SpecSet:
             spec.frequencies = read_frequencies(data)
             lv = read_levels(data)
             spec.levels, spec.tap_margin = lv["levels"], lv["tap_margin"]
+            spec.parameters = read_parameters(data)
         else:
             setattr(spec, {"cbl": "cables", "cpr": "couplers",
                            "atv": "actives", "tap": "taps"}[ext],

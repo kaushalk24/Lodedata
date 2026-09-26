@@ -299,6 +299,15 @@ out as near-constant power, which is why it exists at all:
 | amps | 1.12 | 0.96 | 0.83 | 0.72 | 0.62 | 0.54 | 0.48 |
 | watts | 42.6 | 43.2 | 43.2 | 43.2 | 43.4 | 43.2 | 43.2 |
 
+**The volts need one more rule: a span's resistance is whole milliohms,
+truncated** — feet × the cable file's µΩ/ft, integer-divided by 1000 (136 ft of
+EX P3 750 A, 760 µΩ/ft, is 0.103 Ω, not 0.10336). With it all 29 volts on
+branch 4 match to the hundredth, and AL00415's map tag (86.78 V, 0.79 A);
+without it the drop runs ~0.5 % high and 16 of 29 are off by 0.01–0.02 V.
+Checked against the alternatives: truncating to 0.1 mΩ or 10 mΩ, rounding
+instead, or rounding currents, span drops or node volts each leave 12–27 of
+the 29 wrong. The Parameters file has no resistance or temperature setting.
+
 **Active IDs and the index a design uses.** The actives table starts six
 records into the record area: a design file stores an active as an index `i`,
 and its record is `i + 6`. The Active ID shown in the amp column is *text* —
@@ -360,24 +369,56 @@ the screen's 30.73 / 32.31 / 39.23 / 36.85 on 6.9.
 
 ### 3.5 `.par` — system design parameters
 
-Mapped so far (identical offsets in all three sample spec sets):
+Mapped against screenshots of all six Spec Edit → Parameters tabs of
+WV750-2026.par, and cross-checked by diffing KERMIT750-2026.par (same
+offsets, different values). Numbers are i32 ×1e6 unless marked u8/u16.
+**Proven** = a value on the screen that no other field shares, or a
+whole table that matches row for row.
 
-| offset | field |
-|---|---|
-| 1134 | i32 ×1e6 tap margin (0.5) |
-| 1154 + 20·lv | System Levels 0–15: min forward high, min forward low, max return high, max return low |
-| 1567 + 25·k | power supply type k+1 name, e.g. `EXISTING  90v` |
-| 2212 + 20·k | power supply type k+1: volts, amps, % of maximum current |
-| 3792 + 10·k | frequency column k (F1–F6, R1–R4): 5-char label, enabled byte |
+| offset | field | WV750 | status |
+|---|---|---|---|
+| 512 | u8[33] Tap Selection, Ports → Tap Type, ports 0–32, as port code 0/1/2/3 = 2/4/6/8 | 1–2 → 2, 3–4 → 4, 5+ → 8 | proven |
+| 545 | u8[33] Tap Selection, Homes → Number of Ports, homes 0–32 | n → n | proven |
+| 578 + 25·k | char[25] HTH Connectors, Splices, Terminators (3 more blank slots follow) | HOUS TO HOUS, SGMC, GTRM | proven |
+| 728 + 25·k | char[25] underground housing part numbers, 13 slots | TV-60 … TV-1024 | proven |
+| 1053 | u16 Strand/Trench Types, bit n = series n00 ticked | 0x1D = 000 200 300 400 | proven for 000–700; 800/900 assumed bits 8–9 (clear everywhere) |
+| 1056 | u8, 5 | 5 | one of the 5-point sizes (2/4/6-port tap, 8-port tap, coupler, equalizer) — unassigned |
+| 1057 | u8 points, Amplifier | 16 (KERMIT 36) | proven |
+| 1058 | u8 points, Line Extender | 11 | proven |
+| 1059–1061 | u8 ×3, all 5 | 5 5 5 | the other 5-point sizes — unassigned |
+| 1062 | u8 points, Power Supply | 30 | proven |
+| 1063 + k | u8 housing k+1 Minimum Size (Points) | 4 6 11 17 27 | proven |
+| 1082 | ×4: 12, 16, 16, 16 | same in KERMIT | unknown — equals the four design tap windows |
+| 1098 | ×4 | 0 (KERMIT 47 53 51 54) | unknown |
+| 1118 | Max. Crossover | 3.00 | likely (1126 is 3.00 too) |
+| 1122 | Max Return Crossover | 99.00 | proven |
+| 1126, 1130 | 3.00, 0 (KERMIT 2, 45) | | unknown — Max LE Cascade / Lines per Form / Max Tap Cascade? |
+| 1134 | Tap Margin | 0.50 | proven |
+| 1154 + 20·lv | System Levels lv 0–15: Min 750, Min 54, Max 40, Max 5, then one more (0) | 17 10 45 45 / 19 12 45 45 | proven (5th unknown) |
+| 1474 | u8 Power Interpolation, 0 Step / 1 Linear / 2 Constant Wattage | 2 | 2 proven; 0/1 by the radio order |
+| 1478 | u8 | 0 (KERMIT 1) | unknown — Overvoltage Check or Pre Load? |
+| 1486 + 4·k | Maximum Amperage Through: Power Inserter, Amplifier, Bridger Port, Coupler, Line Extender, Tap | 16 15 15 15 15 12 | 16 and 12 proven; the four 15s by screen order |
+| 1510 | 1.00 | same in KERMIT | unknown |
+| 1567 + 25·k | power supply ID k+1 part number, 25 slots | EXISTING STDBY … | proven |
+| 2212 + 20·k | power supply ID k+1: Voltage Rating, Current Rating, % Capacity | 60/15/85, 60/15/90, 90/15/90, 90/15/85 | proven |
+| 2972 | i32 raw 7777 | same in KERMIT | unknown (a marker?) |
+| 2976 + 24·lv | Min 550 (freq 3) of level lv, then presumably Min F4–F6, Max R3–R4 | 15 / 17 | Min F3 proven; the rest of the 24 bytes assumed |
+| 3792 + 10·k | frequency k (F1–F6, R1–R4): char[5] label, u8 enabled, i32 tap window | 750 54 550* F4* F5* F6* 40 5 R3* R4* (*off); windows 12 16 · 16 16 | proven |
+| 3894, 3898 | u8 1, 1 | same in KERMIT | unknown |
+| 3900, 3905 | u8 pairs 100/30, 101/30 | same in KERMIT | unknown — not the replacement cables, which are 0/0 |
+| 3911 | u8 1 | KERMIT 0 | unknown — Allow Over Equalization? |
 
-WV750-2026: frequencies 750 / 54 / 40 / 5; level 0 = 17 / 10 / 45 / 45,
-level 1 = 19 / 12 / 45 / 45; supply 3 = 90 V 15 A. With those levels exactly
-the taps AL004's Design screen shows red come out red.
+Not located, because WV750 holds zero / the first choice there: Distance Units,
+Signal Display, Show Count Types, NIU Settings (5), Default EQ Placement,
+Replacement Cables (Backfeed, Fwd. Feed), Lines per Form, Max. Tap Cascade,
+Max. LE Cascade, Allow Over Equalization, Optimization, Enforce Tap Window,
+Enforce Tap Tilt, Flag Hi/Lo Tilt, Overvoltage Check, Pre Load, Transformers
+(8), the four tilt columns of System Levels, and Freqs. for Active EQ
+Selection.
 
-Not yet located: the Power interpolation setting, tap window, tap selection
-page, NIU settings, backfeed/forwardfeed replacement cables. Readable content
-also includes `HOUS TO HOUS`, `SGMC`, `GTRM`/`NATOR` and the plans
-`TV-60` … `TV-1024`.
+What the replica uses: frequencies and System Levels (tap colours), tap
+margin, Strand/Trench Types (a branch with footage only on unticked series
+can be `<n>`), Power Interpolation, and the supply table.
 
 ### 3.6 `.cpr` record mark
 

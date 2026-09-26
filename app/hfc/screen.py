@@ -494,8 +494,9 @@ def _powering(design: Design, scr: Screen) -> None:
 
     Actives draw the current their power steps give at the voltage they see,
     so the solution is iterated: voltages from the supply outward, currents
-    back from the loads.  The drop along a span is its current times the
-    cable's loop resistance.
+    back from the loads.  The drop along a span is its current times its
+    resistance: feet times the cable's loop resistance, truncated to whole
+    milliohms.
 
     Shown per node, as checked against the AL004 Power screen:
       volt     the voltage at the node
@@ -509,7 +510,7 @@ def _powering(design: Design, scr: Screen) -> None:
         for i, n in enumerate(b.nodes, start=1):
             nodes[(b.number, n.seq or i)] = n
 
-    # span edges: child key -> (parent key, feet, ohms per foot)
+    # span edges: child key -> (parent key, ohms)
     edges = {}
     for b in design.branches.values():
         prev = (b.parent_branch, b.parent_node) if b.parent_branch else None
@@ -521,12 +522,18 @@ def _powering(design: Design, scr: Screen) -> None:
                 if loop >= 99.0:           # "never power this" cable
                     prev = key
                     continue
-                edges[key] = (prev, n.ftg, loop / 1000.0)
+                # A span's resistance is whole milliohms, truncated: feet times
+                # the cable file's micro-ohms per foot, integer-divided by 1000
+                # (136 ft of 760 uohm/ft is 0.103 ohm, not 0.10336).  With
+                # that every volt on AL004's branch 4 Power screen matches;
+                # without it the drop runs ~0.5 % high.
+                milliohms = int(round(n.ftg)) * int(round(loop * 1000)) // 1000
+                edges[key] = (prev, milliohms / 1000.0)
             prev = key
     adj = {k: [] for k in nodes}
-    for child, (parent, ft, rpf) in edges.items():
-        adj[child].append((parent, ft * rpf, child))
-        adj[parent].append((child, ft * rpf, child))
+    for child, (parent, ohms) in edges.items():
+        adj[child].append((parent, ohms, child))
+        adj[parent].append((child, ohms, child))
 
     def draw(key, volts: float) -> float:
         n = nodes[key]

@@ -50,10 +50,11 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 2. **8-port tap brackets — closed.** The Design screen draws an 8-port tap
    `<n>` (11.2: `<15>`), like the 6-port-slot pad `<43>`; the preview box
    draws 2/4/8-port as `(17)` `[8]` `{15}`. Both already reproduced.
-3. **Power volts** are within 0.02 V; the drop is ~0.5 % more than the photo.
-   Currents all match, so it is the resistance — probably a Parameters setting.
-   The user's map tag for AL00415 (6.1, at 4.4's pole) says 86.78 V 0.79 A;
-   the replica gives 86.76 V 0.79 A. Needs: Spec Edit → Parameters, each tab.
+3. **Power volts — closed.** Each span's resistance is whole milliohms,
+   truncated (feet × µΩ/ft, integer-divided by 1000). All 29 volts and 29
+   currents on branch 4 now match exactly, and AL00415 reads 86.78 V 0.79 A
+   as on the map. The Parameters tabs have no resistance setting; Power
+   Interpolation is Constant Wattage, as already modelled.
 4. **Pad/EQ values.** EQs are stored as indexes (AL00416: forward EQ #16 is
    shown as 12, return EQ #3 as 4). The map tag of AL00415 shows forward pad 8,
    EQ `SCS4`, return pad 7, EQ `2`; the file has pads 8 / 7 and EQ indexes
@@ -66,9 +67,24 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    35.32) are all green, so it is not a plain threshold on the value. The
    same unknown yellow is on 6.8's `<43>` (LEQ\RC PAD 13, port levels 26.54
    26.82 39.23 36.85 — within System Levels); the replica draws it green.
+   Lead from the System Levels tab: the tap windows (750: 12, 54: 16; 40: 16,
+   5: 16). Read as "a port may be at most min + window" (lv 0: 29 at 750, 26
+   at 54), `<43>`'s 26.82 at 54 is the only port above its window among all
+   13 taps seen, and it is the only unexplained yellow tap. But it does not
+   explain branch 6's yellow 21.63 / 24.81, and Enforce Tap Window is off.
+   Not applied until confirmed.
 6. **The "ntw map AL004" file** mentioned earlier has not arrived.
 7. **The small 3-option dialog** in the videos, and the multi-line node view
    (the manual says `/` toggles an expanded display).
 8. **Keystrokes** — a screen recording (Win + Alt + R) of keying a few nodes.
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
+10. **Parameters fields not yet proven** (file-formats 3.5): the ones WV750
+    holds as zero or as the first choice (Distance Units, Signal Display, NIU,
+    EQ Placement, Replacement Cables, Lines per Form, the cascades, Allow Over
+    Equalization, Optimization, the three Enforce/Flag boxes, Overvoltage,
+    Pre Load, Transformers, the tilt columns, Freqs. for Active EQ
+    Selection), which of the 5-point sizes sits where, and which 15 A limit
+    is which. One test copy of the .par with distinct values settles all of
+    them. Also: does Strand/Trench Types decide `<n>` for 5xx cable as it
+    does for 1xx? (No AL004 branch runs on 5xx alone.)
