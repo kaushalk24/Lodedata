@@ -252,6 +252,23 @@ class ActiveType:
 
 
 @dataclass
+class InlineType:
+    """An in-line device placed in the amp column as Qn: an equalizer, a pad,
+    or a zero-loss marker such as EXIST SPLICE.  Losses at each frequency."""
+    id: str
+    name: str
+    number: int = 0                            # the n of Qn
+    losses: list = field(default_factory=list)  # [(MHz, dB)]
+    source: str = "manual"
+
+    def loss_db(self, mhz: float) -> float:
+        for f, v in self.losses:
+            if abs(f - mhz) < 1e-6:
+                return float(v)
+        return 0.0
+
+
+@dataclass
 class PowerSupplyType:
     id: str
     name: str
@@ -269,11 +286,13 @@ class Library:
     passives: dict = field(default_factory=dict)
     actives: dict = field(default_factory=dict)
     power_supplies: dict = field(default_factory=dict)
+    inline: dict = field(default_factory=dict)
     imported_from: str = ""
 
     _TABLES = {
         "cables": CableType, "taps": TapType, "passives": PassiveType,
         "actives": ActiveType, "power_supplies": PowerSupplyType,
+        "inline": InlineType,
     }
 
     def add(self, part) -> Any:
@@ -315,6 +334,9 @@ class DesignParameters:
     # less than the tap margin is marginal (yellow), beyond it red.
     levels: list = field(default_factory=lambda: [[15.0, 9.0, 45.0, 45.0]])
     tap_margin_db: float = 0.5
+    # cable series (the hundreds of a cable ID) not counted as mileage --
+    # 1xx is where backfeeds and parallel cable go, per the manual
+    non_mileage_series: list = field(default_factory=lambda: [1])
     # how an active's power steps are read: "step", "linear" or
     # "constant_wattage" -- the Parameters file's Power interpolation setting
     power_interpolation: str = "constant_wattage"

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .plant import (Design, Branch, Node, TAP_BRACKETS, BRANCH_BRACKETS,
+from .plant import (Design, Branch, Node, TAP_BRACKETS, BRANCH_BRACKETS, BRANCH_NORMAL,
                     THROUGH_MARK, THROUGH_DOWNSTREAM, bracket)
 
 POWERING_PASSES = 4
@@ -35,10 +35,13 @@ class Row:
     lv: int = 0
     tsg: int = 0
     amp: str = ""
+    fixed: bool = False
     amp_name: str = ""
     amp_label: str = ""
     taps: list = field(default_factory=list)       # rendered strings, e.g. "[26]"
     tap_severity: list = field(default_factory=list)  # "", "yellow" or "red" per tap
+    tap_levels: list = field(default_factory=list)    # each tap's port levels, per frequency
+    power_stop: bool = False
     end: bool = False           # the line under a branch's last node
     port_levels: list = field(default_factory=list)   # that line: last tap's port output
     port_severity: list = field(default_factory=list)
@@ -53,7 +56,11 @@ class Row:
     current: float = 0.0
     supply: float = 0.0
     supply_label: str = ""
+    supply_type: int = 0
+    supply_name: str = ""
     supply_pct: int | None = None
+    powered_by: str = ""        # label of the supply whose area this node is in
+    amp_info: dict = field(default_factory=dict)
     # checks
     flags: list = field(default_factory=list)      # (severity, message)
 
@@ -72,10 +79,12 @@ class Row:
             "levels": [round(self.levels.get(f, 0.0), 2) for f in self.freq_order],
             "ftg": round(self.ftg, 0), "hc": self.hc, "cab": self.cab,
             "cab_name": self.cab_name, "lv": self.lv, "tsg": self.tsg,
-            "amp": self.amp, "amp_name": self.amp_name,
+            "amp": self.amp, "amp_name": self.amp_name, "fixed": self.fixed,
             "amp_label": self.amp_label,
             "taps": self.taps, "couplers": self.couplers,
             "tap_severity": self.tap_severity, "end": self.end,
+            "tap_levels": [[round(v, 2) for v in t] for t in self.tap_levels],
+            "power_stop": self.power_stop,
             "port_levels": [round(v, 2) for v in self.port_levels],
             "port_severity": self.port_severity,
             "tap_parts": self.tap_parts, "coupler_parts": self.coupler_parts,
@@ -83,7 +92,9 @@ class Row:
             "volts": None if self.volts is None else round(self.volts, 2),
             "current": round(self.current, 2),
             "supply": self.supply,
-            "supply_label": self.supply_label,
+            "supply_label": self.supply_label, "supply_type": self.supply_type,
+            "supply_name": self.supply_name, "powered_by": self.powered_by,
+            "amp_info": self.amp_info,
             "supply_pct": self.supply_pct,
             "flags": [{"severity": s, "message": m} for s, m in self.flags + self.tap_notes],
             "severity": self.severity,
@@ -128,15 +139,33 @@ def build(design: Design) -> Screen:
         cable = lib.cables.get(node.cab_part)
         return cable.loss_db(mhz, node.ftg) if cable and node.ftg else 0.0
 
+    starts, feeders = {}, {}      # per branch: levels out of its coupler, coupler name
+
+    # A branch with no mileage footage -- nothing, or only 1xx cable -- is
+    # drawn <n>, one with mileage [n].  Fits all twelve branches seen on
+    # AL004's screens (12<6>, 100[9], 3-<11><12>, 2[17], 1<18>, 16<19>,
+    # 100[20], 3[21]<24>, 8[22], 108[10]).
+    def mileage(number: int) -> float:
+        b = design.branch(number)
+        return sum(n.ftg for n in b.nodes
+                   if n.cab // 100 not in p.non_mileage_series) if b else 0.0
+
+    def branch_style(cp) -> str:
+        if cp.style != BRANCH_NORMAL:
+            return BRANCH_BRACKETS.get(cp.style, "[]")
+        return "[]" if mileage(cp.branch) > 0 else "<>"
+
     def walk(branch: Branch, incoming: dict, depth: int, cum_ft: float,
              gutter_open: bool):
+        starts[branch.number] = [round(incoming.get(f, 0.0), 2) for f in freqs]
         levels = dict(incoming)
         last_tap = None
         for idx, node in enumerate(branch.nodes):
             last_tap = None
             row = Row(freq_order=freqs, branch=branch.number, node=node.seq or idx + 1,
                       depth=depth, ftg=node.ftg, hc=node.hc, cab=node.cab,
-                      lv=node.lv, tsg=node.tsg, amp=node.amp,
+                      lv=node.lv, tsg=node.tsg, amp=node.amp, fixed=node.fixed,
+                      power_stop=node.power_stop,
                       amp_label=node.amp_label, supply=node.supply_volts)
             cable = lib.cables.get(node.cab_part)
             row.cab_name = cable.name if cable else ""
@@ -172,6 +201,16 @@ def build(design: Design) -> Screen:
                     levels[p.return_high_mhz] = part.in_return_high
                     levels[p.return_low_mhz] = part.in_return_low
 
+            # an in-line device in the amp column (Qn) comes before the taps
+            if node.inline:
+                q = lib.inline.get(node.inline_part)
+                row.amp = f"Q{node.inline}"
+                if q:
+                    row.amp_name = q.name
+                    for f in freqs:
+                        loss = q.loss_db(f)
+                        levels[f] = levels[f] - loss if _is_forward(p, f) else levels[f] + loss
+
             # taps: the through loss applies to everything downstream
             for slot in node.taps:
                 tap = lib.taps.get(slot.part_id)
@@ -180,13 +219,16 @@ def build(design: Design) -> Screen:
                 style = TAP_BRACKETS.get(tap.ports, "[]")
                 # the Design screen shows the Tap ID, integer part only
                 shown = tap.tap_id or int(round(tap.tap_value_db))
-                row.taps.append(bracket(str(shown), style))
+                row.taps.append(bracket(f"{shown:>2}", style))
                 row.tap_ports.append(tap.ports)
                 row.tap_parts.append(
                     f"{tap.name} ({tap.ports} port, {tap.tap_value_db:g} dB)")
-                ports = _tap_ports(p, freqs, row.levels, tap)
+                # a tap sees the level after whatever precedes it on the line:
+                # the amplifier, an in-line Q device, an earlier tap
+                ports = _tap_ports(p, freqs, levels, tap)
                 sev, why = _check_tap(p, node.lv, freqs, ports)
                 row.tap_severity.append(sev)
+                row.tap_levels.append([ports[f] for f in freqs])
                 if why:
                     row.tap_notes.append((sev, f"{shown}: {why}"))
                 last_tap = (tap, ports)
@@ -212,7 +254,7 @@ def build(design: Design) -> Screen:
                           and node.couplers[0].part_id == node.couplers[1].part_id
                           and len(passive.port_losses) > 2)
                 for i, cp in enumerate(node.couplers):
-                    style = BRANCH_BRACKETS.get(cp.style, "[]")
+                    style = branch_style(cp)
                     own = lib.passives.get(cp.part_id) or passive
                     cid = cp.coupler_id or (own.coupler_id if own else 0)
                     text = bracket(str(cp.branch), style)
@@ -240,6 +282,8 @@ def build(design: Design) -> Screen:
                         continue
                     down = {f: (levels[f] - leg(i, f) if _is_forward(p, f)
                                 else levels[f] + leg(i, f)) for f in freqs}
+                    own = lib.passives.get(cp.part_id) or passive
+                    feeders[child.number] = own.name if own else ""
                     walk(child, down, depth + 1, cum_ft, True)
                 for f in freqs:
                     loss = leg(THROUGH_DOWNSTREAM, f)
@@ -280,8 +324,87 @@ def build(design: Design) -> Screen:
         "parent_node": b.parent_node, "style": b.style, "label": b.label,
         "nodes": len(b.nodes),
         "position": order.index(b.number) + 1 if b.number in order else 0,
+        "start": starts.get(b.number, []),
+        "coupler": feeders.get(b.number, ""),
     } for b in sorted(design.branches.values(), key=lambda x: x.number)]
+    _amp_info(design, scr)
     return scr
+
+
+def _amp_info(design: Design, scr: Screen) -> None:
+    """What the info box shows with the cursor on an amplifier.
+
+    Checked on AL004's AL00416: 2027 ft to the node and to the start of the
+    network, 1141 ft to the previous active or split (the DC-12 at 4.4),
+    cascade position 1, supply A, 120 homes downstream.
+    """
+    lib = design.library
+    rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+
+    def upstream(b: int, n: int):
+        """(branch, node) pairs from this node back to the start, nearest first."""
+        while b:
+            br = design.branch(b)
+            for k in range(n, 0, -1):
+                yield b, k
+            n, b = br.parent_node, br.parent_branch
+
+    def node(b, n):
+        return design.branch(b).nodes[n - 1]
+
+    def aerial(nd) -> bool:
+        cable = lib.cables.get(nd.cab_part)
+        return (cable.cable_index if cable and cable.cable_index >= 0 else nd.cab % 100) % 2 == 0
+
+    def downstream_homes(b: int, n: int) -> int:
+        total, stack = 0, [(b, n)]
+        while stack:
+            bb, first = stack.pop()
+            br = design.branch(bb)
+            for nd in br.nodes[first - 1:]:
+                total += nd.hc
+                stack += [(c.branch, 1) for c in nd.couplers if design.branch(c.branch)]
+        return total
+
+    for (b, n), r in rows.items():
+        nd = node(b, n)
+        if not nd.amp:
+            continue
+        part = lib.actives.get(nd.amp_part)
+        d = dict.fromkeys(("aerial_prev", "aerial_start", "total_split",
+                           "total_prev", "total_start"), 0)
+        found_active = found_split = False
+        cascade = 0
+        first = True
+        for bb, k in upstream(b, n):
+            here = node(bb, k)
+            if not first:
+                if here.amp and not found_active:
+                    found_active = True
+                    cascade += 0
+                if here.amp:
+                    cascade += 1
+                if (here.amp or here.couplers) and not found_split:
+                    found_split = True
+            ft = here.ftg
+            d["total_start"] += ft
+            d["aerial_start"] += ft if aerial(here) else 0
+            if not found_active:
+                d["total_prev"] += ft
+                d["aerial_prev"] += ft if aerial(here) else 0
+            if not found_split:
+                d["total_split"] += ft
+            first = False
+        fibre = part is not None and part.fibre_fed
+        pads = (nd.pads + [0, 0, 0, 0])[:4]
+        r.amp_info = {
+            "name": nd.amp_label, "type": part.name if part else "",
+            "fwd_pad": pads[0], "ret_pad": pads[1], "fwd_eq": pads[2], "ret_eq": pads[3],
+            **d,
+            # the node itself is position 0; each active upstream adds one
+            "cascade": 0 if fibre else max(cascade, 1),
+            "supply": r.powered_by, "homes_down": downstream_homes(b, n),
+        }
 
 
 def _tap_ports(p, freqs, levels: dict, tap) -> dict:
@@ -432,6 +555,7 @@ def _powering(design: Design, scr: Screen) -> None:
                 continue
             r.volts = volts[k]
             r.current = current[k]
+            r.powered_by = n.supply_label
             node = nodes[k]
             if node.amp:
                 part = lib.actives.get(node.amp_part)
@@ -443,6 +567,8 @@ def _powering(design: Design, scr: Screen) -> None:
         if r is not None:
             r.supply = n.supply_volts
             r.supply_label = n.supply_label
+            if sup:
+                r.supply_type, r.supply_name = sup.type_id, sup.name
             if sup and sup.amps:
                 r.supply_pct = round(100 * current[key] / sup.amps)
                 if current[key] > sup.amps:

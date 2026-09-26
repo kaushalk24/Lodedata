@@ -335,6 +335,35 @@ def read_frequencies(data: bytes) -> dict:
     return out
 
 
+# In-line devices (the Actives file's "Inline Eqs"): Q1, Q2 ... placed in a
+# node's amp column.  69-byte records from a fixed offset (the .atv is a
+# fixed-size file); name, then losses at the four design columns
+# [F1, F2, R1, R2].  WV750: Q2 LEQ-PEA-0 = 1.2 / 1.0 / 1.2 / 0.7, exactly what
+# it costs on AL004's Design screen at 6.8.
+ATV_INLINE, ATV_INLINE_STRIDE, ATV_INLINE_SLOTS = 169372, 69, 40
+ATV_INLINE_LOSS = 29
+
+
+@dataclass
+class InlineSpec:
+    number: int          # the n of Qn
+    name: str
+    losses: list         # dB at F1, F2, R1, R2
+
+
+def read_inline(data: bytes) -> list:
+    out = []
+    for k in range(1, ATV_INLINE_SLOTS):
+        o = ATV_INLINE + ATV_INLINE_STRIDE * k
+        if o + ATV_INLINE_LOSS + 16 > len(data):
+            break
+        name = _name(data[o:o + 20])
+        losses = [round(_fx(v), 3) for v in struct.unpack_from("<4i", data, o + ATV_INLINE_LOSS)]
+        if name and all(abs(v) < 60 for v in losses):
+            out.append(InlineSpec(number=k, name=name, losses=losses))
+    return out
+
+
 PAR_LEVELS, PAR_LEVEL_STRIDE, PAR_LEVEL_COUNT = 1154, 20, 16
 PAR_TAP_MARGIN = 1134
 
@@ -396,6 +425,7 @@ class SpecSet:
     actives: list = field(default_factory=list)
     taps: list = field(default_factory=list)
     supplies: list = field(default_factory=list)
+    inline: list = field(default_factory=list)
     frequencies: dict = field(default_factory=dict)
     levels: list = field(default_factory=list)
     tap_margin: float = 0.0
@@ -434,4 +464,6 @@ def load_spec_set(base: str | Path) -> SpecSet:
             setattr(spec, {"cbl": "cables", "cpr": "couplers",
                            "atv": "actives", "tap": "taps"}[ext],
                     READERS[ext](data))
+            if ext == "atv":
+                spec.inline = read_inline(data)
     return spec

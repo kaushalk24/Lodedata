@@ -162,7 +162,7 @@ def test_typing_a_negative_coupler_swaps_the_legs_and_makes_a_branch(page):
     page.keyboard.press("Enter")
     page.wait_for_timeout(1000)
     cell = page.inner_text(f'#grid tbody tr:nth-child(1) td[data-c="{cplr}"]').strip()
-    assert cell.startswith("8-["), cell
+    assert cell.startswith("8-<"), cell      # a new branch has no footage yet
     assert "Branch 1 of 2" in page.inner_text("#stBranch")
     assert "through leg to this branch" in page.inner_text("#stMsg")
     assert not page.errors

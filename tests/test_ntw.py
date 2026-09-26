@@ -173,15 +173,15 @@ def test_the_node_shows_no_input_and_its_ports_the_node_output(screen):
 
 
 def test_tap_display_uses_the_tap_id_and_port_brackets(screen):
-    assert [r.taps for r in _rows(screen, 4)][26:] == [["[17]"], ["[11]"], ["/4/"]]
-    assert [t for r in _rows(screen, 3) for t in r.taps] == ["[20]", "/17/", "/14/", "/8/"]
+    assert [r.taps for r in _rows(screen, 4)][26:] == [["[17]"], ["[11]"], ["/ 4/"]]
+    assert [t for r in _rows(screen, 3) for t in r.taps] == ["[20]", "/17/", "/14/", "/ 8/"]
 
 
 def test_taps_out_of_the_system_levels_are_flagged_as_on_screen(screen):
     # branch 3: /14/ (lv 1, needs 19) and /8/ (lv 0, needs 17) are red on the
     # Design screen, and so is the 11.31 port output under the last one
     sev = {t: s for r in _rows(screen, 3) for t, s in zip(r.taps, r.tap_severity)}
-    assert sev == {"[20]": "", "/17/": "", "/14/": "red", "/8/": "red"}
+    assert sev == {"[20]": "", "/17/": "", "/14/": "red", "/ 8/": "red"}
     end = next(r for r in screen.rows if r.branch == 3 and r.end)
     assert [round(v, 2) for v in end.port_levels] == [11.31, 21.98, 32.12, 29.21]
     assert end.port_severity[0] == "red"
@@ -212,3 +212,90 @@ def test_each_supply_carries_its_area(screen):
     load = {r.supply_label: round(r.current, 2) for r in screen.rows if r.supply}
     assert set(load) == {"A", "B", "C"}
     assert abs(load["A"] - 8.60) <= 0.011
+
+
+# -------------------------------------------------- the branch screenshots
+# From Design screen screenshots of AL004 (branch 6, and the branch previews
+# the info box shows with the cursor on a coupler): 750, 54, 40, 5.
+SHOTS = {
+    6: [(23.89, 22.72, 31.75, 29.97), (46.76, 37.43, 21.46, 21.17),
+        (44.76, 36.94, 21.88, 21.32), (42.46, 36.36, 22.36, 21.49),
+        (40.77, 35.94, 22.71, 21.61), (37.31, 35.09, 23.43, 21.87),
+        (34.80, 34.03, 24.44, 22.94), (31.94, 33.32, 25.03, 23.15),
+        (30.73, 32.31, 39.23, 36.85), (26.93, 29.41, 42.13, 39.75)],
+    9: [(49.00, 38.00, 21.00, 21.00), (46.40, 36.60, 22.40, 22.60),
+        (41.96, 35.49, 23.33, 22.93), (39.99, 35.00, 23.74, 23.08),
+        (37.31, 34.33, 24.30, 23.28), (34.93, 33.73, 24.80, 23.45),
+        (32.71, 33.18, 25.27, 23.62), (30.65, 32.66, 25.70, 23.77),
+        (29.29, 32.32, 25.98, 23.87), (24.69, 31.17, 26.95, 24.21)],
+    11: [(41.23, 33.33, 25.58, 25.17), (36.99, 31.80, 27.01, 26.29),
+         (29.68, 27.69, 30.92, 29.86), (0.00, 0.00, 0.00, 0.00)],
+    18: [(-66.87, -73.29, 132.15, 131.67), (-66.87, -73.29, 132.15, 131.67)],
+    19: [(15.88, 9.46, 49.45, 49.17), (15.88, 9.46, 49.45, 49.17)],
+    21: [(39.23, 30.38, 28.57, 28.59), (37.73, 29.58, 29.37, 29.59)],
+    22: [(33.60, 25.20, 33.74, 33.42), (30.26, 23.69, 35.24, 34.85),
+         (23.85, 22.03, 36.64, 35.32), (49.00, 38.00, 21.00, 21.00),
+         (42.78, 33.53, 25.41, 25.00), (39.78, 32.13, 26.81, 26.50)],
+}
+# "Start / Levels" in the coupler preview: what leaves the coupler
+STARTS = {9: (49.00, 38.00, 21.00, 21.00), 11: (43.50, 33.90, 25.10, 25.00),
+          18: (-66.87, -73.29, 132.15, 131.67), 19: (15.88, 9.46, 49.45, 49.17),
+          21: (40.50, 30.70, 28.30, 28.50), 22: (33.60, 25.20, 33.74, 33.42)}
+
+
+@pytest.mark.parametrize("branch", sorted(SHOTS))
+def test_branch_levels_match_the_screenshots(screen, branch):
+    rows = [r for r in screen.rows if r.branch == branch]   # end line included
+    got = [tuple(round(r.levels[f], 2) for f in screen.frequencies) for r in rows]
+    if branch == 9:              # the preview box shows its first ten lines
+        got = got[:10]
+    assert got == SHOTS[branch]
+
+
+def test_coupler_preview_start_levels(screen):
+    meta = {b["number"]: b for b in screen.branches}
+    for branch, want in STARTS.items():
+        assert tuple(meta[branch]["start"]) == want, branch
+
+
+def test_in_line_q_device_and_the_pad_after_it(screen):
+    # 6.2 carries Q5 (EXIST SPLICE, 0 dB), 6.8 Q2 (LEQ-PEA-0) then the
+    # LEQ\RC PAD 13; the info box on that pad reads 26.54 26.82 39.23 36.85
+    rows = {r.node: r for r in screen.rows if r.branch == 6 and not r.end}
+    assert rows[2].amp == "Q5" and rows[8].amp == "Q2"
+    assert rows[8].taps == ["<43>"]
+    assert [round(v, 2) for v in rows[8].tap_levels[0]] == [26.54, 26.82, 39.23, 36.85]
+    end = next(r for r in screen.rows if r.branch == 6 and r.end)
+    assert [round(v, 2) for v in end.port_levels] == [21.63, 24.81, 46.73, 44.45]
+    assert end.port_severity[2] == "red"
+
+
+def test_fixed_nodes_carry_the_arrow(screen):
+    b4 = {r.node: r.fixed for r in screen.rows if r.branch == 4 and not r.end}
+    # every line but the two amplifiers shows "→" on the Design screen
+    assert [n for n, f in b4.items() if not f] == [13, 24]
+
+
+def test_amplifier_info_box(screen):
+    row = next(r for r in screen.rows if (r.branch, r.node) == (4, 13))
+    a = row.amp_info
+    assert (a["name"], a["type"]) == ("AL00416", "BRIDGER 750 MHz")
+    assert (a["fwd_pad"], a["ret_pad"]) == (4, 14)
+    assert (a["aerial_prev"], a["aerial_start"], a["total_split"],
+            a["total_prev"], a["total_start"]) == (2027, 2027, 1141, 2027, 2027)
+    assert (a["cascade"], a["supply"], a["homes_down"]) == (1, "A", 120)
+
+
+def test_power_supply_info(screen):
+    ps = next(r for r in screen.rows if (r.branch, r.node) == (18, 1))
+    assert (ps.supply_label, ps.supply_type, ps.supply_name) == ("A", 3, "EXISTING  90v")
+    assert ps.supply_pct == 57
+
+
+def test_coupler_column_matches_the_screen(screen):
+    # the coupler column of branch 4 as the Design screen shows it, and the
+    # first line of branch 9 as its preview box shows it
+    got = [c for r in _rows(screen, 4) for c in r.couplers]
+    assert got == ["12<6>", "100[9]", "3-<11><12>", "2[17]", "1<18>", "16<19>",
+                   "100[20]", "3[21]<24>", "8[22]"]
+    assert _rows(screen, 9)[0].couplers == ["108[10]"]

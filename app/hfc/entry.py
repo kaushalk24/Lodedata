@@ -14,8 +14,8 @@ than pick from a list.
                      8      a DC-8
                      -8     the same DC with its legs swapped: the through
                             (low loss) leg goes to the branch and the tap
-                            (high loss) leg carries on downstream
-                     --3    or "=3": through leg to the right-most branch
+                            (high loss) leg carries on downstream; "8-" too
+                     --3    or "=3", "3=": through leg to the right-most branch
                      0      clear the cell, removing the branch it created
 
     amp column       the Active ID from the spec set -- "61", "11H"; 0 clears it.
@@ -91,13 +91,18 @@ def resolve_coupler(lib: Library, code: str) -> tuple:
     if code in ("", "0"):
         return None, THROUGH_DOWNSTREAM
 
+    # the designation may come before or after the ID: "-8" or "8-",
+    # "--3", "=3", "3--" or "3="
     through = THROUGH_DOWNSTREAM
-    if code.startswith("--") or code.startswith("="):
+    head = re.match(r"^\s*([-=]*)\s*(.*?)\s*([-=]*)\s*$", code)
+    mark = head.group(1) + head.group(3)
+    code = head.group(2)
+    if mark in ("--", "="):
         through = THROUGH_SECOND
-        code = code.lstrip("-=").strip()
-    elif code.startswith("-"):
+    elif mark == "-":
         through = THROUGH_FIRST
-        code = code[1:].strip()
+    elif mark:
+        raise EntryError(f"'{mark}' is not a leg designation: use -, -- or =")
 
     if not re.fullmatch(r"\d+(?:\.\d+)?", code):
         raise EntryError(f"'{code}' is not a coupler ID")

@@ -56,10 +56,16 @@ function columns() {
     ];
   }
   if (S.mode === 'power') {
+    // the Power screen runs footage, houses, cable and level together as one
+    // "ftg-hc-cab-lv" column, then the power-stop separator
     return [
       { key: 'node', head: 'Node' },
       { key: 'volt', head: 'Volt' }, { key: 'current', head: 'Current' },
-      ...common,
+      { key: 'ftg', head: 'ftg-hc-cab-lv', span: 4, cls: 'j', edit: true },
+      { key: 'hc', head: '', cls: 'j', edit: true },
+      { key: 'cab', head: '', cls: 'j', edit: true },
+      { key: 'lv', head: '', cls: 'j', edit: true },
+      { key: 'stop', head: '', cls: 'stop' },
       { key: 'amp', head: 'amp', edit: true },
       { key: 'ampname', head: 'amp ID#', cls: 'l', edit: true },
       { key: 'supply', head: 'supply', edit: true },
@@ -72,6 +78,7 @@ function columns() {
   return [
     { key: 'node', head: 'Node' },
     ...lvl,
+    { key: 'fx', head: '', cls: 'fx' },          // "→" marks a fixed node
     ...common,
     { key: 'amp', head: 'amp', edit: true },
     { key: 'tsg', head: 'TSG', edit: true },
@@ -99,23 +106,32 @@ function cellText(r, c) {
   switch (c.key) {
     case 'branch': return r.branch;
     case 'node': return r.node;
-    case 'ftg': return r.ftg || (r.ftg === 0 ? '0' : '');
-    case 'hc': return r.hc || '';
-    case 'cab': return r.cab || (r.cab_name ? r.cab : '');
-    case 'lv': return r.lv || '';
-    // in Design mode the amplifier's name runs on from the amp column
-    case 'tsg': return (S.mode === 'design' && r.amp_label) ? r.amp_label : (r.tsg || '');
+    case 'ftg': return (r.ftg || (r.ftg === 0 ? '0' : '')) + (S.mode === 'power' ? '|' : '');
+    case 'hc': return (r.hc || '') + (S.mode === 'power' ? '|' : '');
+    case 'cab': return (r.cab || (r.cab_name ? r.cab : '')) + (S.mode === 'power' ? '|' : '');
+    case 'lv': return (r.lv || '') + (S.mode === 'power' ? '|' : '');
+    case 'tsg': return r.tsg || '';
     case 'amp': return r.amp || '';
     case 'ampname': return r.amp_label ? `[${r.amp_label}]` : (r.amp_name || '');
     case 'map': return r.map || '';
     case 'loc': return r.loc || '';
-    case 'supply': return r.supply ? (r.supply_label || String(r.supply)) : '';
-    case 'supplypct': return r.supply_pct != null ? String(r.supply_pct) : '';
+    // "A" then the supply type and its load, as "\03  57%", run across
+    case 'supply': return r.supply
+      ? `${(r.supply_label || '').padEnd(12)}\\${String(r.supply_type || 0).padStart(2, '0')}` +
+        (r.supply_pct != null ? `  ${r.supply_pct}%` : '')
+      : '';
+    case 'supplypct': return '';
     case 'niu': return r.volts === null ? '' : 'Y';
+    case 'fx': return r.fixed ? '\u2192' : '';
+    case 'stop': return S.mode === 'power' ? (r.power_stop ? '=' : '|') : '';
     case 'volt': return r.volts === null ? '' : r.volts.toFixed(2);
     case 'current': return r.current ? r.current.toFixed(2) : '0.00';
-    case 'tap0': case 'tap1': case 'tap2': case 'tap3':
-      return r.taps[+c.key.slice(3)] || '';
+    case 'tap0': case 'tap1': case 'tap2': case 'tap3': {
+      // in Design mode an amplifier's name runs on from the tap1 column
+      const k = +c.key.slice(3);
+      if (k === 0 && S.mode === 'design' && r.amp_label && !r.taps.length) return r.amp_label;
+      return r.taps[k] || '';
+    }
     case 'cplr0': case 'cplr1':
       return r.couplers[+c.key.slice(4)] || '';
   }
@@ -127,8 +143,13 @@ function renderGrid() {
   const cols = columns();
   const rows = pageRows();
   const thead = $('#grid thead'), tbody = $('#grid tbody');
+  let skip = 0;
   thead.innerHTML = '<tr><th class="gutter"></th>' +
-    cols.map(c => `<th class="${c.cls || ''}">${esc(c.head)}</th>`).join('') +
+    cols.map(c => {
+      if (skip) { skip--; return ''; }
+      if (c.span) { skip = c.span - 1; return `<th class="${c.cls || ''}" colspan="${c.span}">${esc(c.head)}</th>`; }
+      return `<th class="${c.cls || ''}">${esc(c.head)}</th>`;
+    }).join('') +
     '<th class="l"></th></tr>';
 
   if (!S.net) { tbody.innerHTML = ''; return; }
@@ -155,7 +176,8 @@ function renderGrid() {
       let extra = '';
       if (c.key === 'cab' && r.cab >= 100) extra = ' series1';
       if (c.key === 'ampname') extra = ' amp';
-      if (c.key === 'tsg' && S.mode === 'design' && r.amp_label) extra = ' amp spill';
+      if (c.key === 'tap0' && S.mode === 'design' && r.amp_label && !r.taps.length) extra = ' amp spill';
+      if (c.key === 'supply' && r.supply) extra = ' spill';
       if (/^tap\d$/.test(c.key)) {
         const k = +c.key.slice(3);
         const sev = r.end ? (r.port_severity || [])[k] : (r.tap_severity || [])[k];
@@ -175,30 +197,111 @@ function renderGrid() {
   renderInfo();
 }
 
-function renderInfo() {
-  const r = pageRows()[S.row] || null;
-  const box = $('#info');
-  if (!r) { box.textContent = ''; return; }
+// The info box follows the cursor's column, as the program's does: a tap
+// shows its port levels, a coupler previews the branch it feeds, an
+// amplifier its definition, a power supply its type.
+const PREVIEW_TAP = { 2: '()', 4: '[]', 6: '<>', 8: '{}' };
+const f2 = v => (v === undefined || v === null) ? '' : Number(v).toFixed(2);
+const pad = (v, n) => String(v).padStart(n);
+
+function infoTap(r, k) {
+  const part = (r.tap_parts || [])[k] || '';
+  const lv = r.tap_levels ? r.tap_levels[k] : null;
+  const fq = (S.scr && S.scr.frequencies) || [];
+  if (!lv) return `${r.branch}.${r.node}\nTap Type:  ${part}`;
+  return `${r.branch}.${r.node}\nTap Type:            ${part.replace(/ \(.*$/, '')}\n\n` +
+    `Frequency\n  Forward\n` +
+    `${pad(fq[0], 8)}: ${pad(f2(lv[0]), 7)}\n${pad(fq[1], 8)}: ${pad(f2(lv[1]), 7)}\n\n` +
+    `  Return\n${pad(fq[2], 8)}: ${pad(f2(lv[2]), 7)}\n${pad(fq[3], 8)}: ${pad(f2(lv[3]), 7)}\n\n` +
+    `<double-click or [.][ENTER] to edit branches>`;
+}
+
+function infoBranch(r, k) {
+  const text = (r.couplers || [])[k] || '';
+  const nums = [...text.matchAll(/[\[<({](\d+)[\]>)}]/g)].map(m => +m[1]);
+  if (!nums.length) return null;
+  const fq = (S.scr && S.scr.frequencies) || [];
+  const out = [];
+  for (const b of nums) {
+    const m = branchMeta(b) || {};
+    const rows = S.scr.rows.filter(x => x.branch === b);
+    out.push(`${r.branch}.${r.node}\n${m.coupler || ''}\nFeeds Branch: ${b}\n` +
+      `Start   ${fq.map(f => pad(f, 7)).join(' ')}\n` +
+      `Levels  ${(m.start || []).map(v => pad(f2(v), 7)).join(' ')}\n` + '-'.repeat(96) + '\n' +
+      `Node ${fq.map(f => pad(f, 7)).join(' ')}   ftg  hc cab lv amp  tap1 tap2 tap3 tap4   cplr[Br]   cplr[Br]\n` +
+      rows.map(x => {
+        const lv = x.levels.map(v => pad(f2(v), 7)).join(' ');
+        if (x.end) return `     ${lv}`;
+        const taps = [0, 1, 2, 3].map(i => {
+          const t = (x.taps || [])[i];
+          if (!t) return '     ';
+          const br = PREVIEW_TAP[(x.tap_ports || [])[i]] || '[]';
+          return pad(br[0] + t.replace(/[\/\[\]<>{}()]/g, '').trim() + br[1], 5);
+        }).join('');
+        return `${pad(x.node, 4)} ${lv} ${pad(x.ftg, 5)} ${pad(x.hc, 3)} ${pad(x.cab, 3)} ${pad(x.lv, 2)} ` +
+          `${pad(x.amp || '', 4)} ${taps} ${pad((x.couplers || [])[0] || '', 10)} ${pad((x.couplers || [])[1] || '', 10)}`;
+      }).join('\n') + '\n<double-click or [.][LT] or [.][RT] to enter branch>');
+  }
+  return out.join('\n\n');
+}
+
+function infoSupply(r) {
+  return `${r.branch}.${r.node}\n\n\nPower Supply Information\n` +
+    `Power Supply:${' '.repeat(30)}${r.supply_label || ''}\n` +
+    `PS Type:${' '.repeat(35)}${r.supply_name || ''}`;
+}
+
+function infoAmp(r) {
+  const a = r.amp_info || {};
+  const line = (label, v) => `${label.padEnd(36)}${v === undefined || v === null ? '' : v}\n`;
+  return `${r.branch}.${r.node}\n` +
+    line('Amp Name:', a.name) + line('Amp Type:', a.type || r.amp_name) +
+    line('Forward Pad:', a.fwd_pad) + line('Forward Eq:', a.fwd_eq === undefined ? '' : '#' + a.fwd_eq) +
+    line('Return Pad:', a.ret_pad) + line('Return Eq:', a.ret_eq === undefined ? '' : '#' + a.ret_eq) +
+    line('Aerial Dist to Previous Active:', a.aerial_prev) +
+    line('Aerial Dist to Start of Network:', a.aerial_start) +
+    line('Tot Dist to Previous Act-split:', a.total_split) +
+    line('Total Dist to Previous Active:', a.total_prev) +
+    line('Total Dist to Start of Network:', a.total_start) +
+    line('Cascade Position:', a.cascade) + line('Power Supply:', a.supply) +
+    line('Housecounts downstream:', a.homes_down);
+}
+
+function infoNode(r) {
   const t = (S.scr && S.scr.totals) || {};
-  box.textContent =
-    `${r.branch}.${r.node}\n` +
+  return `${r.branch}.${r.node}\n` +
     `${r.address || 'No Address'}\n` +
     `${r.cab_name || 'no cable'}\n` +
-    (r.tap_parts && r.tap_parts.length
-      ? `Taps: ${r.tap_parts.join(', ')}\n` : '') +
-    (r.coupler_parts && r.coupler_parts.length
-      ? `Coupler: ${r.coupler_parts.join(', ')}\n` : '') +
     `Distance from previous node:   ${r.ftg}\n` +
     `Total distance to start:       ${r.cumulative_ft}\n` +
     `Housecounts this node:         ${r.hc}\n` +
-    `Voltage / current:             ${r.volts === null ? '-' : r.volts.toFixed(1)} V  ${r.current.toFixed(2)} A\n` +
+    (r.volts === null ? '' : `Voltage / current:             ${r.volts.toFixed(2)} V  ${r.current.toFixed(2)} A\n`) +
     (r.flags.length ? r.flags.map(f => `! ${f.message}`).join('\n') + '\n' : '') +
-    `\nnodes ${t.nodes || 0}  taps ${t.taps || 0}  actives ${t.actives || 0}  ` +
+    `\n<double-click or [.][ENTER] to edit address>` +
+    `\n\nnodes ${t.nodes || 0}  taps ${t.taps || 0}  actives ${t.actives || 0}  ` +
     `homes ${t.homes || 0}  ${t.footage || 0} ft`;
+}
+
+function renderInfo() {
+  const r = pageRows()[S.row] || null;
+  const box = $('#info');
+  if (!r || r.end) { box.textContent = ''; }
+  else {
+    const c = curCol() || { key: '' };
+    let text = null;
+    if (/^tap\d$/.test(c.key) && (r.taps || [])[+c.key.slice(3)]) text = infoTap(r, +c.key.slice(3));
+    else if (/^cplr\d$/.test(c.key)) text = r.supply ? infoSupply(r) : infoBranch(r, +c.key.slice(4));
+    else if ((c.key === 'amp' || c.key === 'ampname' || c.key === 'tsg') && r.amp_info && r.amp_info.type) text = infoAmp(r);
+    else if (c.key === 'supply' && r.supply) text = infoSupply(r);
+    box.textContent = text || infoNode(r);
+  }
+  const total = (S.scr && S.scr.branches.length) || 1;
+  $('#stBranch').textContent = `Branch ${S.branch} of ${total}`;
+  $('#stFeeder').textContent = 'Feeder 1.1';
   const m = branchMeta(S.branch);
-  $('#stBranch').textContent =
-    `Branch ${m ? m.position : 1} of ${(S.scr && S.scr.branches.length) || 1}`;
-  $('#stFeeder').textContent = `Feeder ${r.branch}.${r.node}`;
+  const starting = m && m.parent_branch ? ` Starting ${m.parent_branch}.${m.parent_node}` : '';
+  const mode = { design: 'Design', entry: 'Entry', power: 'Power' }[S.mode];
+  $('#title').textContent = `Design Assistant - ${mode} - ${S.net ? S.net.name : ''}${starting}`;
 }
 
 // ---------------------------------------------------------------- screen menu
@@ -253,6 +356,7 @@ function renderMenu() {
     if (fn) fn(); else msg(`${el.textContent.trim()} is not implemented yet`);
   });
   document.body.className = 'mode-' + S.mode;
+  $$('.tbset').forEach(t => { t.hidden = !t.dataset.modes.split(' ').includes(S.mode); });
   $('#app').className = 'mode-' + S.mode;
 }
 
@@ -1024,7 +1128,8 @@ async function doRefresh() {
 }
 async function reload() {
   S.net = await api(`/api/networks/${S.nid}`);
-  $('#stSpecs').textContent = S.net.library.name || 'no spec file attached';
+  const sn = S.net.library.name;
+  $('#stSpecs').textContent = sn ? `${sn} : ${sn} : ${sn} : ${sn} : ${sn} : Untitled` : 'no spec file attached';
   await refresh();
 }
 async function open(id) {

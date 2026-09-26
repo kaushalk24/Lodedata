@@ -42,6 +42,13 @@ N_PREV, N_NEXT, N_FTG = 4, 8, 12
 N_TAPS, TAP_SLOT, TAP_SLOTS = 14, 21, 4
 N_BRANCH_A, N_BRANCH_B = 98, 102
 N_AMP_INDEX, N_AMP_INDEX2 = 106, 107
+# The amp column holds either an active -- both bytes the actives index -- or
+# an in-line device from the Actives file's Bridgers/Feedermakers/Inline Eqs
+# page, shown as Q1, Q2 ...: then the first byte is 80 - n and the second
+# 24 - n.  Seen in all five sample designs (Q1 = 79/23, Q2 = 78/22,
+# Q5 = 75/19); on AL004 Q2 costs exactly LEQ-PEA-0's losses.
+INLINE_BASE, INLINE_BASE2 = 80, 24
+N_FIXED = 128                # the node is fixed (locked): drawn as an arrow
 N_PADS = 112                 # four (flag, value, 0) triples
 N_PS_TYPE = 135
 N_POWER_STOP = 133
@@ -74,7 +81,8 @@ class NtwNode:
     taps: list = field(default_factory=list)          # NtwTap
     branches: list = field(default_factory=list)      # branch numbers started here
     active_index: int = 0     # actives table index, 0 = none
-    inline_index: int = 0     # a non-active device in the amp column (EQ / Q)
+    inline: int = 0           # in-line device Qn in the amp column, 0 = none
+    fixed: bool = False       # locked against the semi-automatic design commands
     label: str = ""           # Amplifier Definition name
     pads: list = field(default_factory=list)          # fwd pad, ret pad, fwd EQ, ret EQ
     supply: str = ""          # power supply label, "" = none
@@ -152,16 +160,18 @@ def _node(r: _Reader, p: int) -> NtwNode:
             n.taps.append(NtwTap(row=row, ports=PORTS_BY_CODE.get(r.u8(s + 4), 4)))
     n.branches = [b for b in (r.u32(p + N_BRANCH_A), r.u32(p + N_BRANCH_B)) if b]
     n.power_stop = bool(r.u8(p + N_POWER_STOP))
-    idx = r.u8(p + N_AMP_INDEX)
-    if r.u8(p + N_HAS_ACTIVE):
+    n.fixed = bool(r.u8(p + N_FIXED))
+    idx, idx2 = r.u8(p + N_AMP_INDEX), r.u8(p + N_AMP_INDEX2)
+    if idx and idx2 == idx - (INLINE_BASE - INLINE_BASE2):
+        n.inline = INLINE_BASE - idx
+    elif idx:
         n.active_index = idx
-        n.label = _text(r.d[p + N_LABEL:p + N_LABEL + 16])
         n.pads = [r.u8(p + N_PADS + 3 * k + 1) for k in range(4)]
+    if r.u8(p + N_HAS_ACTIVE):
+        n.label = _text(r.d[p + N_LABEL:p + N_LABEL + 16])
         if r.u8(p + N_PS_NAME):
             n.supply = _text(r.d[p + N_PS_NAME:p + N_PS_NAME + 1]) or "PS"
             n.supply_type = r.u8(p + N_PS_TYPE)
-    elif idx:
-        n.inline_index = idx
     return n
 
 

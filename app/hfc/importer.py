@@ -26,7 +26,7 @@ from dataclasses import asdict
 from lodedata.network import read_network                  # noqa: E402
 
 from .model import (Library, CableType, TapType, PassiveType, ActiveType,
-                    PowerSupplyType, DesignParameters, new_id)
+                    PowerSupplyType, InlineType, DesignParameters, new_id)
 from .plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
                     THROUGH_FIRST, THROUGH_SECOND)
 
@@ -210,6 +210,13 @@ def library_from_spec_set(base: str | Path,
             source=f"lodedata:{base.name}.atv",
         ))
 
+    for q in spec.inline:
+        lib.add(InlineType(
+            id=new_id("inl"), name=q.name, number=q.number,
+            losses=[[params.forward_high_mhz, q.losses[0]], [params.forward_low_mhz, q.losses[1]],
+                    [params.return_high_mhz, q.losses[2]], [params.return_low_mhz, q.losses[3]]],
+            source=f"lodedata:{base.name}.atv"))
+
     for sup in spec.supplies:
         lib.add(PowerSupplyType(
             id=new_id("psu"), name=sup.name, volts=sup.volts, amps=sup.amps,
@@ -238,6 +245,7 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
     actives = {a.index: a for a in lib.actives.values()}
     cables = {c.cable_index: c for c in lib.cables.values()}
     supplies = {s.type_id: s for s in lib.power_supplies.values()}
+    inline = {q.number: q for q in lib.inline.values()}
 
     report = {"network": net.name, "saved_with": net.spec_names[0] if net.spec_names else "",
               "spec_set": Path(spec_base).name, "branches": len(net.branches),
@@ -258,7 +266,15 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
         br = Branch(number=number, parent_branch=pb, parent_node=pn)
         for i, nn in enumerate(nb.nodes, start=1):
             node = Node(seq=i, ftg=float(nn.ftg), hc=nn.hc, cab=nn.cable, lv=nn.lv,
-                        power_stop=nn.power_stop, amp_label=nn.label, pads=list(nn.pads))
+                        power_stop=nn.power_stop, amp_label=nn.label, pads=list(nn.pads),
+                        fixed=nn.fixed)
+            if nn.inline:
+                q = inline.get(nn.inline)
+                node.inline = nn.inline
+                if q:
+                    node.inline_part = q.id
+                else:
+                    miss(f"{number}.{i}: in-line device Q{nn.inline}")
             if nn.cable:
                 cable = cables.get(nn.cable % 100)
                 if cable:

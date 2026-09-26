@@ -341,8 +341,22 @@ An earlier reading used 908-byte records at 512 with the 8-port part at +16.
 It lined up for 2/4-port parts on even rows only, skipped every odd row and
 paired each 8-port part with the row before it. Corrected here.
 
+On the Design screen a 6-port-slot part (WV750's LEQ\RC pads) is drawn `<43>`;
+the branch preview in the info box draws 2-port `(n)`, 4-port `[n]`, 8-port
+`{n}`.
+
 WV750's six tap families (Tap IDs): MGT 4–24, LEQ\RC pads 30–45 (6-port slot),
 AN-WIFI 104–124, RMT1 204–235, RMT2 404–426.
+
+### 3.4b `.atv` in-line devices (Q1, Q2 …)
+
+The Actives file's Bridgers/Feedermakers/Inline Eqs page: 69-byte records from
+offset 169372 (the file is a fixed 273200 bytes), record n = Qn. Name, then at
++29 the losses at the four design columns F1, F2, R1, R2. WV750: Q1 LEQ-PEA-8,
+Q2 LEQ-PEA-0 (1.2 / 1.0 / 1.2 / 0.7), Q3 FFE-8-120-85/RP-R, Q5 EXIST SPLICE,
+Q6 NEW SPLICE, Q10–Q13 REMOVE/MOVE LE/BR markers. Placed in the amp column the
+device's loss applies before the node's taps; on AL004 6.8 that gives exactly
+the screen's 30.73 / 32.31 / 39.23 / 36.85 on 6.9.
 
 ### 3.5 `.par` — system design parameters
 
@@ -393,14 +407,15 @@ Node record, offsets from its id:
 | 12 | u16 footage |
 | 14 + 21·k | tap slot k (0–3): i32 tap-file row (−1 empty), u8 port code |
 | 98, 102 | u32 branch started here, first and second coupler column |
-| 106 | u8 amp column: actives index when +701 is set, otherwise an in-line device |
+| 106, 107 | amp column: an active when both bytes are the actives index; an in-line device Qn when they are 80−n and 24−n (Q1 = 79/23, Q2 = 78/22, Q5 = 75/19) |
 | 112 + 3·k | forward pad, return pad, forward EQ, return EQ (amps only) |
+| 128 | u8 fixed (locked) — drawn as `→` left of the footage |
 | 129 | u8 house count |
 | 130 | u16 cable ID as displayed (series·100 + cable file index) |
 | 132 | u8 lv (System Levels row) |
 | 133 | u8 power stop in the span leading to this node |
 | 135 | u8 power supply type (Parameters file) |
-| 701 | u8 active present — the record is then 2504 bytes |
+| 701 | u8 extended record (actives and power supplies) — the record is then 2504 bytes |
 | 726 | power supply label (`A`) |
 | 981 | Amplifier Definition name (`AL00416`) |
 

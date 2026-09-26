@@ -31,8 +31,10 @@ BRANCH_BRACKETS = {
     BRANCH_FORWARDFEED: "<>",
 }
 
-# a tap is drawn in the bracket style of its port count
-TAP_BRACKETS = {2: "//", 4: "[]", 6: "{}", 8: "<>"}
+# A tap is drawn in the bracket style of its port count.  The manual gives
+# 6-port as {n}; AL004's Design screen shows the 6-port-slot LEQ\RC pad as
+# <43>, and 8-port as <n> is what the program's users know.
+TAP_BRACKETS = {2: "//", 4: "[]", 6: "<>", 8: "<>"}
 
 
 def bracket(text: str, style: str) -> str:
@@ -80,6 +82,9 @@ class Node:
     amp_part: str | None = None
     amp_label: str = ""         # from the Amplifier Definition window
     pads: list = field(default_factory=list)   # fwd pad, ret pad, fwd EQ, ret EQ as stored
+    inline: int = 0             # an in-line device Qn in the amp column, 0 = none
+    inline_part: str | None = None
+    fixed: bool = False         # locked: the design commands leave it alone (drawn "→")
     taps: list = field(default_factory=list)      # up to 4 TapPlacement
     couplers: list = field(default_factory=list)  # up to 2 CouplerPlacement
     through_leg: int = THROUGH_DOWNSTREAM

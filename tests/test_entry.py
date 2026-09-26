@@ -79,6 +79,9 @@ def test_a_bad_port_count_is_rejected():
     ("-8", "RLDC-8-15A", THROUGH_FIRST),
     ("--3", "RLS10-3-15A", THROUGH_SECOND),
     ("=3", "RLS10-3-15A", THROUGH_SECOND),
+    ("8-", "RLDC-8-15A", THROUGH_FIRST),       # as keyed in the program
+    ("3=", "RLS10-3-15A", THROUGH_SECOND),
+    ("3--", "RLS10-3-15A", THROUGH_SECOND),
 ])
 def test_typing_a_coupler_id_finds_it_and_reads_the_leg_designation(code, name, through):
     lib = library_from_spec_set(WVBECK)
@@ -148,5 +151,16 @@ def test_swapping_the_legs_moves_the_loss_between_the_paths():
 
 
 def test_the_screen_shows_the_leg_designation():
-    assert build(_design_with_dc(THROUGH_DOWNSTREAM)).rows[0].couplers[0] == "8[2]"
-    assert build(_design_with_dc(THROUGH_FIRST)).rows[0].couplers[0] == "8-[2]"
+    # a new branch has no footage yet, so it is drawn <2>, as AL004 draws its
+    # empty branches (16<19>, 3[21]<24>)
+    assert build(_design_with_dc(THROUGH_DOWNSTREAM)).rows[0].couplers[0] == "8<2>"
+    assert build(_design_with_dc(THROUGH_FIRST)).rows[0].couplers[0] == "8-<2>"
+
+
+def test_a_branch_with_mileage_footage_is_drawn_square():
+    d = _design_with_dc(THROUGH_DOWNSTREAM)
+    child = d.branches[2]
+    child.nodes[0].ftg, child.nodes[0].cab = 120, 410      # series 4: mileage
+    assert build(d).rows[0].couplers[0] == "8[2]"
+    child.nodes[0].cab = 110                               # series 1: parallel
+    assert build(d).rows[0].couplers[0] == "8<2>"

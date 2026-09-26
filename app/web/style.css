@@ -112,3 +112,13 @@ body.nogrid table.grid td{border-color:transparent}
 .ps-row span{font-size:12px;color:#222}
 .ps-row input{font-size:12px}
 .ps-note{font-size:12px}
+
+/* the fixed-node arrow, between the levels and the footage */
+table.grid td.fx,table.grid th.fx{width:14px;padding:0 2px;text-align:center;color:var(--green)}
+/* Power: ftg-hc-cab-lv run together, then the power-stop separator */
+table.grid td.j{border-right-color:transparent;padding:0 1px}
+table.grid th.j{text-align:center}
+table.grid td.stop{width:10px;padding:0 2px;text-align:center}
+table.grid td.spill{white-space:pre}
+.tbset[hidden]{display:none}
+.tbset{display:inline-flex;gap:6px;align-items:center}

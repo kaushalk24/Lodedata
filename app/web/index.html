@@ -21,9 +21,18 @@
     <button class="tb" id="tbInsert" title="Insert node">✚</button>
     <button class="tb" id="tbDelete" title="Delete node">━</button>
     <span class="sep"></span>
-    <label class="sel">EQ <select id="selEQ"><option>Auto</option><option>EQ+</option><option>EQ-</option><option>EQe</option></select></label>
-    <label class="sel">OP <select id="selOP"><option>Off</option><option>OP+</option><option>OPf</option></select></label>
+    <!-- Design mode: EQ placement, optimization, deviation, tap selection group -->
+    <span class="tbset" data-modes="design">
+    <label class="sel">EQ <select id="selEQ"><option>Manual</option><option selected>Auto</option><option>Auto Ex</option></select></label>
+    <label class="sel">OP <select id="selOP"><option>Off</option><option>On Fail</option><option>On</option></select></label>
+    <label class="sel">DEV <select id="selDEV"><option>Total Dev.</option><option>Fwd Dev.</option><option>Rtn Dev.</option></select></label>
     <label class="sel">TSG <select id="selTSG"><option>1</option><option>2</option><option>3</option></select></label>
+    </span>
+    <!-- Power mode: carrying a power supply, carrying a line extender -->
+    <span class="tbset" data-modes="power" hidden>
+    <label class="sel">PS <select id="selPS"><option>Off</option><option>On</option></select></label>
+    <label class="sel">LE <select id="selLE"><option>Off</option><option>On</option></select></label>
+    </span>
     <span class="spacer"></span>
     <label class="sel">Network <select id="selNet"></select></label>
     <label class="sel">Mode <select id="selMode">
