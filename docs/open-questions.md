@@ -81,6 +81,7 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    it on many more nodes.
 10. **Parameters — mapped.** Every setting on the six tabs is located and
     read (file-formats 3.5), proven by the test copy and two save chains.
-    Only transformer part numbers are not reliably in the file. Still to
+    Transformer 1's first letter is lost in the file itself: it shares a
+    byte with the 900 Series flag. Still to
     confirm: does Strand/Trench Types decide `<n>` for 5xx cable as it does
     for 1xx? (No AL004 branch runs on 5xx alone.)

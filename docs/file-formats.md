@@ -416,8 +416,7 @@ whole table that matches row for row.
 | 3909 | u8 Max. Tap Cascade | 0 | proven (test copy: 6) |
 | 3911 | u8 Allow Over Equalization | 1 (KERMIT 0) | proven (test copy: unticked → 0) |
 | 3912–3915 | u8 Strand/Trench Types 600, 700, 800, 900 Series | 0 0 0 0 | proven (chains s4, v2–v4) |
-| 3916 | `FMR-T1 60.5` — transformer 1 as typed, without its first letter | blank | the names are not reliably here: see below |
-| 4171 + 260·k | Transformer k+1 voltage, i32 ×1e6 (unaligned), 8 slots | 0 | proven (60.5, 70.25, 80.75 for 1–3) |
+| 3915 + 260·k | Transformer k+1, 8 records of 260 bytes: char[256] part number, then i32 ×1e6 voltage (at 4171, 4431, 4691 …) | blank | proven (v7, v10: FMR-T1 60.5, ABC-2 70.25, DEF-3 80.75) |
 | 6000 | u8 Enforce Tap Tilt | 0 | proven (chain v5) |
 | 6001 | u8 Flag Hi/Lo Tilt | 0 | proven (save chain s8) |
 | 6002 + 16·lv | System Levels Max Tilt Fwd, Min Tilt Fwd, Max Tilt Ret, Min Tilt Ret | 0 | proven (test copy level 0: 1.10 2.20 3.30 4.40) |
@@ -437,11 +436,13 @@ user ids into the header.
 A second chain from s8 (`v1.par` … `v9.par`) placed everything else on the
 six tabs. Every setting on them is now located.
 
-**Transformer part numbers are the one thing the .par does not hold
-reliably.** Transformer 2 and 3's names (ABC-2, DEF-3) were saved nowhere in
-the file, and the user found them gone on reopening while all three voltages
-survived; transformer 1 shows as XFMR-T1 though the file holds `FMR-T1`.
-The program may keep them elsewhere.
+**Transformer 1's first letter is lost.** Its part number starts on byte
+3915, which is also the 900 Series flag, so saving overwrites the letter
+with 0 or 1: typed `XFMR-T1`, the file holds `\x01FMR-T1` (900 ticked). The
+reader takes slot 1's name from 3916. After a name the rest of the field can
+hold leftovers (` 60.5`), so names end at the first NUL. The first time the
+user typed transformers 2 and 3 only their voltages were saved; typed again
+(v10) the names were saved too.
 
 Bytes that no tab shows and that no setting tried has changed, the same in
 every file: 1054–1055 (32, 32); 1082 (12, 16, 16, 16 — equal to the four

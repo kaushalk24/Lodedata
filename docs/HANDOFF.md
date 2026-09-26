@@ -36,7 +36,7 @@ The user is a Lode Data designer. What they want:
   * `samples/AL004-WV750/WV750-2026.{par,atv,tap,cpr,cbl}` — the user's
     `aloo4_apec.zip`
   * optionally `samples/partest/paratest.par`, `s1.par` … `s8.par` and
-    `v1.par` … `v9.par`: the user's test copy of the .par and two chains of
+    `v1.par` … `v10.par`: the user's test copy of the .par and two chains of
     saves changing one setting each
   * optionally the older `samples/KERMIT750-2026.*`, `samples/WVBeck750.*` and
     `samples/AL00{2,3,4,5}.ntw` from the earlier OneDrive zips

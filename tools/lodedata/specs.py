@@ -435,7 +435,10 @@ PAR_EQ_SELECTION = 3892         # u16 x4: Fwd High, Fwd Low (index into F1-F6), 
 PAR_ENFORCE_TAP_WINDOW = 3904   # u8
 PAR_MAX_TAP_CASCADE = 3909      # u8
 PAR_OVER_EQUALIZATION = 3911    # u8, 1 = Allow Over Equalization ticked
-PAR_TRANSFORMER_VOLTS, PAR_TRANSFORMER_STRIDE = 4171, 260   # i32 x8, unaligned
+# Transformers 1-8: 260-byte records, char[256] part number then i32 volts.
+# Slot 1's name starts on 3915, the 900 Series flag's byte, so its first
+# letter is lost when the file is saved (XFMR-T1 is stored as FMR-T1).
+PAR_TRANSFORMERS, PAR_TRANSFORMER_STRIDE, PAR_TRANSFORMER_VOLTS = 3915, 260, 256
 PAR_ENFORCE_TAP_TILT = 6000     # u8
 PAR_FLAG_TILT = 6001            # u8 Flag Hi/Lo Tilt
 PAR_TILTS, PAR_TILT_STRIDE = 6002, 16   # Max/Min Tilt Fwd, Max/Min Tilt Ret per level
@@ -492,8 +495,12 @@ def read_parameters(data: bytes) -> dict:
         "pre_load": len(data) > PAR_PRE_LOAD and bool(data[PAR_PRE_LOAD]),
         "eq_selection": {"fwd_high": fwd[eq_sel[0] % 6], "fwd_low": fwd[eq_sel[1] % 6],
                          "ret_high": ret[eq_sel[2] % 4], "ret_low": ret[eq_sel[3] % 4]},
-        # names are not reliably in the .par (see docs/file-formats.md 3.5)
-        "transformer_volts": [fx(PAR_TRANSFORMER_VOLTS + PAR_TRANSFORMER_STRIDE * k) for k in range(8)],
+        "transformers": [t for t in (
+            {"id": k + 1,
+             "part": _name(data[PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + (k == 0):
+                                PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + PAR_TRANSFORMER_VOLTS]),
+             "volts": fx(PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + PAR_TRANSFORMER_VOLTS)}
+            for k in range(8)) if t["part"] or t["volts"]],
         "flag_hi_lo_tilt": bool(data[PAR_FLAG_TILT]),
         "power_interpolation": INTERPOLATION.get(data[PAR_INTERPOLATION], "constant_wattage"),
         "max_amps_through": {k: fx(PAR_MAX_AMPS + 4 * i) for i, k in enumerate(MAX_AMPS_THROUGH)},

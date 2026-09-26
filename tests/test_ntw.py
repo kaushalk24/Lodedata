@@ -238,7 +238,7 @@ V_CHAIN = [
     {"strand_series": ([0, 2, 3, 4, 6, 7], [0, 2, 3, 4, 6, 7, 9])},
     {"enforce_tap_tilt": (False, True)},
     {"pre_load": (False, True)},
-    {"extra_levels": None, "transformer_volts": None},
+    {"extra_levels": None, "transformers": None},
     {"eq_selection": ({"fwd_high": "750", "fwd_low": "54", "ret_high": "40", "ret_low": "5"},
                       {"fwd_high": "54", "fwd_low": "750", "ret_high": "40", "ret_low": "5"})},
     {"eq_selection": ({"fwd_high": "54", "fwd_low": "750", "ret_high": "40", "ret_low": "5"},
@@ -246,7 +246,7 @@ V_CHAIN = [
 ]
 
 
-@pytest.mark.skipif(not (PARTEST.parent / "v9.par").exists(), reason="the user's second save chain")
+@pytest.mark.skipif(not (PARTEST.parent / "v10.par").exists(), reason="the user's second save chain")
 def test_the_second_save_chain_places_the_rest():
     before = read_parameters((PARTEST.parent / "s8.par").read_bytes())
     for k, want in enumerate(V_CHAIN, start=1):
@@ -258,7 +258,15 @@ def test_the_second_save_chain_places_the_rest():
         before = after
     # v7: level 0 Min F3..F6, Max R3, R4 and transformers 1-3
     assert before["extra_levels"][0] == [15.0, 1.25, 2.25, 3.35, 4.25, 5.25]
-    assert before["transformer_volts"][:4] == [60.5, 70.25, 80.75, 0.0]
+    # the names of 2 and 3 were not saved the first time, only the voltages
+    assert [(t["part"], t["volts"]) for t in before["transformers"]] == \
+        [("FMR-T1", 60.5), ("", 70.25), ("", 80.75)]
+    # v10: the user typed them again and saved.  Transformer 1 was typed
+    # XFMR-T1; its first letter shares byte 3915 with the 900 Series flag
+    v10 = read_parameters((PARTEST.parent / "v10.par").read_bytes())
+    assert [(t["part"], t["volts"]) for t in v10["transformers"]] == \
+        [("FMR-T1", 60.5), ("ABC-2", 70.25), ("DEF-3", 80.75)]
+    assert [f for f in v10 if v10[f] != before[f]] == ["transformers"]
 
 
 # ------------------------------------------------------------ calculations
