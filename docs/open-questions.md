@@ -165,8 +165,9 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    * `Insert` adds a 0-ft line above the cursor's, `. Insert` one below;
      every press adds another, the cursor staying on its line. A new line
      takes the cable of the line above it.
-   Still open: the Feedermaker Networks box in Amplifier Definition (Net
-   1–4, Enter…/Delete) is not drawn. The replica's own choices where
+   The Feedermaker Networks box in Amplifier Definition (Net 1–4,
+   Enter…/Delete) is left out: the user does not use it. The replica's own
+   choices where
    nothing says: `+`/`-` step the last run of digits; the name remembered
    is the last one accepted; "Amp Exists" quotes the name as typed; a line
    inserted above a branch's first takes the coupler line's cable.
