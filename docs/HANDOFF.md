@@ -109,5 +109,6 @@ Power currents and volts match on all 29 lines of branch 4.
 
 Questions 1, 2, 3, 5 and the Parameters file are closed. Waiting on the user
 for the open points in items 7 and 8 of `docs/open-questions.md` (the
-expanded display's `(1)` and cyan block,
+expanded display's `(1)` and the cyan block's second line — predictions for
+branch 22 are in item 7,
 the Alter prompts on other columns, Select Tap's tabs). Then item 4, Pads/EQ.

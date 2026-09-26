@@ -86,14 +86,40 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 6. **The "ntw map AL004" file** mentioned earlier has not arrived.
 7. **Expanded display (`/`) — mostly answered.** Seven lines to a node: the
    node line; four tap-slot lines (port levels coloured per value, or dashes)
-   with a cyan `(1)` under ftg; the level passed on (grey); a blank. Open:
-   what `(1)` counts (slot number? homes?), what the passed-on line shows at
-   a coupler node, and the cyan block at the cursor's node — the first line
-   is the amplifier box's five distances then cable loss at 750 from the
-   previous active, (split?), and the network start
-   (`[1015 1901 1015 1015 1901 15.56 15.56 28.67]` at 6.9); the second line
-   (`1-0-0 0-0-0 1 894`) is unknown. The small 3-option dialog in the old
-   videos is still unidentified.
+   with a cyan `(1)` under ftg; the level passed on (grey, taken after the
+   node's couplers: 4.24–4.26); a blank. An amplifier node puts its name,
+   supply and pad/EQ parts on lines 2–3 (4.24: `[AL00419]`,
+   `< SPB-7 ! SEQ-750-0 >`, `A>`, `< SPB-2 ! MEQ-42-2 >`).
+   A cyan block sits on lines 4–5 of every node with an amplifier or a
+   coupler and of each branch's last node. Checked on 6.9, 4.24, 4.25 and
+   4.26 — every number matches:
+   * line 1 `[a b c d e f g h]`: aerial distance to the previous active;
+     aerial distance to the network start; total distance to the previous
+     active or split; total to the previous active; total to the start;
+     cable loss at 750 over c, over d and over e. The first five are the
+     amplifier info box's distances.
+   * line 2 `A-B-C D-E-F homes ftg`: `homes` = housecounts from this node
+     on, couplers included; `ftg` = footage since the previous active or
+     split on this node's cable (6.9: 894 = the 106 spans, not 6.2's
+     121 ft of 114). `A-B-C` = actives from the network start down to this
+     node, itself included, `D-E-F` = actives from this node on (itself
+     and every branch below), each counted by kind: A, D = bridgers
+     (6.9: 1-0-0 = AL00415; 4.24: 2-0-0, 2-3-0 = 4.24 + 20.17, and the
+     three LEs 20.6, 20.11, 22.3). The node (Ripple) is not counted. A
+     "deepest cascade below" reading gives 2-2-0 at 4.24, not the 2-3-0
+     shown.
+   Open: (a) B = LEs on the way down is inferred, not yet seen — no node
+   shown so far has an LE above it; predicted for branch 22:
+   22.3 `[ 74 2994 385 459 3379 6.85 8.45 51.67]` `2-1-0 0-1-0 16 360`,
+   22.4 `[ 0 2994 0 0 3379 0.00 0.00 51.67]` `2-1-0 0-0-0 16 0`,
+   22.5 `[ 0 2994 80 80 3459 1.42 1.42 53.09]` `2-1-0 0-0-0 8 80`;
+   22.3's 360 is also the test of "this node's cable": 22.2 is cab 505,
+   the same EX P3 625 U as 22.3's 405 — 385 if the program matches the
+   cable rather than the code. (b) What C and F count (0 everywhere in
+   AL004). (c) How the program tells a bridger from an LE: no byte of the
+   `.atv` records differs between them apart from name, levels and power
+   table. (d) What `(1)` counts; AL004 has no node with two taps.
+   The small 3-option dialog in the old videos is still unidentified.
 8. **Keystrokes — partly answered.** Design mode's digits are the screen
    menu (`0 Alter`, `5 Test`, `.2 BkFeed`, `..5 Dsmry`; `./ Distance`), `/`
    toggles the expanded display, Esc closes a window. `0` on a tap prompts
