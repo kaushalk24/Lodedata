@@ -112,6 +112,8 @@ def parameters_from_spec_set(base: str | Path,
         w = par["tap_windows"]
         params.tap_windows = [w["F1"], w["F2"], w["R1"], w["R2"]]
         params.max_crossover_db = par["max_crossover"]
+        params.housings = [[h["number"], h["min_points"]] for h in par["housings"]]
+        params.equipment_points = dict(par["points"])
     return params
 
 

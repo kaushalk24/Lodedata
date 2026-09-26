@@ -101,6 +101,8 @@ Power currents and volts match on all 29 lines of branch 4.
   below window (return below max − window), both yellow, crossover (> Max.
   Crossover, yellow); levels compared to the hundredth. AL004's 37-line list
   is reproduced exactly (`tests/test_ntw.py`).
+* Levels print to the hundredth, halves up: AL004 34.7 shows 21.115 as
+  21.12 and 37.865 as 37.87 (`as_shown` in `app/hfc/screen.py`).
 * Keys: in Design the digits are the screen menu; `0` Alters (tap prompt
   "Enter desired tap {# of ports}.{ID #}: [home] for list", Home = Select
   Tap), `5` Test, `/` expanded display, Esc closes. Entry types directly.
@@ -109,5 +111,5 @@ Power currents and volts match on all 29 lines of branch 4.
 
 Questions 1, 2, 3, 5 and the Parameters file are closed. Waiting on the user
 for the open points in items 7 and 8 of `docs/open-questions.md` (the
-expanded display's open points — predictions for branch 34 are in item 7,
+expanded display's open points in item 7,
 the Alter prompts on other columns, Select Tap's tabs). Then item 4, Pads/EQ.

@@ -143,6 +143,7 @@ table.grid td.xtext{text-align:left;white-space:pre;overflow:visible}
 td.xtext.xblock{color:#11f6de!important}
 td.xtext.xname{color:#7f7f00!important}
 td.xtext.xsupply{color:var(--white)!important}
+table.grid td.xhousing{color:var(--white)!important;text-align:left}
 /* Select Tap */
 .seltap{min-width:520px}
 .seltap .sttitle{font-weight:600;margin-bottom:8px}

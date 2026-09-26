@@ -150,9 +150,10 @@ function blockText(b) {
   const [ap, as, ts, tp, tt] = b.distances.map(v => Math.round(v));
   const one = '[' + w(ap, 5) + w(as, 6) + w(ts, 5) + w(tp, 5) + w(tt, 6) +
     b.losses.map(v => w(v.toFixed(2), 6)).join('') + ']';
-  // homes sit at a fixed column; a 3-digit count has not been seen yet
+  // homes take three columns and the footage follows with no gap: 4.4 shows
+  // 127 homes and 886 ft as "127886"
   const two = ' ' + b.above.join('-') + ' ' + b.below.join('-') + '   ' +
-    (b.homes + ' ').padEnd(3) + Math.round(b.same_cable);
+    String(b.homes).padEnd(3) + Math.round(b.same_cable);
   return [one, two];
 }
 
@@ -186,6 +187,8 @@ function expandedLines(r, cols) {
       }
       // which number this is -- the tap slot or its homes -- is not yet known
       if (c.key === 'ftg' && lv) return cell(c, `(${k + 1})`, 'xcyan');
+      // an underground location's housing, under the node number
+      if (c.key === 'node' && k === 0 && r.housing) return cell(c, `(${r.housing})`, 'xhousing');
       return cell(c, '');
     }, ...text[k]));
   }

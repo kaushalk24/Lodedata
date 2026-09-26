@@ -12,11 +12,21 @@ arrive back at the node at the target level.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal, ROUND_HALF_UP
 
 from .plant import (Design, Branch, Node, TAP_BRACKETS, BRANCH_BRACKETS, BRANCH_NORMAL,
                     THROUGH_MARK, THROUGH_DOWNSTREAM, bracket)
 
 POWERING_PASSES = 4
+
+
+def as_shown(v: float) -> float:
+    """A level as the screen prints it: to the hundredth, halves up.
+
+    AL004 34.7 shows 21.115 as 21.12 and 37.865 as 37.87 -- round-half-even
+    would give 37.86, and the binary 21.115 sits just below the half.
+    """
+    return float(Decimal(repr(v)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 @dataclass
@@ -66,6 +76,7 @@ class Row:
     powered_by: str = ""        # label of the supply whose area this node is in
     amp_info: dict = field(default_factory=dict)
     block: dict = field(default_factory=dict)      # the expanded display's cyan block
+    housing: int = 0            # underground housing number, 0 = none
     # checks
     flags: list = field(default_factory=list)      # (severity, message)
 
@@ -81,7 +92,7 @@ class Row:
         return {
             "branch": self.branch, "node": self.node, "depth": self.depth,
             "gutter": self.gutter,
-            "levels": [round(self.levels.get(f, 0.0), 2) for f in self.freq_order],
+            "levels": [as_shown(self.levels.get(f, 0.0)) for f in self.freq_order],
             "ftg": round(self.ftg, 0), "hc": self.hc, "cab": self.cab,
             "cab_name": self.cab_name, "lv": self.lv, "tsg": self.tsg,
             "amp": self.amp, "amp_name": self.amp_name, "fixed": self.fixed,
@@ -89,11 +100,11 @@ class Row:
             "taps": self.taps, "couplers": self.couplers,
             "tap_severity": self.tap_severity, "end": self.end,
             "tap_port_severity": self.tap_port_severity,
-            "out_levels": [round(self.out_levels[f], 2) for f in self.freq_order]
+            "out_levels": [as_shown(self.out_levels[f]) for f in self.freq_order]
                           if self.out_levels else [],
-            "tap_levels": [[round(v, 2) for v in t] for t in self.tap_levels],
+            "tap_levels": [[as_shown(v) for v in t] for t in self.tap_levels],
             "power_stop": self.power_stop,
-            "port_levels": [round(v, 2) for v in self.port_levels],
+            "port_levels": [as_shown(v) for v in self.port_levels],
             "port_severity": self.port_severity,
             "tap_parts": self.tap_parts, "coupler_parts": self.coupler_parts,
             "cumulative_ft": round(self.cumulative_ft, 0),
@@ -102,7 +113,7 @@ class Row:
             "supply": self.supply,
             "supply_label": self.supply_label, "supply_type": self.supply_type,
             "supply_name": self.supply_name, "powered_by": self.powered_by,
-            "amp_info": self.amp_info, "block": self.block,
+            "amp_info": self.amp_info, "block": self.block, "housing": self.housing,
             "supply_pct": self.supply_pct,
             "flags": [{"severity": s, "message": m} for s, m in self.flags + self.tap_notes],
             "severity": self.severity,
@@ -188,7 +199,7 @@ def build(design: Design) -> Screen:
 
     def walk(branch: Branch, incoming: dict, depth: int, cum_ft: float,
              gutter_open: bool):
-        starts[branch.number] = [round(incoming.get(f, 0.0), 2) for f in freqs]
+        starts[branch.number] = [as_shown(incoming.get(f, 0.0)) for f in freqs]
         levels = dict(incoming)
         last_tap = None
         for idx, node in enumerate(branch.nodes):
@@ -366,6 +377,7 @@ def build(design: Design) -> Screen:
         "coupler": feeders.get(b.number, ""),
     } for b in sorted(design.branches.values(), key=lambda x: x.number)]
     _amp_info(design, scr)
+    _housings(design, scr)
     return scr
 
 
@@ -477,7 +489,7 @@ def _amp_info(design: Design, scr: Screen) -> None:
             r.block = {
                 "distances": [d[k] for k in ("aerial_prev", "aerial_start", "total_split",
                                              "total_prev", "total_start")],
-                "losses": [lost["split"], lost["prev"], lost["start"]],
+                "losses": [as_shown(lost["split"]), as_shown(lost["prev"]), as_shown(lost["start"])],
                 "above": kinds(node(bb, k) for bb, k in upstream(b, n)),
                 "below": kinds(below),
                 "homes": homes, "same_cable": same_cable,
@@ -495,6 +507,52 @@ def _amp_info(design: Design, scr: Screen) -> None:
             "cascade": 0 if fibre else max(cascade, 1),
             "supply": r.powered_by, "homes_down": homes,
         }
+
+
+def _housings(design: Design, scr: Screen) -> None:
+    """The white (n) the expanded display puts under an underground node's
+    number: the Underground Housings size the equipment there needs.
+
+    Nodes 0 ft apart are one location.  Its points -- Parameters: amplifier,
+    line extender, tap, 8-port tap, coupler, power supply -- pick the largest
+    housing whose Minimum Size they reach, shown on the location's first
+    node.  AL004: (3) at 22.3 (LE 11 + 22.4's coupler 5 = 16, TV-104 from
+    11), (1) at 22.5, 34.8 and 34.9 (a tap, 5 -- TV-60 from 4; "the smallest
+    that holds them" would make these a 2); none on aerial cable.
+    """
+    p = design.parameters
+    pts, sizes = p.equipment_points, p.housings
+    if not pts or not sizes:
+        return
+    lib = design.library
+    rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+
+    def points(nd) -> int:
+        n = 0
+        if nd.amp:
+            kind = _active_kind(lib.actives.get(nd.amp_part))
+            n += pts["line_extender"] if kind == "line_extender" else pts["amplifier"]
+        n += sum(pts["tap_8_port"] if t.ports == 8 else pts["tap"] for t in nd.taps if t)
+        n += pts["coupler"] * len(nd.couplers)
+        n += pts["power_supply"] if nd.supply_volts else 0
+        return n
+
+    for branch in design.branches.values():
+        groups = []
+        for k, nd in enumerate(branch.nodes, start=1):
+            if k == 1 or nd.ftg:
+                groups.append([])
+            groups[-1].append((k, nd))
+        for group in groups:
+            k, first = group[0]
+            cable = lib.cables.get(first.cab_part)
+            index = cable.cable_index if cable and cable.cable_index >= 0 else first.cab % 100
+            if index % 2 == 0:
+                continue
+            total = sum(points(nd) for _, nd in group)
+            fits = [number for number, least in sizes if total and least <= total]
+            if fits and (branch.number, k) in rows:
+                rows[(branch.number, k)].housing = fits[-1]
 
 
 def _tap_ports(p, freqs, levels: dict, tap) -> dict:
@@ -536,7 +594,7 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
     colour of each column's port value and the messages, in the list's order.
     """
     lim = _level_row(p, lv)
-    shown = {f: round(ports[f], 2) for f in freqs}
+    seen = {f: as_shown(ports[f]) for f in freqs}
     per = [""] * len(freqs)
     errors = []
 
@@ -546,7 +604,7 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
 
     for i, f in enumerate(freqs):
         limit = lim[i] if i < len(lim) else 0.0
-        out = limit - shown[f] if _is_forward(p, f) else shown[f] - limit
+        out = limit - seen[f] if _is_forward(p, f) else seen[f] - limit
         if out > 0.005:
             sev = "red" if out > p.tap_margin_db + 0.005 else "yellow"
             mark(i, sev)
@@ -557,14 +615,14 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
         if i >= len(windows) or not windows[i]:
             continue
         if _is_forward(p, f):
-            out, side = shown[f] - (lim[i] + windows[i]), "over window"
+            out, side = seen[f] - (lim[i] + windows[i]), "over window"
         else:
-            out, side = (lim[i] - windows[i]) - shown[f], "below window"
+            out, side = (lim[i] - windows[i]) - seen[f], "below window"
         if out > 0.005:
             mark(i, "yellow")
             errors.append(("yellow", f"Tap({f:g}) {out:5.2f} {side}"))
     hi, lo = freqs.index(p.forward_high_mhz), freqs.index(p.forward_low_mhz)
-    cross = shown[freqs[lo]] - shown[freqs[hi]]
+    cross = seen[freqs[lo]] - seen[freqs[hi]]
     if getattr(p, "max_crossover_db", 0) and cross > p.max_crossover_db + 0.005:
         mark(hi, "yellow")
         mark(lo, "yellow")

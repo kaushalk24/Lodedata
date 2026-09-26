@@ -236,4 +236,10 @@ def test_expanded_display_draws_the_amplifier_and_its_block(page):
     assert "<                 A>" in text
     assert "      [   74  2994  385  459  3379  6.85  8.45 51.67]" in text
     assert "       2-1-0 0-1-0   16 385" in text
+    marks = page.eval_on_selector_all("#grid tbody td.xhousing", "els => els.map(e => e.textContent)")
+    assert marks == ["(3)", "(1)"]
+    page.evaluate("gotoBranch(4, 4)")
+    page.wait_for_timeout(300)
+    text = page.eval_on_selector_all("#grid tbody td.xtext", "els => els.map(e => e.textContent)")
+    assert "       0-0-0 8-7-0   127886" in text
     assert not page.errors

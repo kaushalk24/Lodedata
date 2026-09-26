@@ -340,6 +340,10 @@ class DesignParameters:
     # a "Crossover".  Both marginal (yellow).
     tap_windows: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
     max_crossover_db: float = 0.0
+    # Underground Housings: [housing number, Minimum Size in points], and the
+    # points each kind of equipment takes (Parameters, General tab)
+    housings: list = field(default_factory=list)
+    equipment_points: dict = field(default_factory=dict)
     # cable series (the hundreds of a cable ID) not counted as mileage: the
     # ones not ticked under the Parameters file's Strand/Trench Types
     # (WV750: 000 200 300 400 ticked, so 1xx and 5xx-9xx are not mileage)

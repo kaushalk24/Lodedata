@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT / "app"))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from hfc.importer import design_from_ntw, library_from_spec_set   # noqa: E402
-from hfc.screen import build                                      # noqa: E402
+from hfc.screen import build, as_shown                            # noqa: E402
 from lodedata.obfuscation import open_ntw                         # noqa: E402
 from lodedata.network import read_network                         # noqa: E402
 from lodedata.specs import read_taps, read_actives, load_spec_set, read_parameters  # noqa: E402
@@ -303,7 +303,7 @@ def test_branch_6_colours_before_and_after_the_pad_change(screen):
     # with PAD 10 (<40>) the return comes down 3 dB: / 8/ is only crossed over
     rows = {r.node: r for r in _with_pad_10().rows if r.branch == 6}
     assert rows[8].taps == ["<40>"] and rows[8].tap_severity == ["yellow"]
-    assert [round(v, 2) for v in rows[10].port_levels] == [21.63, 24.81, 43.73, 41.45]
+    assert [as_shown(v) for v in rows[10].port_levels] == [21.63, 24.81, 43.73, 41.45]
     assert rows[9].tap_severity == ["yellow"]
     assert rows[10].port_severity == ["yellow", "yellow", "", ""]
 
@@ -393,17 +393,17 @@ def test_design_levels_match_the_screen(screen):
     rows = _rows(screen, 4)
     assert len(rows) == 29
     for r, want in zip(rows, B4_LEVELS):
-        got = tuple(round(r.levels[f], 2) for f in screen.frequencies)
+        got = tuple(as_shown(r.levels[f]) for f in screen.frequencies)
         assert got == want, f"4.{r.node}: {got} != {want}"
     for r, want in zip(_rows(screen, 3), B3_LEVELS):
-        got = tuple(round(r.levels[f], 2) for f in screen.frequencies)
+        got = tuple(as_shown(r.levels[f]) for f in screen.frequencies)
         assert got == want, f"3.{r.node}: {got} != {want}"
 
 
 def test_the_node_shows_no_input_and_its_ports_the_node_output(screen):
     feeder = _rows(screen, 1)
-    assert [round(v, 2) for v in feeder[0].levels.values()] == [0.0] * 4
-    assert tuple(round(feeder[1].levels[f], 2) for f in screen.frequencies) == \
+    assert [as_shown(v) for v in feeder[0].levels.values()] == [0.0] * 4
+    assert tuple(as_shown(feeder[1].levels[f]) for f in screen.frequencies) == \
         (49.0, 38.0, 17.0, 17.0)
 
 
@@ -418,15 +418,15 @@ def test_taps_out_of_the_system_levels_are_flagged_as_on_screen(screen):
     sev = {t: s for r in _rows(screen, 3) for t, s in zip(r.taps, r.tap_severity)}
     assert sev == {"[20]": "", "/17/": "", "/14/": "red", "/ 8/": "red"}
     end = next(r for r in screen.rows if r.branch == 3 and r.end)
-    assert [round(v, 2) for v in end.port_levels] == [11.31, 21.98, 32.12, 29.21]
+    assert [as_shown(v) for v in end.port_levels] == [11.31, 21.98, 32.12, 29.21]
     assert end.port_severity[0] == "red"
-    assert [round(end.levels[f], 2) for f in screen.frequencies] == [16.61, 26.58, 27.52, 24.51]
+    assert [as_shown(end.levels[f]) for f in screen.frequencies] == [16.61, 26.58, 27.52, 24.51]
 
 
 def test_a_terminating_tap_ends_the_line(screen):
     end = next(r for r in screen.rows if r.branch == 4 and r.end)
-    assert [round(end.levels[f], 2) for f in screen.frequencies] == [0.0] * 4
-    assert [round(v, 2) for v in end.port_levels] == [21.44, 22.41, 36.28, 35.32]
+    assert [as_shown(end.levels[f]) for f in screen.frequencies] == [0.0] * 4
+    assert [as_shown(v) for v in end.port_levels] == [21.44, 22.41, 36.28, 35.32]
 
 
 def test_power_screen_currents(screen):
@@ -473,6 +473,12 @@ SHOTS = {
     22: [(33.60, 25.20, 33.74, 33.42), (30.26, 23.69, 35.24, 34.85),
          (23.85, 22.03, 36.64, 35.32), (49.00, 38.00, 21.00, 21.00),
          (42.78, 33.53, 25.41, 25.00), (39.78, 32.13, 26.81, 26.50)],
+    # 34.7's 21.115 at 40 shows as 21.12: halves round up
+    34: [(37.38, 31.78, 26.99, 26.02), (34.89, 31.16, 27.51, 26.21),
+         (29.85, 29.91, 28.56, 26.58), (49.00, 38.00, 21.00, 21.00),
+         (44.03, 36.59, 22.25, 21.70), (37.25, 34.91, 23.66, 22.20),
+         (48.46, 37.87, 21.12, 21.04), (41.16, 36.04, 22.67, 21.58),
+         (37.73, 34.76, 23.87, 22.45), (36.23, 33.96, 24.67, 23.45)],
 }
 # "Start / Levels" in the coupler preview: what leaves the coupler
 STARTS = {9: (49.00, 38.00, 21.00, 21.00), 11: (43.50, 33.90, 25.10, 25.00),
@@ -483,7 +489,7 @@ STARTS = {9: (49.00, 38.00, 21.00, 21.00), 11: (43.50, 33.90, 25.10, 25.00),
 @pytest.mark.parametrize("branch", sorted(SHOTS))
 def test_branch_levels_match_the_screenshots(screen, branch):
     rows = [r for r in screen.rows if r.branch == branch]   # end line included
-    got = [tuple(round(r.levels[f], 2) for f in screen.frequencies) for r in rows]
+    got = [tuple(as_shown(r.levels[f]) for f in screen.frequencies) for r in rows]
     if branch == 9:              # the preview box shows its first ten lines
         got = got[:10]
     assert got == SHOTS[branch]
@@ -501,9 +507,9 @@ def test_in_line_q_device_and_the_pad_after_it(screen):
     rows = {r.node: r for r in screen.rows if r.branch == 6 and not r.end}
     assert rows[2].amp == "Q5" and rows[8].amp == "Q2"
     assert rows[8].taps == ["<43>"]
-    assert [round(v, 2) for v in rows[8].tap_levels[0]] == [26.54, 26.82, 39.23, 36.85]
+    assert [as_shown(v) for v in rows[8].tap_levels[0]] == [26.54, 26.82, 39.23, 36.85]
     end = next(r for r in screen.rows if r.branch == 6 and r.end)
-    assert [round(v, 2) for v in end.port_levels] == [21.63, 24.81, 46.73, 44.45]
+    assert [as_shown(v) for v in end.port_levels] == [21.63, 24.81, 46.73, 44.45]
     assert end.port_severity[2] == "red"
 
 
@@ -538,7 +544,39 @@ EXPANDED_BLOCKS = {
     (22, 3): ([74, 2994, 385, 459, 3379], [6.85, 8.45, 51.67], [2, 1, 0], [0, 1, 0], 16, 385),
     (22, 4): ([0, 2994, 0, 0, 3379], [0.00, 0.00, 51.67], [2, 1, 0], [0, 0, 0], 16, 0),
     (22, 5): ([0, 2994, 80, 80, 3459], [1.42, 1.42, 53.09], [2, 1, 0], [0, 0, 0], 8, 80),
+    (4, 4): ([886, 886, 886, 886, 886], [13.11, 13.11, 13.11], [0, 0, 0], [8, 7, 0], 127, 886),
+    (34, 3): ([889, 5206, 543, 889, 5206], [8.09, 13.25, 77.43], [2, 1, 0], [0, 2, 0], 3, 543),
+    (34, 6): ([728, 5934, 728, 728, 5934], [10.85, 10.85, 88.27], [2, 2, 0], [0, 1, 0], 2, 728),
+    (34, 9): ([0, 5934, 471, 471, 6405], [10.17, 10.17, 98.45], [2, 2, 0], [0, 0, 0], 1, 471),
 }
+# lines seen with "/" on and no block: 34.1 and 4.1 are first nodes with
+# footage, 34.4 is 0 ft on from an amplifier
+NO_BLOCK = [(4, 1), (4, 2), (4, 3), (4, 5), (4, 6), (4, 21), (4, 22), (4, 23),
+            (6, 6), (6, 7), (6, 8), (22, 2), (34, 1), (34, 2), (34, 4), (34, 5),
+            (34, 7), (34, 8)]
+# the grey line: what each node passes on
+OUT_LEVELS = {
+    4: {1: (41.96, 36.24, 18.48, 17.52), 2: (39.66, 35.67, 18.96, 17.69),
+        3: (37.68, 35.17, 19.37, 17.84), 4: (33.49, 33.62, 20.85, 19.07),
+        5: (31.18, 33.04, 21.33, 19.25), 6: (29.05, 32.51, 21.78, 19.40),
+        21: (24.50, 23.11, 35.58, 34.37), 22: (23.18, 22.78, 35.85, 34.46),
+        23: (21.33, 22.32, 36.24, 34.60), 24: (49.00, 38.00, 21.00, 21.00),
+        25: (43.50, 33.90, 25.10, 25.00), 26: (39.00, 31.70, 27.24, 27.02)},
+    22: {1: (30.70, 23.80, 35.14, 34.82), 2: (30.26, 23.69, 35.24, 34.85),
+         3: (49.00, 38.00, 21.00, 21.00), 4: (44.20, 33.90, 25.10, 24.90),
+         5: (39.78, 32.13, 26.81, 26.50)},
+    34: {1: (37.38, 31.78, 26.99, 26.02), 2: (34.89, 31.16, 27.51, 26.21),
+         3: (49.00, 38.00, 21.00, 21.00), 4: (48.10, 37.60, 21.40, 21.40),
+         5: (44.03, 36.59, 22.25, 21.70), 6: (49.00, 38.00, 21.00, 21.00),
+         7: (48.46, 37.87, 21.12, 21.04), 8: (40.06, 35.34, 23.37, 22.28),
+         9: (36.23, 33.96, 24.67, 23.45)},
+}
+# the first tap line: the tap's port levels
+PORT_LEVELS = {(22, 1): (22.90, 14.20, 44.74, 44.32), (22, 5): (24.98, 15.73, 43.21, 42.60),
+               (34, 4): (26.00, 15.10, 43.90, 42.10), (34, 8): (21.16, 16.04, 42.67, 39.88),
+               (34, 9): (22.83, 19.66, 38.97, 36.05)}
+# the white (n) under the node number: underground housings
+HOUSINGS = {(22, 3): 3, (22, 5): 1, (34, 8): 1, (34, 9): 1}
 
 
 def test_expanded_display_block(screen):
@@ -548,9 +586,25 @@ def test_expanded_display_block(screen):
         got = ([round(v) for v in b["distances"]], [round(v, 2) for v in b["losses"]],
                b["above"], b["below"], b["homes"], round(b["same_cable"]))
         assert got == (dist, loss, above, below, homes, ftg), key
-    # lines shown without one: no amplifier, coupler, or end of branch
-    for key in [(4, 21), (4, 22), (4, 23), (6, 6), (6, 7), (6, 8), (22, 2)]:
+    for key in NO_BLOCK:
         assert not rows[key].block, key
+
+
+def test_expanded_display_lines(screen):
+    rows = {(r.branch, r.node): r for r in screen.rows if not r.end}
+    for branch, nodes in OUT_LEVELS.items():
+        for n, want in nodes.items():
+            r = rows[(branch, n)]
+            assert tuple(as_shown(r.out_levels[f]) for f in screen.frequencies) == want, (branch, n)
+    for key, want in PORT_LEVELS.items():
+        assert tuple(as_shown(v) for v in rows[key].tap_levels[0]) == want, key
+
+
+def test_underground_housing_marker(screen):
+    rows = {(r.branch, r.node): r for r in screen.rows if not r.end}
+    seen = set(HOUSINGS) | set(NO_BLOCK) | {(22, 1), (22, 2), (22, 4), (34, 3), (34, 6),
+                                            (4, 4), (4, 24), (4, 25), (4, 26), (6, 9)}
+    assert {k: rows[k].housing for k in seen if rows[k].housing} == HOUSINGS
 
 
 def test_power_supply_info(screen):
@@ -575,7 +629,7 @@ def test_branch_1_matches_the_screen(screen):
     # Design screen of branch 1: the node, then four 570 couplers.  Branch 3
     # is all 1xx cable yet drawn [3] -- it does not start along a parent span
     rows = [r for r in screen.rows if r.branch == 1]
-    got = [tuple(round(r.levels[f], 2) for f in screen.frequencies) for r in rows]
+    got = [tuple(as_shown(r.levels[f]) for f in screen.frequencies) for r in rows]
     assert got == [(0.0, 0.0, 0.0, 0.0)] + [(49.0, 38.0, 17.0, 17.0)] * 5
     assert [r.amp for r in rows[:1]] == ["70"] and rows[0].amp_label == "AL004"
     assert [r.fixed for r in rows[:5]] == [False, True, True, True, True]
@@ -591,10 +645,10 @@ def test_a_feed_stops_being_one_when_its_span_no_longer_matches():
     scr = build(design)
     assert [r for r in _rows(scr, 4) if r.node == 14][0].couplers == ["3-[11]<12>"]
     rows = [r for r in scr.rows if r.branch == 11]
-    got = [tuple(round(r.levels[f], 2) for f in scr.frequencies) for r in rows]
+    got = [tuple(as_shown(r.levels[f]) for f in scr.frequencies) for r in rows]
     assert got == [(41.21, 33.33, 25.59, 25.17), (36.97, 31.79, 27.01, 26.29),
                    (29.65, 27.69, 30.93, 29.87), (0.0, 0.0, 0.0, 0.0)]
     # the 8-port tap on 11.2 is drawn <15> on the Design screen
     assert [t for r in rows for t in r.taps] == ["/17/", "<15>", "[ 8]"]
-    assert [round(v, 2) for v in rows[-1].port_levels] == [21.55, 20.59, 38.13, 37.17]
+    assert [as_shown(v) for v in rows[-1].port_levels] == [21.55, 20.59, 38.13, 37.17]
     assert rows[-1].port_severity == [""] * 4
