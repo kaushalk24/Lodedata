@@ -174,7 +174,7 @@ function renderGrid() {
       let text = cellText(r, c);
       if (i === S.row && j === S.col && S.buffer !== null) text = S.buffer + '_';
       let extra = '';
-      if (c.key === 'cab' && r.cab >= 100) extra = ' series1';
+      if (c.key === 'cab') extra = ' cab';
       if (c.key === 'ampname') extra = ' amp';
       if (c.key === 'tap0' && S.mode === 'design' && r.amp_label && !r.taps.length) extra = ' amp spill';
       if (c.key === 'supply' && r.supply) extra = ' spill';
@@ -267,19 +267,21 @@ function infoAmp(r) {
     line('Housecounts downstream:', a.homes_down);
 }
 
+// Address and cable; on an amplifier's node also its distances and homes.
+// As AL004 shows it: 1.1 (the fibre node) and 11.1 have the short box, 6.1
+// (bridger AL00415, cascade 1) the long one.
 function infoNode(r) {
-  const t = (S.scr && S.scr.totals) || {};
-  return `${r.branch}.${r.node}\n` +
-    `${r.address || 'No Address'}\n` +
-    `${r.cab_name || 'no cable'}\n` +
-    `Distance from previous node:   ${r.ftg}\n` +
-    `Total distance to start:       ${r.cumulative_ft}\n` +
-    `Housecounts this node:         ${r.hc}\n` +
-    (r.volts === null ? '' : `Voltage / current:             ${r.volts.toFixed(2)} V  ${r.current.toFixed(2)} A\n`) +
-    (r.flags.length ? r.flags.map(f => `! ${f.message}`).join('\n') + '\n' : '') +
-    `\n<double-click or [.][ENTER] to edit address>` +
-    `\n\nnodes ${t.nodes || 0}  taps ${t.taps || 0}  actives ${t.actives || 0}  ` +
-    `homes ${t.homes || 0}  ${t.footage || 0} ft`;
+  const a = r.amp_info || {};
+  const line = (label, v) => `${label.padEnd(33)}${v === undefined || v === null ? '' : v}\n`;
+  const amp = a.cascade ?
+    line('Aerial Dist to Previous Active:', a.aerial_prev) +
+    line('Aerial Dist to Start of Network:', a.aerial_start) +
+    line('Tot Dist to Previous Act-split:', a.total_split) +
+    line('Total Dist to Previous Active:', a.total_prev) +
+    line('Total Dist to Start of Network:', a.total_start) +
+    line('Housecounts downstream:', a.homes_down) : '';
+  return `${r.branch}.${r.node}\n${r.address || 'No Address'}\n${r.cab_name || ''}\n` + amp +
+    `<double-click or [.][ENTER] to edit address>`;
 }
 
 function renderInfo() {

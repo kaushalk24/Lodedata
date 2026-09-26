@@ -141,33 +141,32 @@ def build(design: Design) -> Screen:
 
     starts, feeders = {}, {}      # per branch: levels out of its coupler, coupler name
 
-    # Nothing in the file marks a branch <n> or [n].  What fits all sixteen
+    # Nothing in the file marks a branch <n> or [n].  What fits all seventeen
     # seen on AL004's screens (branch 1: 570<2> 570[3] 570[4] 570[5];
     # branch 4: 12<6> 100[9] 3-<11><12> 2[17] 1<18> 16<19> 100[20]
-    # 3[21]<24> 8[22]; branch 9: 108[10]): a branch is drawn <n> when it
-    # adds no mileage -- no footage, or only 1xx cable -- and its first span
-    # runs along a span already at the coupler's pole, the span BkFeed or
-    # FwdFd copies (6 starts on 4's 121 backward, 11 on its 105 forward, 12
-    # on its 99 backward).  Branch 3 is all 1xx too, but its pole is branch
-    # 1's, which has no spans, so it is [3].  Confirmed in Lode Data: 11.1
-    # changed from 105 to 106 ft turns 4.14 into 3-[11]<12>.
+    # 3[21]<24> 8[22]; branch 6: 100[7]; branch 9: 108[10]): a branch is
+    # drawn <n> when it adds no mileage -- no footage, or only 1xx cable --
+    # and its first span matches the nearest span behind or ahead of the
+    # coupler on the parent branch, the span BkFeed or FwdFd copies (6
+    # starts on 4's 121 backward, 11 on its 105 forward, 12 on its 99
+    # backward).  Branch 3 is all 1xx
+    # too, but branch 1 has no spans, so it is [3].  Confirmed in Lode Data:
+    # 11.1 changed from 105 to 106 ft turns 4.14 into 3-[11]<12>.  Only the
+    # parent branch counts: 6.1 is a 0-ft branch start at 4.4, and 7 runs
+    # along 4's 156 from there, yet it is 100[7] -- 6's own span is 121.
     def mileage(b: Branch) -> float:
         return sum(n.ftg for n in b.nodes if n.cab // 100 not in p.non_mileage_series)
 
-    def spans_at(number: int, k: int) -> set:
-        """Footages of the spans at node k's pole: the nearest behind and
-        ahead on its branch, and, while k sits at its branch's start, those
-        at the parent's pole as well."""
-        found = set()
-        while (b := design.branch(number)) is not None:
-            spans = [n.ftg for n in b.nodes]
-            back = next((f for f in reversed(spans[:k]) if f), 0)
-            ahead = next((f for f in spans[k:] if f), 0)
-            found |= {back, ahead} - {0}
-            if back:
-                break
-            number, k = b.parent_branch, b.parent_node
-        return found
+    def fed(b: Branch) -> bool:
+        first = next((n.ftg for n in b.nodes if n.ftg), 0)
+        parent = design.branch(b.parent_branch)
+        if not first or parent is None:
+            return not first
+        spans = [n.ftg for n in parent.nodes]
+        k = b.parent_node               # spans[:k] runs up to the coupler's node
+        back = next((f for f in reversed(spans[:k]) if f), 0)
+        ahead = next((f for f in spans[k:] if f), 0)
+        return first in (back, ahead)
 
     def branch_style(cp) -> str:
         if cp.style != BRANCH_NORMAL:
@@ -175,9 +174,7 @@ def build(design: Design) -> Screen:
         b = design.branch(cp.branch)
         if b is None:
             return "<>"
-        first = next((n.ftg for n in b.nodes if n.ftg), 0)
-        fed = not first or first in spans_at(b.parent_branch, b.parent_node)
-        return "<>" if mileage(b) == 0 and fed else "[]"
+        return "<>" if mileage(b) == 0 and fed(b) else "[]"
 
     def walk(branch: Branch, incoming: dict, depth: int, cum_ft: float,
              gutter_open: bool):

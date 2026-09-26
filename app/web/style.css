@@ -1,6 +1,6 @@
 :root{
-  --black:#000; --green:#00e000; --dimgreen:#00a000; --yellow:#e8e800;
-  --cyan:#00e8e8; --magenta:#e800e8; --red:#ff4040; --white:#e0e0e0;
+  --black:#000; --green:#00bf00; --bright:#00ff00; --dimgreen:#00a000;
+  --yellow:#ffff00; --cyan:#00e8e8; --red:#ff0000; --white:#ffffff;
   --grid:#303030; --chrome:#f0f0f0; --chromeline:#a0a0a0;
 }
 *{box-sizing:border-box}
@@ -55,11 +55,9 @@ tr.red td{color:var(--red)}
 tr.yellow td{color:var(--yellow)}
 td.cur{background:var(--green);color:#000!important}
 tr.red td.cur,tr.yellow td.cur{color:#000!important}
-td.series1{color:var(--magenta)}
+td.cab{color:var(--bright)}
 td.amp{color:var(--white)}
 table.grid td.spill{overflow:visible;text-align:left;position:relative;z-index:1}
-td.tap{color:var(--yellow)}
-td.port{color:var(--white)}
 td.red,tr td.tap.red,tr td.port.red{color:var(--red)}
 td.yellow{color:var(--yellow)}
 .totrow td{color:var(--dimgreen);border-top:1px solid var(--grid)}

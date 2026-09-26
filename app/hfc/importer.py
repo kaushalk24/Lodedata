@@ -275,12 +275,13 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
                     node.inline_part = q.id
                 else:
                     miss(f"{number}.{i}: in-line device Q{nn.inline}")
-            if nn.cable:
-                cable = cables.get(nn.cable % 100)
-                if cable:
-                    node.cab_part = cable.id
-                else:
-                    miss(f"{number}.{i}: cable {nn.cable}")
+            # cable 0 is a real cable, index 0: on AL004 1.1 (cab 0) shows
+            # EX P3 500 A in its info box, as 11.1 (cab 100) does
+            cable = cables.get(nn.cable % 100)
+            if cable:
+                node.cab_part = cable.id
+            elif nn.cable:
+                miss(f"{number}.{i}: cable {nn.cable}")
             for t in nn.taps:
                 tap = taps.get((t.row, t.ports))
                 if tap:

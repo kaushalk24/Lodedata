@@ -15,7 +15,10 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
   margin).
 * The coupler column, including `<n>` versus `[n]` (see 1 below).
 * The info boxes: tap port levels, coupler branch preview (start levels and
-  the branch table), power supply information, amplifier definition.
+  the branch table), power supply information, amplifier definition, and the
+  node box (address, cable; on an amplifier's node its distances and homes).
+* Screen colours, measured from the screenshots: text #00bf00, the cab
+  column #00ff00, amplifier names white, marginal #ffff00, out #ff0000.
 * Power currents on all 29 lines of branch 4.
 
 ## Answered by the user
@@ -29,39 +32,40 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 
 ## Open, in the order to settle them
 
-1. **`<n>` versus `[n]` on couplers — mechanism confirmed.** Nothing in the
-   file marks it (file-formats 3.7); the program derives it from footage.
-   `<n>` when the branch adds no mileage (no footage, or only 1xx cable)
-   **and** its first span matches a span already at the coupler's pole — the
-   span `BkFeed` (`.2`) / `FwdFd` (`..2`) copy: 6 starts on branch 4's 121
-   backward, 11 on its 105 forward, 12 on its 99 backward. Branch 3 is all
-   1xx too but hangs off branch 1, which has no spans, so it is `[3]`
-   (branch 1 screenshot: `570<2> 570[3] 570[4] 570[5]`).
+1. **`<n>` versus `[n]` on couplers — closed.** Nothing in the file marks it
+   (file-formats 3.7); the program derives it from footage. `<n>` when the
+   branch adds no mileage (no footage, or only 1xx cable) **and** its first
+   span matches the nearest span behind or ahead of the coupler on the
+   **parent branch** — the span `BkFeed` (`.2`) / `FwdFd` (`..2`) copy: 6
+   starts on branch 4's 121 backward, 11 on its 105 forward, 12 on its 99
+   backward. Evidence:
+   * branch 1: `570<2> 570[3] 570[4] 570[5]` — 3 is all 1xx but branch 1 has
+     no spans;
+   * 11.1 changed 105 → 106 in Lode Data turned 4.14 into `3-[11]<12>`;
+   * branch 6: `100[7]`. 6.1 is bridger AL00415 at 4.4's pole and 100 its
+     internal DC-12; 7 runs as a second cable along branch 4's 156 (the user's
+     map confirms it), but only branch 6's own span, 121, is compared.
 
-   Proven by experiment: with 11.1 changed from 105 to 106 in Lode Data,
-   4.14 turned from `3-<11><12>` into `3-[11]<12>`, exactly as predicted,
-   and branch 11's levels and end line matched the replica.
-
-   Left over: (a) when the coupler sits on a 0-ft branch start, does the
-   match follow up to the parent's pole? `screen.py` assumes yes, which draws
-   6.1's coupler as `100<7>` (7 runs along branch 4's 156 from the bridger at
-   4.4); a parent-only match would give `100[7]`. A branch 6 screenshot
-   settles it. (b) `{n}` (backfeed) has not been seen; 6 and 12 run backward
-   and are drawn `<`.
+   Not seen yet: `{n}` (backfeed) — 6 and 12 run backward and are drawn `<`.
 2. **8-port tap brackets — closed.** The Design screen draws an 8-port tap
    `<n>` (11.2: `<15>`), like the 6-port-slot pad `<43>`; the preview box
    draws 2/4/8-port as `(17)` `[8]` `{15}`. Both already reproduced.
 3. **Power volts** are within 0.02 V; the drop is ~0.5 % more than the photo.
    Currents all match, so it is the resistance — probably a Parameters setting.
-   Needs: Spec Edit → Parameters, each tab.
+   The user's map tag for AL00415 (6.1, at 4.4's pole) says 86.78 V 0.79 A;
+   the replica gives 86.76 V 0.79 A. Needs: Spec Edit → Parameters, each tab.
 4. **Pad/EQ values.** EQs are stored as indexes (AL00416: forward EQ #16 is
-   shown as 12, return EQ #3 as 4). Needs: Spec Edit → Actives, Pads/EQs Bank
-   tabs.
+   shown as 12, return EQ #3 as 4). The map tag of AL00415 shows forward pad 8,
+   EQ `SCS4`, return pad 7, EQ `2`; the file has pads 8 / 7 and EQ indexes
+   2 / 1 — so the return EQ shown is index + 1 both times, and the forward EQ
+   is a name from a table. Needs: Spec Edit → Actives, Pads/EQs Bank tabs.
 5. **Port output colours on the end line.** On branch 6 the 750 and 54 port
    values (21.63, 24.81) are yellow although they are within System Levels;
    the rule behind that is not known. Branch 11's end line (21.55, 20.59,
    38.13, 37.17, with 11.1 at 106 ft) and branch 4's (21.44, 22.41, 36.28,
-   35.32) are all green, so it is not a plain threshold on the value.
+   35.32) are all green, so it is not a plain threshold on the value. The
+   same unknown yellow is on 6.8's `<43>` (LEQ\RC PAD 13, port levels 26.54
+   26.82 39.23 36.85 — within System Levels); the replica draws it green.
 6. **The "ntw map AL004" file** mentioned earlier has not arrived.
 7. **The small 3-option dialog** in the videos, and the multi-line node view
    (the manual says `/` toggles an expanded display).

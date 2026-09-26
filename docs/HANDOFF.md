@@ -85,16 +85,17 @@ Power currents match on all 29 lines of branch 4. Power volts are within
   * a node's current is the current in the span on its supply side
   * a power stop cuts the span leading into its node
 * Coupler brackets (nothing in the file stores them): `<n>` if the branch has
-  no footage on non-1xx cable and its first span matches a span already at
-  the coupler's pole (what BkFeed/FwdFd copy), otherwise `[n]`. Fits all 16
-  seen, and confirmed by experiment: 11.1 changed 105 → 106 turned 4.14 into
-  `3-[11]<12>`.
+  no footage on non-1xx cable and its first span matches the nearest span
+  behind or ahead of the coupler on the parent branch (what BkFeed/FwdFd
+  copy), otherwise `[n]`. Confirmed by experiment (11.1 changed 105 → 106
+  turned 4.14 into `3-[11]<12>`) and by 6.1's `100[7]`.
+* Cable ID 0 is a real cable (index 0), not "none".
 * Taps: 8-port is `<n>` on the Design screen, `{n}` in the preview box.
 
 ## Next step
 
-Open question 1's mechanism is confirmed and question 2 is closed. The last
-piece of 1: a **branch 6 Design screenshot**, for the bracket on 6.1's coupler.
-The prediction is `100<7>`; `100[7]` would mean the span match looks only at
-the coupler's own branch, not up through a 0-ft branch start. Then carry on
-with item 3 (power volts) in `docs/open-questions.md`.
+Open questions 1 and 2 are closed. Next is item 3, power volts: ask for
+**Spec Edit → Parameters**, a screenshot of each tab — the drop is ~0.5 % too
+high (86.76 V against 86.78 V at AL00415) and the setting behind it is
+probably there, along with the backfeed/forwardfeed replacement cables
+(`.par` 3900 holds 100 / 101, both spec sets).

@@ -51,8 +51,8 @@ drawn where its coupler sits, with line art down the left gutter.
 Details carried over from the manual: taps print in the bracket of their port
 count (`/2/ [4] {6} <8>`) showing the Tap ID; branch numbers print in the
 bracket of their type (`[n]` normal, `(n)` no footage, `{n}` backfeed,
-`<n>` forwardfeed); a fibre-fed node shows no RF input; cable series 100+ draw
-in magenta; the numbered screen menu carries the real command names.
+`<n>` forwardfeed); a fibre-fed node shows no RF input; the numbered screen
+menu carries the real command names.
 
 **Keying it in.** Equipment is typed at the cell, not picked from a list.
 
