@@ -165,7 +165,7 @@ def test_parameters_read_back_as_the_spec_edit_tabs_show_them():
     # System Levels
     assert spec.tap_margin == 0.5
     assert spec.levels[:2] == [[17.0, 10.0, 45.0, 45.0], [19.0, 12.0, 45.0, 45.0]]
-    assert p["min_f3"][:2] == [15.0, 17.0]                   # Min. 550
+    assert [lv[0] for lv in p["extra_levels"][:2]] == [15.0, 17.0]   # Min. 550
     assert {k: v for k, v in p["tap_windows"].items() if v} == \
         {"F1": 12.0, "F2": 16.0, "R1": 16.0, "R2": 16.0}
     # Tap Selection
@@ -184,6 +184,8 @@ def test_parameters_read_back_as_the_spec_edit_tabs_show_them():
                            "tap_8_port": 5, "coupler": 5, "power_supply": 30}
     assert (p["max_le_cascade"], p["max_tap_cascade"], p["lines_per_form"]) == (3, 0, 0)
     assert p["allow_over_equalization"] and not p["overvoltage_check"]
+    # Frequencies: Freqs. for Active EQ Selection
+    assert p["eq_selection"] == {"fwd_high": "750", "fwd_low": "54", "ret_high": "40", "ret_low": "5"}
 
 
 PARTEST = SAMPLES / "partest" / "paratest.par"
@@ -225,6 +227,38 @@ def test_each_save_in_the_chain_changes_one_setting():
         changed = [f for f in after if after[f] != before[f]]
         assert changed == [key] and (before[key], after[key]) == (was, now), f"s{k}"
         before = after
+
+
+# A second chain from s8: v1 ... v9, one step each, except v1 (three radio
+# groups whose bytes were already known) and v7 (distinct numbers).
+V_CHAIN = [
+    {"distance_units": ("Ftg", "dM"), "eq_placement": ("EQ+", "EQ-"), "optimization": ("OP-", "OP+")},
+    {"strand_series": ([0, 2, 3, 4], [0, 2, 3, 4, 6])},
+    {"strand_series": ([0, 2, 3, 4, 6], [0, 2, 3, 4, 6, 7])},
+    {"strand_series": ([0, 2, 3, 4, 6, 7], [0, 2, 3, 4, 6, 7, 9])},
+    {"enforce_tap_tilt": (False, True)},
+    {"pre_load": (False, True)},
+    {"extra_levels": None, "transformer_volts": None},
+    {"eq_selection": ({"fwd_high": "750", "fwd_low": "54", "ret_high": "40", "ret_low": "5"},
+                      {"fwd_high": "54", "fwd_low": "750", "ret_high": "40", "ret_low": "5"})},
+    {"eq_selection": ({"fwd_high": "54", "fwd_low": "750", "ret_high": "40", "ret_low": "5"},
+                      {"fwd_high": "54", "fwd_low": "750", "ret_high": "5", "ret_low": "40"})},
+]
+
+
+@pytest.mark.skipif(not (PARTEST.parent / "v9.par").exists(), reason="the user's second save chain")
+def test_the_second_save_chain_places_the_rest():
+    before = read_parameters((PARTEST.parent / "s8.par").read_bytes())
+    for k, want in enumerate(V_CHAIN, start=1):
+        after = read_parameters((PARTEST.parent / f"v{k}.par").read_bytes())
+        assert sorted(f for f in after if after[f] != before[f]) == sorted(want), f"v{k}"
+        for key, pair in want.items():
+            if pair:
+                assert (before[key], after[key]) == pair, f"v{k} {key}"
+        before = after
+    # v7: level 0 Min F3..F6, Max R3, R4 and transformers 1-3
+    assert before["extra_levels"][0] == [15.0, 1.25, 2.25, 3.35, 4.25, 5.25]
+    assert before["transformer_volts"][:4] == [60.5, 70.25, 80.75, 0.0]
 
 
 # ------------------------------------------------------------ calculations

@@ -414,28 +414,33 @@ PAR_MISC_PARTS = 578            # char[25] x3: HTH connectors, splices, terminat
 PAR_HOUSING_PARTS, PAR_HOUSINGS = 728, 13   # char[25] each; min size u8 at 1063 + k
 PAR_HOUSING_SIZE = 1063
 PAR_STRAND_SERIES = 1053        # bit n: series n00 (000-500) is a strand/trench type
-PAR_STRAND_800 = 3914           # u8: 800 Series ticked -- 600/700/900 not yet placed
+PAR_STRAND_600 = 3912           # u8 each for 600, 700, 800, 900 Series
 # Underground Housings points, u8 each
 PAR_POINTS = {"equalizer": 1056, "amplifier": 1057, "line_extender": 1058, "tap": 1059,
               "tap_8_port": 1060, "coupler": 1061, "power_supply": 1062}
 PAR_NIU = 1098                  # i32 x5 in the tab's order; whole numbers (1.11 saves as 1)
-PAR_SIGNAL_DISPLAY, PAR_DISTANCE_UNITS = 1138, 1142   # 0 dBmV / 1 dBuV; 0 Ftg / 1 m
+PAR_SIGNAL_DISPLAY, PAR_DISTANCE_UNITS = 1138, 1142   # 0 dBmV / 1 dBuV; 0 Ftg / 1 m / 2 dM
 NIU_FIELDS = ("system_penetration", "offhook", "ring", "additional_line", "offhook_limit")
 PAR_CROSSOVER, PAR_RETURN_CROSSOVER = 1118, 1122
 PAR_MAX_LE_CASCADE, PAR_LINES_PER_FORM = 1126, 1130
 PAR_BACKFEED_CABLE, PAR_FWDFEED_CABLE = 1146, 1470
 PAR_INTERPOLATION = 1474        # 0 Step, 1 Linear, 2 Constant Wattage
-PAR_OPTIMIZATION = 1482         # 0 OP-, 1 OFf (OP+ not yet seen)
+PAR_OPTIMIZATION = 1482         # 0 OP-, 1 OFf, 2 OP+
 PAR_OVERVOLTAGE = 1478          # u8, 1 = On
 PAR_MAX_AMPS = 1486             # i32 x6 in the tab's order
-PAR_EQ_PLACEMENT = 1510         # 1 EQ+, 2 EQe (EQ- not yet seen)
-PAR_EXTRA_LEVELS, PAR_EXTRA_LEVEL_STRIDE = 2976, 24   # Min F3 of level lv at +24*lv
+PAR_EQ_PLACEMENT = 1510         # 0 EQ-, 1 EQ+, 2 EQe
+# per level: Min F3, Min F4, Min F5, Min F6, Max R3, Max R4
+PAR_EXTRA_LEVELS, PAR_EXTRA_LEVEL_STRIDE = 2976, 24
+PAR_EQ_SELECTION = 3892         # u16 x4: Fwd High, Fwd Low (index into F1-F6), Ret High, Ret Low (R1-R4)
 PAR_ENFORCE_TAP_WINDOW = 3904   # u8
 PAR_MAX_TAP_CASCADE = 3909      # u8
 PAR_OVER_EQUALIZATION = 3911    # u8, 1 = Allow Over Equalization ticked
+PAR_TRANSFORMER_VOLTS, PAR_TRANSFORMER_STRIDE = 4171, 260   # i32 x8, unaligned
+PAR_ENFORCE_TAP_TILT = 6000     # u8
 PAR_FLAG_TILT = 6001            # u8 Flag Hi/Lo Tilt
 PAR_TILTS, PAR_TILT_STRIDE = 6002, 16   # Max/Min Tilt Fwd, Max/Min Tilt Ret per level
 PAR_SHOW_COUNT_TYPES = 6514     # u8
+PAR_PRE_LOAD = 6515             # u8, only in the 6516-byte files version 12 writes
 INTERPOLATION = {0: "step", 1: "linear", 2: "constant_wattage"}
 MAX_AMPS_THROUGH = ("power_inserter", "amplifier", "bridger_port", "coupler",
                     "line_extender", "tap")
@@ -460,7 +465,12 @@ def read_parameters(data: bytes) -> dict:
         return {}
     fx = lambda o: round(_fx(struct.unpack_from("<i", data, o)[0]), 3)
     mask = data[PAR_STRAND_SERIES] & 0x3F
-    strand = [n for n in range(6) if mask >> n & 1] + ([8] if data[PAR_STRAND_800] else [])
+    strand = [n for n in range(6) if mask >> n & 1] + \
+        [6 + k for k in range(4) if data[PAR_STRAND_600 + k]]
+    label = [_name(data[PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k:
+                        PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k + 5]) for k in range(10)]
+    fwd, ret = label[:6], label[6:]
+    eq_sel = struct.unpack_from("<4H", data, PAR_EQ_SELECTION)
     windows = {}
     for k, key in enumerate(PAR_FREQUENCY_NAMES):
         windows[key] = fx(PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k + 6)
@@ -472,12 +482,18 @@ def read_parameters(data: bytes) -> dict:
                              "min_points": data[PAR_HOUSING_SIZE + k]})
     return {
         "strand_series": strand,
-        "distance_units": {0: "Ftg", 1: "m"}.get(int(fx(PAR_DISTANCE_UNITS)), fx(PAR_DISTANCE_UNITS)),
+        "distance_units": {0: "Ftg", 1: "m", 2: "dM"}.get(int(fx(PAR_DISTANCE_UNITS)), fx(PAR_DISTANCE_UNITS)),
         "signal_display": {0: "dBmV", 1: "dBuV"}.get(int(fx(PAR_SIGNAL_DISPLAY)), fx(PAR_SIGNAL_DISPLAY)),
         "show_count_types": bool(data[PAR_SHOW_COUNT_TYPES]),
-        "eq_placement": {1: "EQ+", 2: "EQe"}.get(int(fx(PAR_EQ_PLACEMENT)), fx(PAR_EQ_PLACEMENT)),
-        "optimization": {0: "OP-", 1: "OFf"}.get(int(fx(PAR_OPTIMIZATION)), fx(PAR_OPTIMIZATION)),
+        "eq_placement": {0: "EQ-", 1: "EQ+", 2: "EQe"}.get(int(fx(PAR_EQ_PLACEMENT)), fx(PAR_EQ_PLACEMENT)),
+        "optimization": {0: "OP-", 1: "OFf", 2: "OP+"}.get(int(fx(PAR_OPTIMIZATION)), fx(PAR_OPTIMIZATION)),
         "enforce_tap_window": bool(data[PAR_ENFORCE_TAP_WINDOW]),
+        "enforce_tap_tilt": bool(data[PAR_ENFORCE_TAP_TILT]),
+        "pre_load": len(data) > PAR_PRE_LOAD and bool(data[PAR_PRE_LOAD]),
+        "eq_selection": {"fwd_high": fwd[eq_sel[0] % 6], "fwd_low": fwd[eq_sel[1] % 6],
+                         "ret_high": ret[eq_sel[2] % 4], "ret_low": ret[eq_sel[3] % 4]},
+        # names are not reliably in the .par (see docs/file-formats.md 3.5)
+        "transformer_volts": [fx(PAR_TRANSFORMER_VOLTS + PAR_TRANSFORMER_STRIDE * k) for k in range(8)],
         "flag_hi_lo_tilt": bool(data[PAR_FLAG_TILT]),
         "power_interpolation": INTERPOLATION.get(data[PAR_INTERPOLATION], "constant_wattage"),
         "max_amps_through": {k: fx(PAR_MAX_AMPS + 4 * i) for i, k in enumerate(MAX_AMPS_THROUGH)},
@@ -501,7 +517,8 @@ def read_parameters(data: bytes) -> dict:
         "tilts": [[fx(PAR_TILTS + PAR_TILT_STRIDE * lv + 4 * j) for j in range(4)]
                   for lv in range(16)],
         "tap_windows": windows,
-        "min_f3": [fx(PAR_EXTRA_LEVELS + PAR_EXTRA_LEVEL_STRIDE * lv) for lv in range(16)],
+        "extra_levels": [[fx(PAR_EXTRA_LEVELS + PAR_EXTRA_LEVEL_STRIDE * lv + 4 * j) for j in range(6)]
+                         for lv in range(16)],
     }
 
 

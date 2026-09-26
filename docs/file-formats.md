@@ -381,7 +381,7 @@ whole table that matches row for row.
 | 545 | u8[33] Tap Selection, Homes → Number of Ports, homes 0–32 | n → n | proven |
 | 578 + 25·k | char[25] HTH Connectors, Splices, Terminators (3 more blank slots follow) | HOUS TO HOUS, SGMC, GTRM | proven |
 | 728 + 25·k | char[25] underground housing part numbers, 13 slots | TV-60 … TV-1024 | proven |
-| 1053 | u8 Strand/Trench Types 000–500, bit n = series n00 ticked | 0x1D = 000 200 300 400 | proven for the pattern; 800 is elsewhere (3914), 600/700/900 not placed |
+| 1053 | u8 Strand/Trench Types 000–500, bit n = series n00 ticked | 0x1D = 000 200 300 400 | proven (600–900 are bytes at 3912–3915) |
 | 1056 | u8 points, Equalizer | 5 | proven (test copy: 9) |
 | 1057 | u8 points, Amplifier | 16 (KERMIT 36) | proven |
 | 1058 | u8 points, Line Extender | 11 | proven |
@@ -396,31 +396,33 @@ whole table that matches row for row.
 | 1130 | Lines per Form | 0 (KERMIT 45) | proven (test copy: 44) |
 | 1134 | Tap Margin | 0.50 | proven |
 | 1138 | Signal Display, 0 dBmV / 1 dBuV | 0 | proven (save chain s2) |
-| 1142 | Distance Units, 0 Ftg / 1 m (dM not seen) | 0 | proven (save chain s1) |
+| 1142 | Distance Units, 0 Ftg / 1 m / 2 dM | 0 | proven (chains s1, v1) |
 | 1146 | Replacement Cables, Backfeed | 0 | proven (test copy: 7) |
 | 1154 + 20·lv | System Levels lv 0–15: Min 750, Min 54, Max 40, Max 5, then one more (0) | 17 10 45 45 / 19 12 45 45 | proven (5th unknown) |
 | 1470 | Replacement Cables, Fwd. Feed | 0 | proven (test copy: 9) |
 | 1474 | u8 Power Interpolation, 0 Step / 1 Linear / 2 Constant Wattage | 2 (KERMIT 0) | proven (test copy: 1) |
 | 1478 | u8 Overvoltage Check, 1 = On | 0 (KERMIT 1) | proven (test copy: 1; Pre Load left Off) |
-| 1482 | Optimization, 0 OP- / 1 OFf (OP+ not seen) | 0 | proven (save chain s6) |
+| 1482 | Optimization, 0 OP- / 1 OFf / 2 OP+ | 0 | proven (chains s6, v1) |
 | 1486 + 4·k | Maximum Amperage Through: Power Inserter, Amplifier, Bridger Port, Coupler, Line Extender, Tap | 16 15 15 15 15 12 | proven (test copy: 16 15.1 15.2 15.3 15.4 12) |
-| 1510 | Default EQ Placement, 1 EQ+ / 2 EQe (EQ- not seen) | 1 (KERMIT 1) | proven (save chain s5) |
+| 1510 | Default EQ Placement, 0 EQ- / 1 EQ+ / 2 EQe | 1 (KERMIT 1) | proven (chains s5, v1) |
 | 1567 + 25·k | power supply ID k+1 part number, 25 slots | EXISTING STDBY … | proven |
 | 2212 + 20·k | power supply ID k+1: Voltage Rating, Current Rating, % Capacity | 60/15/85, 60/15/90, 90/15/90, 90/15/85 | proven |
 | 2972 | i32 raw 7777 | same in KERMIT | unknown (a marker?) |
-| 2976 + 24·lv | Min 550 (freq 3) of level lv, then presumably Min F4–F6, Max R3–R4 | 15 / 17 | Min F3 proven; the rest of the 24 bytes assumed |
+| 2976 + 24·lv | per level: Min F3 (550), Min F4, Min F5, Min F6, Max R3, Max R4 | 15 / 17, rest 0 | proven (v7 level 0: 1.25 2.25 3.35 4.25 5.25) |
 | 3792 + 10·k | frequency k (F1–F6, R1–R4): char[5] label, u8 enabled, i32 tap window | 750 54 550* F4* F5* F6* 40 5 R3* R4* (*off); windows 12 16 · 16 16 | proven |
-| 3894, 3898 | u8 1, 1 | same in KERMIT and the test copy | unknown |
+| 3892 + 2·k | u16 Freqs. for Active EQ Selection: Fwd High, Fwd Low (index into F1–F6), Ret High, Ret Low (index into R1–R4) | 0 1 0 1 = 750 54 40 5 | proven (v8, v9 swapped each pair) |
 | 3900, 3905 | u8 pairs 100/30, 101/30 | same in KERMIT and the test copy | unknown — not the replacement cables |
 | 3904 | u8 Enforce Tap Window | 0 | proven (save chain s7) |
 | 3909 | u8 Max. Tap Cascade | 0 | proven (test copy: 6) |
 | 3911 | u8 Allow Over Equalization | 1 (KERMIT 0) | proven (test copy: unticked → 0) |
-| 3914 | u8 Strand/Trench Types, 800 Series | 0 | proven (save chain s4) |
-| 3916 | Transformer 1 part number, typed `XFMR-T1`, saved as `FMR-T1` (no `X` anywhere in the file); then the voltage as text ` 60.5` at 3923 | blank | partly |
-| 4171 | Transformer 1 voltage, i32 ×1e6 (unaligned) | 0 | proven (test copy: 60.5) |
+| 3912–3915 | u8 Strand/Trench Types 600, 700, 800, 900 Series | 0 0 0 0 | proven (chains s4, v2–v4) |
+| 3916 | `FMR-T1 60.5` — transformer 1 as typed, without its first letter | blank | the names are not reliably here: see below |
+| 4171 + 260·k | Transformer k+1 voltage, i32 ×1e6 (unaligned), 8 slots | 0 | proven (60.5, 70.25, 80.75 for 1–3) |
+| 6000 | u8 Enforce Tap Tilt | 0 | proven (chain v5) |
 | 6001 | u8 Flag Hi/Lo Tilt | 0 | proven (save chain s8) |
 | 6002 + 16·lv | System Levels Max Tilt Fwd, Min Tilt Fwd, Max Tilt Ret, Min Tilt Ret | 0 | proven (test copy level 0: 1.10 2.20 3.30 4.40) |
 | 6514 | u8 Show Count Types | 0 | proven (save chain s3) |
+| 6515 | u8 Pre Load/Test Attached Networks — only in the 6516-byte files version 12 writes | absent | proven (chain v6) |
 
 The user's test copy (WV750-2026.par re-saved with a distinct value in every
 field, `samples/partest/paratest.par`) placed most of the rest. Re-saving
@@ -432,10 +434,20 @@ A chain of eight saves, each undoing one setting of the test copy
 fields that had all saved as 1. Saving also stamps the saver's licence and
 user ids into the header.
 
-Still not placed: Strand/Trench 600, 700 and 900; Enforce Tap Tilt; Pre Load;
-the third choice of Distance Units (dM), EQ Placement (EQ-) and Optimization
-(OP+); Freqs. for Active EQ Selection; Min F4–F6 / Max R3–R4 (assumed to
-follow Min F3 at 2976); transformers 2–8.
+A second chain from s8 (`v1.par` … `v9.par`) placed everything else on the
+six tabs. Every setting on them is now located.
+
+**Transformer part numbers are the one thing the .par does not hold
+reliably.** Transformer 2 and 3's names (ABC-2, DEF-3) were saved nowhere in
+the file, and the user found them gone on reopening while all three voltages
+survived; transformer 1 shows as XFMR-T1 though the file holds `FMR-T1`.
+The program may keep them elsewhere.
+
+Bytes that no tab shows and that no setting tried has changed, the same in
+every file: 1054–1055 (32, 32); 1082 (12, 16, 16, 16 — equal to the four
+design tap windows); the fifth value of each System Levels record at
+1154 + 20·lv + 16 (0); 2972 (raw 7777);
+3900 and 3905 (100/30, 101/30).
 
 What the replica uses: frequencies and System Levels (tap colours), tap
 margin, Strand/Trench Types (a branch with footage only on unticked series

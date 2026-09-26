@@ -79,11 +79,8 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 8. **Keystrokes** — a screen recording (Win + Alt + R) of keying a few nodes.
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
-10. **Parameters fields not yet proven** (file-formats 3.5). The test copy
-    and the s1–s8 save chain placed everything that WV750 left at zero,
-    except: Strand/Trench 600, 700, 900; Enforce Tap Tilt; Pre Load; the
-    third choice of Distance Units, EQ Placement and Optimization; Freqs. for
-    Active EQ Selection; Min F4–F6 / Max R3–R4; transformers 2–8 (and why
-    the program shows XFMR-T1 when the file holds FMR-T1). One more chain
-    settles them. Also: does Strand/Trench Types decide `<n>` for 5xx cable as
-    it does for 1xx? (No AL004 branch runs on 5xx alone.)
+10. **Parameters — mapped.** Every setting on the six tabs is located and
+    read (file-formats 3.5), proven by the test copy and two save chains.
+    Only transformer part numbers are not reliably in the file. Still to
+    confirm: does Strand/Trench Types decide `<n>` for 5xx cable as it does
+    for 1xx? (No AL004 branch runs on 5xx alone.)

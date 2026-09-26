@@ -29,15 +29,15 @@ The user is a Lode Data designer. What they want:
 
 * Windows: double-click `run.bat`. Linux: `./run.sh`. Both start
   `uvicorn api:app --app-dir app` on port 8000.
-* `python -m pytest -q` → 99 tests. The browser tests use Playwright with
+* `python -m pytest -q` → 100 tests. The browser tests use Playwright with
   `/opt/pw-browsers/chromium`.
 * The sample-based tests **skip unless the sample files are present**:
   * `samples/AL004-WV750/AL004.ntw`
   * `samples/AL004-WV750/WV750-2026.{par,atv,tap,cpr,cbl}` — the user's
     `aloo4_apec.zip`
-  * optionally `samples/partest/paratest.par` and `s1.par` … `s8.par`, the
-    user's test copy of the .par and a chain of saves undoing one setting
-    each
+  * optionally `samples/partest/paratest.par`, `s1.par` … `s8.par` and
+    `v1.par` … `v9.par`: the user's test copy of the .par and two chains of
+    saves changing one setting each
   * optionally the older `samples/KERMIT750-2026.*`, `samples/WVBeck750.*` and
     `samples/AL00{2,3,4,5}.ntw` from the earlier OneDrive zips
 * `samples/` is gitignored; a new session needs these files uploaded again.
@@ -99,6 +99,7 @@ Power currents and volts match on all 29 lines of branch 4.
 
 ## Next step
 
-Open questions 1, 2 and 3 are closed and the Parameters file is mapped apart
-from the short list in item 10. Waiting on the user for one more save chain
-for those, then the yellow in item 5 (tap window lead), then item 4, Pads/EQ.
+Open questions 1, 2 and 3 are closed and the Parameters file is fully mapped
+(item 10). Next: the yellow in item 5 — the user will answer it (tap window
+lead: `<43>`'s 26.82 at 54 is above min 10 + window 16). Then item 4,
+Pads/EQ.
