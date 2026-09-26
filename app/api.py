@@ -193,6 +193,7 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
 class InsertNode(BaseModel):
     after: int = 0          # node seq to insert after; 0 appends
     before: int = 0         # or the node seq to insert above
+    cable_from_previous: bool = False   # Design's Insert: the line above's cable
 
 
 @app.post("/api/networks/{nid}/branches/{branch}/nodes")
@@ -205,7 +206,16 @@ def insert_node(nid: str, branch: int, body: InsertNode):
         at = max(0, min(body.before - 1, len(b.nodes)))
     else:
         at = len(b.nodes) if not body.after else body.after
-    b.nodes.insert(at, Node())
+    new = Node()
+    if body.cable_from_previous:
+        # the line above; above a branch's first line, the coupler's line
+        parent = d.branch(b.parent_branch) if b.parent_branch else None
+        prev = (b.nodes[at - 1] if at > 0
+                else parent.nodes[b.parent_node - 1] if parent and 0 < b.parent_node <= len(parent.nodes)
+                else b.nodes[0] if b.nodes else None)
+        if prev is not None:
+            new.cab, new.cab_part = prev.cab, prev.cab_part
+    b.nodes.insert(at, new)
     d.renumber(b)
     save(d)
     return {"branch": branch, "node": at + 1}

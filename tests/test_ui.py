@@ -304,6 +304,14 @@ def test_design_alter_keys_ftg_hc_cab_lv_as_one(page):
     page.wait_for_timeout(1200)
     r = _row(page, 34, 2)
     assert (r["ftg"], r["hc"], r["cab"]) == (150, 2, 401)
+    # lv is the last: "." keeps it and goes no further
+    _goto(page, 34, 3, "ftg")
+    _type(page, "0...2.")
+    page.wait_for_timeout(1200)
+    assert page.evaluate("curCol().key") == "lv"
+    assert page.evaluate("S.buffer") is None
+    r = _row(page, 34, 3)
+    assert (r["ftg"], r["cab"], r["lv"]) == (338, 406, 2)
     # a field left empty keeps its value
     _goto(page, 34, 5, "ftg")
     _type(page, "0.3")
@@ -326,14 +334,18 @@ def test_amplifier_definition_names_the_amplifier(page):
     assert "B" in page.inner_text(".ampdef .adrow")
     assert page.input_value("#adName") == "AL00411"
     assert page.inner_text(".ampdef .adstatus") == "Enter Amplifier name."
-    warnings = []
-    page.once("dialog", lambda d: (warnings.append(d.message), d.accept()))
-    page.fill("#adName", "AL00410")               # 34.3's
+    # 34.3's name, in any case: the window closes and "Amp Exists" says where
+    page.fill("#adName", "al00410")
     page.click("#adOk")
-    page.wait_for_timeout(500)
-    assert warnings and "AL00410" in warnings[0]
-    assert not page.evaluate("document.getElementById('modal').hidden")
+    page.wait_for_timeout(400)
+    assert page.inner_text(".msgbox .mbtitle") == "Amp Exists"
+    assert page.inner_text(".msgbox .mbbody span:last-child") == "Amplifier al00410 already exists at 34.3."
+    page.click("#mbOk")
+    assert page.evaluate("document.getElementById('modal').hidden")
     assert _row(page, 34, 6)["amp_label"] == "AL00411"
+    _type(page, ".+")
+    page.wait_for_timeout(300)
+    assert page.input_value("#adName") == "AL00411"
     page.fill("#adName", "A-1/b#2")
     page.keyboard.press("Enter")
     page.wait_for_timeout(1000)
@@ -373,10 +385,61 @@ def test_insert_adds_zero_footage_lines_above_and_below(page):
     rows = page.evaluate("S.scr.rows.filter(r => r.branch === 4 && !r.end)")
     assert len(rows) == before + 3
     assert [r["ftg"] for r in rows[:8]] == [476, 155, 134, 0, 0, 121, 0, 156]
+    assert [r["cab"] for r in rows[3:7]] == [410, 410, 410, 410]
     assert rows[5]["couplers"] == ["12<6>"]
     # the cursor stayed on the coupler's line
     assert page.evaluate("curRow().node") == 6
     # branch 6 still hangs from it, and nothing downstream moved
     assert page.evaluate("S.scr.branches.find(b => b.number === 6).parent_node") == 6
     assert _row(page, 6, 9)["block"] == block
+    # a new line takes the cable of the line above it: 22.2 is 505, 22.3 405
+    _goto(page, 22, 3, "ftg")
+    page.keyboard.press("Insert")
+    page.wait_for_timeout(800)
+    _type(page, ".")
+    page.keyboard.press("Insert")
+    page.wait_for_timeout(800)
+    rows = page.evaluate("S.scr.rows.filter(r => r.branch === 22 && !r.end)")
+    assert [(r["ftg"], r["cab"]) for r in rows[1:5]] == [(25, 505), (0, 505), (360, 405), (0, 405)]
+    assert not page.errors
+
+
+def test_the_next_amplifier_is_offered_the_last_name_and_steps_it(page):
+    """An amplifier not yet named is offered the last name given; + and -
+    in the field step its number."""
+    _open_al004(page)
+    _goto(page, 34, 6, "amp")
+    _type(page, ".+")
+    page.wait_for_timeout(300)
+    page.fill("#adName", "AL00500")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1000)
+    _goto(page, 34, 7, "amp")                     # place a 21 there
+    _type(page, "021")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1200)
+    _goto(page, 34, 7, "amp")
+    _type(page, ".+")
+    page.wait_for_timeout(300)
+    assert page.input_value("#adName") == "AL00500"
+    page.keyboard.press("+")
+    assert page.input_value("#adName") == "AL00501"
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1000)
+    assert _row(page, 34, 7)["amp_label"] == "AL00501"
+    _goto(page, 34, 5, "amp")
+    _type(page, "021")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1200)
+    _goto(page, 34, 5, "amp")
+    _type(page, ".+")
+    page.wait_for_timeout(300)
+    assert page.input_value("#adName") == "AL00501"
+    page.keyboard.press("-")
+    page.keyboard.press("-")
+    assert page.input_value("#adName") == "AL00499"
+    page.keyboard.press("+")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(400)
+    assert page.inner_text(".msgbox .mbbody span:last-child") == "Amplifier AL00500 already exists at 34.6."
     assert not page.errors

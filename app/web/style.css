@@ -170,3 +170,11 @@ table.grid td.xhousing{color:var(--white)!important;text-align:left}
 .ampdef .adrow input{flex:1;width:auto}
 .ampdef .row{justify-content:center}
 .ampdef .adstatus{margin-top:12px;padding-top:4px;border-top:1px solid var(--chromeline);font-size:12px}
+
+/* a Windows message box: "Amp Exists" */
+.msgbox{min-width:360px}
+.msgbox .mbtitle{font-size:13px;color:#555;margin-bottom:18px}
+.msgbox .mbbody{display:flex;align-items:center;gap:12px;font-size:13px;margin-bottom:6px}
+.msgbox .mbicon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;
+  border-radius:50%;background:#d42020;color:#fff;font-size:18px;font-weight:700;flex:none}
+.msgbox .row{justify-content:flex-end}

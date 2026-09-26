@@ -140,7 +140,7 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    the tap selection group in force (the TSG column, blank = the toolbar's
    1).
    The small 3-option dialog in the old videos is still unidentified.
-8. **Keystrokes — partly answered.** Design mode's digits are the screen
+8. **Keystrokes — answered.** Design mode's digits are the screen
    menu (`0 Alter`, `5 Test`, `.2 BkFeed`, `..5 Dsmry`; `./ Distance`), `/`
    toggles the expanded display, Esc closes a window. `0` on a tap prompts
    "Enter desired tap {# of ports}.{ID #}:    [home] for list"; Home opens
@@ -150,21 +150,26 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    replacing any tap there (the user; `tests/test_ui.py`). Entry mode keys
    values directly. From the user, all built and tested:
    * `0` on ftg, hc, cab or lv starts keying; `.` moves on to the next of
-     the four, still keying (`0 150 . 2 . 401`). A tap is keyed the same
-     way: `0 2 . 4` is a 2-port 4, `0 8 . 18` an 8-port 18.
+     the four, still keying (`0 150 . 2 . 401`); a field left empty keeps
+     its value; lv is the last — `.` there keeps it and goes no further.
+     Actives, taps and couplers each take their own `0`. A tap: `0 2 . 4`
+     is a 2-port 4, `0 8 . 18` an 8-port 18.
    * `. +` with the cursor on an amplifier's amp column opens Amplifier
      Definition (Power Supply, Amp ID, OK; status line "Enter Amplifier
      name."). The name shows in tap1; a tap placed in tap1 shows instead,
-     and the name stays the amplifier's. Any characters; a name another
-     active has is refused with a warning.
+     and the name stays the amplifier's. Any characters. An amplifier not
+     yet named is offered the last name given, and `+` / `-` in the field
+     step its number (AL00410 → AL00411). A name another active has, in
+     any case, closes the window and shows the "Amp Exists" box: "Amplifier
+     AL00411 already exists at 34.9." (the user's screenshot).
    * `Insert` adds a 0-ft line above the cursor's, `. Insert` one below;
-     every press adds another.
-   Not yet known (the replica's choice in brackets): the warning's wording
-   (`Amp ID X is already used at b.n.`) and whether the window stays open
-   after it (it does); whether names compare ignoring case (they don't);
-   the Feedermaker Networks box (left out); what an inserted line's cable
-   is (none); where `.` goes after lv (the next line's ftg, as before);
-   where the cursor goes after Insert (it stays on its node).
+     every press adds another, the cursor staying on its line. A new line
+     takes the cable of the line above it.
+   Still open: the Feedermaker Networks box in Amplifier Definition (Net
+   1–4, Enter…/Delete) is not drawn. The replica's own choices where
+   nothing says: `+`/`-` step the last run of digits; the name remembered
+   is the last one accepted; "Amp Exists" quotes the name as typed; a line
+   inserted above a branch's first takes the coupler line's cable.
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
 10. **Parameters — mapped.** Every setting on the six tabs is located and

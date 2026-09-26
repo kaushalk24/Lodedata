@@ -622,8 +622,9 @@ document.addEventListener('keydown', async ev => {
     // the next still keying; a field left empty keeps its value
     const i = EDIT_ORDER.indexOf(cols[S.col].key);
     if (S.buffer !== null && S.mode === 'design' && i >= 0) {
-      if (S.buffer.trim() !== '') commitBuffer(i === EDIT_ORDER.length - 1);
-      else if (i === EDIT_ORDER.length - 1) { S.buffer = null; moveToNextField(); }
+      // lv is the last: "." keeps its value and goes no further
+      if (S.buffer.trim() !== '') commitBuffer(false);
+      else { S.buffer = null; renderGrid(); }
       if (i < EDIT_ORDER.length - 1) {
         S.col = cols.findIndex(x => x.key === EDIT_ORDER[i + 1]);
         S.buffer = ''; msg(`Alter ${cols[S.col].head}:`); renderGrid();
@@ -878,41 +879,62 @@ async function insertRow(below) {
   const r = curRow(); if (!r || r.end) return;
   await api(`/api/networks/${S.nid}/branches/${r.branch}/nodes`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(below ? { after: r.node } : { before: r.node }) });
+    body: JSON.stringify(Object.assign(below ? { after: r.node } : { before: r.node },
+                                       { cable_from_previous: true })) });
   await refresh();
   if (!below) S.row = Math.min(S.row + 1, pageRows().length - 1);
   renderGrid();
 }
 // ".+ Name" with the cursor on an amplifier: the Amplifier Definition window.
 // The name belongs to the amplifier: it shows in tap1 until a tap is placed
-// there and stays with the amplifier either way.  Two actives cannot share
-// a name -- a name already in use is refused with a warning.
+// there and stays with the amplifier either way.  An amplifier not yet named
+// is offered the last name given; + and - in the field step its number
+// (AL00410 -> AL00411).  Two actives cannot share a name, in any case: the
+// window closes and "Amp Exists" says where the name is.
+function stepName(name, by) {
+  const m = /^(.*?)(\d+)(\D*)$/.exec(name);
+  if (!m) return name;
+  const n = Math.max(0, parseInt(m[2], 10) + by);
+  return m[1] + String(n).padStart(m[2].length, '0') + m[3];
+}
+function ampExists(name, at) {
+  modal(`<div class="msgbox"><div class="mbtitle">Amp Exists</div>
+    <div class="mbbody"><span class="mbicon">\u2715</span><span>Amplifier ${esc(name)} already exists at ${esc(at)}.</span></div>
+    <div class="row"><button id="mbOk">OK</button></div></div>`);
+  $('#mbOk').onclick = closeModal; $('#mbOk').focus();
+}
 function ampDefinition() {
   const r = curRow(), c = curCol();
   if (!r || r.end || !c || c.key !== 'amp' || !r.amp_info || r.amp_info.name === undefined) return;
   modal(`<div class="ampdef"><div class="adtitle">Amplifier Definition</div>
     <div class="adrow"><span class="adlab">Power Supply:</span><span>${esc(r.amp_info.supply || '')}</span></div>
-    <div class="adrow"><span class="adlab">Amp ID:</span><input id="adName" value="${esc(r.amp_label || '')}"></div>
+    <div class="adrow"><span class="adlab">Amp ID:</span><input id="adName"></div>
     <div class="row"><button id="adOk">OK</button></div>
     <div class="adstatus">Enter Amplifier name.</div></div>`);
   const input = $('#adName');
+  input.value = r.amp_label || S.lastAmpName || '';
   input.focus(); input.select();
   const ok = async () => {
     const name = input.value;
     const other = name && S.scr.rows.find(x => !x.end && x.amp_info && x.amp_info.name !== undefined
-      && x.amp_label === name && !(x.branch === r.branch && x.node === r.node));
-    if (other) {
-      alert(`Amp ID ${name} is already used at ${other.branch}.${other.node}.`);
-      input.focus(); input.select(); return;
-    }
+      && (x.amp_label || '').toLowerCase() === name.toLowerCase()
+      && !(x.branch === r.branch && x.node === r.node));
+    if (other) { ampExists(name, `${other.branch}.${other.node}`); return; }
     closeModal();
+    S.lastAmpName = name;
     await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amp_label: name }) });
     await refresh();
   };
   $('#adOk').onclick = ok;
-  input.onkeydown = ev => { if (ev.key === 'Enter') { ev.preventDefault(); ok(); } };
+  input.onkeydown = ev => {
+    if (ev.key === 'Enter') { ev.preventDefault(); ok(); }
+    else if (ev.key === '+' || ev.key === '-') {
+      ev.preventDefault();
+      input.value = stepName(input.value, ev.key === '+' ? 1 : -1); input.select();
+    }
+  };
 }
 async function deleteNode() {
   const r = curRow(); if (!r) return;
