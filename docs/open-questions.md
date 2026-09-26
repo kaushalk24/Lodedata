@@ -47,6 +47,9 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
      map confirms it), but only branch 6's own span, 121, is compared.
 
    Not seen yet: `{n}` (backfeed) — 6 and 12 run backward and are drawn `<`.
+   Nor `(n)`, the manual's "no footage": 12.11 draws AL004's no-footage
+   branches 2, 18, 19 and 24 as `<n>`. Asked the user whether either
+   appears at all.
 2. **8-port tap brackets — closed.** The Design screen draws an 8-port tap
    `<n>` (11.2: `<15>`), like the 6-port-slot pad `<43>`; the preview box
    draws 2/4/8-port as `(17)` `[8]` `{15}`. Both already reproduced.
@@ -128,18 +131,27 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
      reach — 22.3: LE 11 + 22.4's coupler 5 = 16 → TV-104 (from 11); a tap,
      5 → TV-60 (from 4). "The smallest that holds them" would make 22.5 a 2.
 
-   Open: (a) whether a 0-ft first node shows the block for being first, or
-   for sitting 0 ft on from its coupler (20.18, 0 ft on from 20.17's
-   coupler, would tell). (b) What the third count of each triple is (0
-   everywhere in AL004). (c) How the program tells a bridger from an LE —
-   the `.atv` records differ only in name, levels and power table; the
-   replica goes by the name. (d) The housing marker where the location's
-   first node carries nothing: 5.29 (333 ft of 415 U, bare) + 5.30 (0 ft,
-   a 2-port tap) — the replica puts `(1)` on 5.29; 23.1 should show `(1)`.
-   (e) What the cyan `(1)` is; AL004 has no node with two taps. It may be
-   the tap selection group in force (the TSG column, blank = the toolbar's
-   1).
-   The small 3-option dialog in the old videos is still unidentified.
+   Open, each with the evidence that would settle it (asked of the user):
+   * (a) Whether a 0-ft first node (22.1) shows the block for being first
+     or for sitting 0 ft on from a coupler. AL004's deciders are nodes 0 ft
+     on from a coupler that are not first: 5.25 (after 5.24's coupler, no
+     amplifier), 9.2, 10.4, 14.5, 20.18, 25.2, 29.3, 29.7, 36.2, 37.2.
+   * (b) What the third count of each triple is: 0 everywhere, and AL004
+     uses only 61 (bridger), LEs and the Ripple node. WV750 also has
+     FM901e-B, FM901e-T, FM902B, FM902T, FML332 and FML1G7J ALC LE.
+   * (c) How the program tells a bridger from an LE. No byte in the active
+     record does: bridger 41 and LE 21 carry the same flag bytes (+55,
+     +56). The Actives Specs window has a Bridgers tab and a Custom
+     Cascading tab, not yet seen. The replica goes by the name.
+   * (d) The housing marker where the location's first node carries
+     nothing: 5.29 (333 ft of 415 U, bare) + 5.30 (0 ft, a 2-port tap),
+     the only such location in AL004. The replica puts `(1)` on 5.29.
+   * (e) The cyan `(1)` on a tap's line under ftg: seen on 22.1 (aerial
+     404), 22.5, 34.8 and 34.9, one tap each, 1 or 8 homes. Not the homes,
+     not the tap cascade (34.9 is the second tap after 34.6 and still reads
+     `(1)`). The tap slot or the TSG. The replica prints the slot.
+   * The small 3-option dialog seen in the user's old videos (earlier
+     session; the videos are no longer here).
 8. **Keystrokes — answered.** Design mode's digits are the screen
    menu (`0 Alter`, `5 Test`, `.2 BkFeed`, `..5 Dsmry`; `./ Distance`), `/`
    toggles the expanded display, Esc closes a window. `0` on a tap prompts
