@@ -470,11 +470,16 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
                                 margin, red beyond it
       Tap(54) 0.82 over window  a forward port above its minimum plus the tap
                                 window (Parameters, System Levels): yellow
+      Tap(5) 0.29 below window  a return port below its maximum less the tap
+                                window: yellow
       Crossover of 3.18         the forward low port above the forward high by
                                 more than Max. Crossover: yellow, on both
 
     Levels are compared as shown, to the hundredth (16.63 - 12.84 is a 3.79
-    crossover at 3.5, not the 3.80 the unrounded levels give).  Returns the
+    crossover at 3.5, not the 3.80 the unrounded levels give).  With the 5 MHz
+    return window at 15.50 and Max. Crossover at 3.50 the program adds
+    "Tap(5) 0.29 below window at 3.6" and drops the 3.18, 3.34 and 3.40
+    crossovers: both are the Parameters settings.  Returns the
     colour of each column's port value and the messages, in the list's order.
     """
     lim = _level_row(p, lv)
@@ -496,12 +501,15 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
             errors.append((sev, f"Tap({f:g}) {out:5.2f} {side}"))
     windows = getattr(p, "tap_windows", None) or []
     for i, f in enumerate(freqs):
-        if not _is_forward(p, f) or i >= len(windows) or not windows[i]:
+        if i >= len(windows) or not windows[i]:
             continue
-        over = shown[f] - (lim[i] + windows[i])
-        if over > 0.005:
+        if _is_forward(p, f):
+            out, side = shown[f] - (lim[i] + windows[i]), "over window"
+        else:
+            out, side = (lim[i] - windows[i]) - shown[f], "below window"
+        if out > 0.005:
             mark(i, "yellow")
-            errors.append(("yellow", f"Tap({f:g}) {over:5.2f} over window"))
+            errors.append(("yellow", f"Tap({f:g}) {out:5.2f} {side}"))
     hi, lo = freqs.index(p.forward_high_mhz), freqs.index(p.forward_low_mhz)
     cross = shown[freqs[lo]] - shown[freqs[hi]]
     if getattr(p, "max_crossover_db", 0) and cross > p.max_crossover_db + 0.005:

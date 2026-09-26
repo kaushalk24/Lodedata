@@ -243,6 +243,51 @@ def test_the_test_results_match_lode_data_line_for_line():
     assert got == TEST_RESULTS.splitlines()
 
 
+# The same Test with the 5 MHz return window set to 15.50 and Max. Crossover
+# to 3.50 (6.8 as imported): "36 Errors"; the user's screenshot shows 1-31
+WINDOW_TEST_FIRST_31 = """\
+R Tap(750)  6.16 below min at 3.5.
+Y Crossover of  3.79 at 3.5.
+R Tap(750)  5.69 below min at 3.6.
+Y Tap(5)  0.29 below window at 3.6.
+Y Crossover of 10.67 at 3.6.
+Y Tap(40)  0.22 above max at 4.27.
+Y Tap(750)  0.15 below min at 5.30.
+Y Crossover of  4.04 at 5.30.
+Y Tap(54)  0.82 over window at 6.8.
+R Tap(40)  1.73 above max at 6.9.
+R Tap(40)  2.04 above max at 7.6.
+R Tap(5)  0.62 above max at 7.6.
+R Tap(750)  1.35 below min at 10.2.
+R Tap(40)  1.19 above max at 10.2.
+R Tap(750)  2.38 below min at 10.15.
+Y Crossover of  5.86 at 10.15.
+R Tap(750)  2.86 below min at 13.3.
+Y Crossover of  3.77 at 13.3.
+R Tap(750)  2.68 below min at 14.1.
+R Tap(54)  0.92 below min at 14.1.
+R Tap(40)  4.68 above max at 14.1.
+R Tap(5)  2.18 above max at 14.1.
+Y Tap(54)  1.23 over window at 16.6.
+Y Tap(54)  1.21 over window at 17.17.
+Y Tap(54)  3.40 over window at 17.18.
+Y Tap(54)  1.04 over window at 25.10.
+Y Tap(54)  3.23 over window at 25.11.
+Y Tap(750)  3.29 over window at 26.3.
+Y Tap(54)  2.09 over window at 26.3.
+Y Tap(750)  0.20 over window at 36.6.
+Y Tap(750)  1.91 over window at 37.6."""
+
+
+def test_the_return_window_and_max_crossover_are_the_parameters():
+    design = design_from_ntw(NTW, SPEC)[0]
+    design.parameters.tap_windows[3] = 15.5          # Return Tap Window, 5
+    design.parameters.max_crossover_db = 3.5         # General, Max. Crossover
+    got = [f"{'R' if v == 'red' else 'Y'} {m}" for v, m in build(design).tests]
+    assert len(got) == 36
+    assert got[:31] == WINDOW_TEST_FIRST_31.splitlines()
+
+
 def test_branch_6_colours_before_and_after_the_pad_change(screen):
     # as imported (<43>): the pad is over its 54 window, / 8/ is 1.73 above
     # max at 40 and crossed over; the end line shows 750/54 yellow, 40 red
