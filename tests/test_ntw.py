@@ -203,6 +203,28 @@ def test_a_test_copy_with_distinct_values_places_every_field():
     assert p["power_interpolation"] == "linear"
     assert list(p["max_amps_through"].values()) == [16.0, 15.1, 15.2, 15.3, 15.4, 12.0]
     assert p["tilts"][0] == [1.1, 2.2, 3.3, 4.4] and p["tilts"][1] == [0.0] * 4
+    assert (p["distance_units"], p["signal_display"], p["eq_placement"], p["optimization"]) \
+        == ("m", "dBuV", "EQe", "OFf")
+    assert p["show_count_types"] and p["enforce_tap_window"] and p["flag_hi_lo_tilt"]
+    assert p["strand_series"] == [0, 2, 3, 4, 8]
+
+
+# The user then undid one setting per save, s1 ... s8: each file must differ
+# from the one before in exactly that setting.
+CHAIN = [("distance_units", "m", "Ftg"), ("signal_display", "dBuV", "dBmV"),
+         ("show_count_types", True, False), ("strand_series", [0, 2, 3, 4, 8], [0, 2, 3, 4]),
+         ("eq_placement", "EQe", "EQ+"), ("optimization", "OFf", "OP-"),
+         ("enforce_tap_window", True, False), ("flag_hi_lo_tilt", True, False)]
+
+
+@pytest.mark.skipif(not (PARTEST.parent / "s8.par").exists(), reason="the user's save chain")
+def test_each_save_in_the_chain_changes_one_setting():
+    before = read_parameters(PARTEST.read_bytes())
+    for k, (key, was, now) in enumerate(CHAIN, start=1):
+        after = read_parameters((PARTEST.parent / f"s{k}.par").read_bytes())
+        changed = [f for f in after if after[f] != before[f]]
+        assert changed == [key] and (before[key], after[key]) == (was, now), f"s{k}"
+        before = after
 
 
 # ------------------------------------------------------------ calculations

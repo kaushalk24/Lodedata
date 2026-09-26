@@ -413,22 +413,29 @@ PAR_PORTS_BY_HOMES = 545        # u8[33]: homes 0-32 -> number of ports
 PAR_MISC_PARTS = 578            # char[25] x3: HTH connectors, splices, terminators
 PAR_HOUSING_PARTS, PAR_HOUSINGS = 728, 13   # char[25] each; min size u8 at 1063 + k
 PAR_HOUSING_SIZE = 1063
-PAR_STRAND_SERIES = 1053        # bit n: cable series n00 is a strand/trench type
+PAR_STRAND_SERIES = 1053        # bit n: series n00 (000-500) is a strand/trench type
+PAR_STRAND_800 = 3914           # u8: 800 Series ticked -- 600/700/900 not yet placed
 # Underground Housings points, u8 each
 PAR_POINTS = {"equalizer": 1056, "amplifier": 1057, "line_extender": 1058, "tap": 1059,
               "tap_8_port": 1060, "coupler": 1061, "power_supply": 1062}
-PAR_NIU = 1098                  # i32 x5 in the tab's order
+PAR_NIU = 1098                  # i32 x5 in the tab's order; whole numbers (1.11 saves as 1)
+PAR_SIGNAL_DISPLAY, PAR_DISTANCE_UNITS = 1138, 1142   # 0 dBmV / 1 dBuV; 0 Ftg / 1 m
 NIU_FIELDS = ("system_penetration", "offhook", "ring", "additional_line", "offhook_limit")
 PAR_CROSSOVER, PAR_RETURN_CROSSOVER = 1118, 1122
 PAR_MAX_LE_CASCADE, PAR_LINES_PER_FORM = 1126, 1130
 PAR_BACKFEED_CABLE, PAR_FWDFEED_CABLE = 1146, 1470
 PAR_INTERPOLATION = 1474        # 0 Step, 1 Linear, 2 Constant Wattage
+PAR_OPTIMIZATION = 1482         # 0 OP-, 1 OFf (OP+ not yet seen)
 PAR_OVERVOLTAGE = 1478          # u8, 1 = On
 PAR_MAX_AMPS = 1486             # i32 x6 in the tab's order
+PAR_EQ_PLACEMENT = 1510         # 1 EQ+, 2 EQe (EQ- not yet seen)
 PAR_EXTRA_LEVELS, PAR_EXTRA_LEVEL_STRIDE = 2976, 24   # Min F3 of level lv at +24*lv
+PAR_ENFORCE_TAP_WINDOW = 3904   # u8
 PAR_MAX_TAP_CASCADE = 3909      # u8
 PAR_OVER_EQUALIZATION = 3911    # u8, 1 = Allow Over Equalization ticked
+PAR_FLAG_TILT = 6001            # u8 Flag Hi/Lo Tilt
 PAR_TILTS, PAR_TILT_STRIDE = 6002, 16   # Max/Min Tilt Fwd, Max/Min Tilt Ret per level
+PAR_SHOW_COUNT_TYPES = 6514     # u8
 INTERPOLATION = {0: "step", 1: "linear", 2: "constant_wattage"}
 MAX_AMPS_THROUGH = ("power_inserter", "amplifier", "bridger_port", "coupler",
                     "line_extender", "tap")
@@ -452,7 +459,8 @@ def read_parameters(data: bytes) -> dict:
     if len(data) < PAR_TILTS + PAR_TILT_STRIDE * 16:
         return {}
     fx = lambda o: round(_fx(struct.unpack_from("<i", data, o)[0]), 3)
-    mask = struct.unpack_from("<H", data, PAR_STRAND_SERIES)[0]
+    mask = data[PAR_STRAND_SERIES] & 0x3F
+    strand = [n for n in range(6) if mask >> n & 1] + ([8] if data[PAR_STRAND_800] else [])
     windows = {}
     for k, key in enumerate(PAR_FREQUENCY_NAMES):
         windows[key] = fx(PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k + 6)
@@ -463,8 +471,14 @@ def read_parameters(data: bytes) -> dict:
             housings.append({"number": k + 1, "part": name,
                              "min_points": data[PAR_HOUSING_SIZE + k]})
     return {
-        # series 800/900 are assumed to be bits 8-9; both are clear in every sample
-        "strand_series": [n for n in range(10) if mask >> n & 1],
+        "strand_series": strand,
+        "distance_units": {0: "Ftg", 1: "m"}.get(int(fx(PAR_DISTANCE_UNITS)), fx(PAR_DISTANCE_UNITS)),
+        "signal_display": {0: "dBmV", 1: "dBuV"}.get(int(fx(PAR_SIGNAL_DISPLAY)), fx(PAR_SIGNAL_DISPLAY)),
+        "show_count_types": bool(data[PAR_SHOW_COUNT_TYPES]),
+        "eq_placement": {1: "EQ+", 2: "EQe"}.get(int(fx(PAR_EQ_PLACEMENT)), fx(PAR_EQ_PLACEMENT)),
+        "optimization": {0: "OP-", 1: "OFf"}.get(int(fx(PAR_OPTIMIZATION)), fx(PAR_OPTIMIZATION)),
+        "enforce_tap_window": bool(data[PAR_ENFORCE_TAP_WINDOW]),
+        "flag_hi_lo_tilt": bool(data[PAR_FLAG_TILT]),
         "power_interpolation": INTERPOLATION.get(data[PAR_INTERPOLATION], "constant_wattage"),
         "max_amps_through": {k: fx(PAR_MAX_AMPS + 4 * i) for i, k in enumerate(MAX_AMPS_THROUGH)},
         "tap_type_by_ports": {n: (2, 4, 6, 8)[data[PAR_TAP_TYPE_BY_PORTS + n] & 3]

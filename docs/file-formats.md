@@ -381,7 +381,7 @@ whole table that matches row for row.
 | 545 | u8[33] Tap Selection, Homes → Number of Ports, homes 0–32 | n → n | proven |
 | 578 + 25·k | char[25] HTH Connectors, Splices, Terminators (3 more blank slots follow) | HOUS TO HOUS, SGMC, GTRM | proven |
 | 728 + 25·k | char[25] underground housing part numbers, 13 slots | TV-60 … TV-1024 | proven |
-| 1053 | u16 Strand/Trench Types, bit n = series n00 ticked | 0x1D = 000 200 300 400 | proven for 000–700; 800/900 assumed bits 8–9 (clear everywhere) |
+| 1053 | u8 Strand/Trench Types 000–500, bit n = series n00 ticked | 0x1D = 000 200 300 400 | proven for the pattern; 800 is elsewhere (3914), 600/700/900 not placed |
 | 1056 | u8 points, Equalizer | 5 | proven (test copy: 9) |
 | 1057 | u8 points, Amplifier | 16 (KERMIT 36) | proven |
 | 1058 | u8 points, Line Extender | 11 | proven |
@@ -389,21 +389,22 @@ whole table that matches row for row.
 | 1062 | u8 points, Power Supply | 30 | proven |
 | 1063 + k | u8 housing k+1 Minimum Size (Points) | 4 6 11 17 27 | proven |
 | 1082 | ×4: 12, 16, 16, 16 | same in KERMIT | unknown — equals the four design tap windows |
-| 1098 + 4·k | NIU: System Penetration %, Offhook %, Ring %, Additional Line %, Offhook Limit | 0 ×5 (KERMIT 47 53 51 54 0) | proven (test copy: 1 2 3 4 5) |
+| 1098 + 4·k | NIU: System Penetration %, Offhook %, Ring %, Additional Line %, Offhook Limit | 0 ×5 (KERMIT 47 53 51 54 0) | proven (test copy: 1 2 3 4 5). Whole numbers: 1.11 typed comes back as 1.0 |
 | 1118 | Max. Crossover | 3.00 | proven (test copy: 3.25) |
 | 1122 | Max Return Crossover | 99.00 | proven |
 | 1126 | Max. LE Cascade | 3 (KERMIT 2) | proven (test copy: 4) |
 | 1130 | Lines per Form | 0 (KERMIT 45) | proven (test copy: 44) |
 | 1134 | Tap Margin | 0.50 | proven |
-| 1138, 1142 | 0 → 1.00 in the test copy | 0 | one of the eight "set to 1" changes — see below |
+| 1138 | Signal Display, 0 dBmV / 1 dBuV | 0 | proven (save chain s2) |
+| 1142 | Distance Units, 0 Ftg / 1 m (dM not seen) | 0 | proven (save chain s1) |
 | 1146 | Replacement Cables, Backfeed | 0 | proven (test copy: 7) |
 | 1154 + 20·lv | System Levels lv 0–15: Min 750, Min 54, Max 40, Max 5, then one more (0) | 17 10 45 45 / 19 12 45 45 | proven (5th unknown) |
 | 1470 | Replacement Cables, Fwd. Feed | 0 | proven (test copy: 9) |
 | 1474 | u8 Power Interpolation, 0 Step / 1 Linear / 2 Constant Wattage | 2 (KERMIT 0) | proven (test copy: 1) |
 | 1478 | u8 Overvoltage Check, 1 = On | 0 (KERMIT 1) | proven (test copy: 1; Pre Load left Off) |
-| 1482 | 0 → 1.00 in the test copy | 0 | one of the eight — see below |
+| 1482 | Optimization, 0 OP- / 1 OFf (OP+ not seen) | 0 | proven (save chain s6) |
 | 1486 + 4·k | Maximum Amperage Through: Power Inserter, Amplifier, Bridger Port, Coupler, Line Extender, Tap | 16 15 15 15 15 12 | proven (test copy: 16 15.1 15.2 15.3 15.4 12) |
-| 1510 | 1.00 → 2.00 in the test copy | 1.00 (KERMIT 1.00) | EQ Placement or Optimization — see below |
+| 1510 | Default EQ Placement, 1 EQ+ / 2 EQe (EQ- not seen) | 1 (KERMIT 1) | proven (save chain s5) |
 | 1567 + 25·k | power supply ID k+1 part number, 25 slots | EXISTING STDBY … | proven |
 | 2212 + 20·k | power supply ID k+1: Voltage Rating, Current Rating, % Capacity | 60/15/85, 60/15/90, 90/15/90, 90/15/85 | proven |
 | 2972 | i32 raw 7777 | same in KERMIT | unknown (a marker?) |
@@ -411,28 +412,30 @@ whole table that matches row for row.
 | 3792 + 10·k | frequency k (F1–F6, R1–R4): char[5] label, u8 enabled, i32 tap window | 750 54 550* F4* F5* F6* 40 5 R3* R4* (*off); windows 12 16 · 16 16 | proven |
 | 3894, 3898 | u8 1, 1 | same in KERMIT and the test copy | unknown |
 | 3900, 3905 | u8 pairs 100/30, 101/30 | same in KERMIT and the test copy | unknown — not the replacement cables |
-| 3904 | u8 0 → 1 in the test copy | 0 | one of the eight — see below |
+| 3904 | u8 Enforce Tap Window | 0 | proven (save chain s7) |
 | 3909 | u8 Max. Tap Cascade | 0 | proven (test copy: 6) |
 | 3911 | u8 Allow Over Equalization | 1 (KERMIT 0) | proven (test copy: unticked → 0) |
-| 3914 | u8 0 → 1 in the test copy | 0 | one of the eight, or the transformer count |
-| 3916 | Transformer 1 part number, typed `XFMR-T1`, saved as `FMR-T1`; then the voltage as text ` 60.5` at 3923 | blank | partly — the first letter is missing in the file |
+| 3914 | u8 Strand/Trench Types, 800 Series | 0 | proven (save chain s4) |
+| 3916 | Transformer 1 part number, typed `XFMR-T1`, saved as `FMR-T1` (no `X` anywhere in the file); then the voltage as text ` 60.5` at 3923 | blank | partly |
 | 4171 | Transformer 1 voltage, i32 ×1e6 (unaligned) | 0 | proven (test copy: 60.5) |
-| 6001 | u8 0 → 1 in the test copy | 0 | one of the eight — see below |
+| 6001 | u8 Flag Hi/Lo Tilt | 0 | proven (save chain s8) |
 | 6002 + 16·lv | System Levels Max Tilt Fwd, Min Tilt Fwd, Max Tilt Ret, Min Tilt Ret | 0 | proven (test copy level 0: 1.10 2.20 3.30 4.40) |
-| 6514 | u8 0 → 1 in the test copy | 0 | one of the eight — see below |
+| 6514 | u8 Show Count Types | 0 | proven (save chain s3) |
 
 The user's test copy (WV750-2026.par re-saved with a distinct value in every
 field, `samples/partest/paratest.par`) placed most of the rest. Re-saving
 also writes the header as format 12.1, blanks the licence and user ids, and
 adds one byte at the end (6516 bytes).
 
-Still ambiguous: eight fields that the test set to their second or third
-choice, all landing on value 1 (1138, 1142, 1482, 3904, 3914, 6001, 6514) or
-1 → 2 (1510): Distance Units, Signal Display, Show Count Types, 800 Series,
-Default EQ Placement, Optimization, Enforce Tap Window, Flag Hi/Lo Tilt.
-Strand/Trench Types at 1053 did not change, so either 800 was not ticked or
-600–900 live elsewhere. Also not placed: Pre Load, Enforce Tap Tilt (left
-unchanged), Freqs. for Active EQ Selection, transformers 2–8.
+A chain of eight saves, each undoing one setting of the test copy
+(`samples/partest/s1.par` … `s8.par`), placed the eight radio and checkbox
+fields that had all saved as 1. Saving also stamps the saver's licence and
+user ids into the header.
+
+Still not placed: Strand/Trench 600, 700 and 900; Enforce Tap Tilt; Pre Load;
+the third choice of Distance Units (dM), EQ Placement (EQ-) and Optimization
+(OP+); Freqs. for Active EQ Selection; Min F4–F6 / Max R3–R4 (assumed to
+follow Min F3 at 2976); transformers 2–8.
 
 What the replica uses: frequencies and System Levels (tap colours), tap
 margin, Strand/Trench Types (a branch with footage only on unticked series

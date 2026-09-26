@@ -80,11 +80,10 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 9. **The power stop field** is confirmed on AL004 only; the older samples set
    it on many more nodes.
 10. **Parameters fields not yet proven** (file-formats 3.5). The test copy
-    placed NIU, points, cascades, lines per form, replacement cables,
-    overvoltage, over-equalization, tilts and the amperage limits. Left:
-    eight fields that all saved as 1 (or 1 → 2) — Distance Units, Signal
-    Display, Show Count Types, 800 Series, EQ Placement, Optimization,
-    Enforce Tap Window, Flag Hi/Lo Tilt — over 1138, 1142, 1482, 1510, 3904,
-    3914, 6001, 6514. A chain of saves reverting one field at a time settles
-    them. Also: does Strand/Trench Types decide `<n>` for 5xx cable as it does
-    for 1xx? (No AL004 branch runs on 5xx alone.)
+    and the s1–s8 save chain placed everything that WV750 left at zero,
+    except: Strand/Trench 600, 700, 900; Enforce Tap Tilt; Pre Load; the
+    third choice of Distance Units, EQ Placement and Optimization; Freqs. for
+    Active EQ Selection; Min F4–F6 / Max R3–R4; transformers 2–8 (and why
+    the program shows XFMR-T1 when the file holds FMR-T1). One more chain
+    settles them. Also: does Strand/Trench Types decide `<n>` for 5xx cable as
+    it does for 1xx? (No AL004 branch runs on 5xx alone.)
