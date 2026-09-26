@@ -523,6 +523,36 @@ def test_amplifier_info_box(screen):
     assert (a["cascade"], a["supply"], a["homes_down"]) == (1, "A", 120)
 
 
+# The expanded display's cyan block, read off the screen with "/" on:
+# [aerial to previous active, aerial to start, total to previous active or
+# split, total to previous active, total to start, loss at 750 over the
+# third, the fourth and the fifth] and "bridgers-LEs-? from the start down,
+# the same from here on, homes from here on, footage on this cable since the
+# previous active or split".
+EXPANDED_BLOCKS = {
+    (6, 9): ([1015, 1901, 1015, 1015, 1901], [15.56, 15.56, 28.67], [1, 0, 0], [0, 0, 0], 1, 894),
+    (4, 24): ([893, 2920, 652, 893, 2920], [9.65, 13.22, 43.22], [2, 0, 0], [2, 3, 0], 45, 652),
+    (4, 25): ([0, 2920, 0, 0, 2920], [0.00, 0.00, 43.22], [2, 0, 0], [0, 1, 0], 25, 0),
+    (4, 26): ([74, 2994, 74, 74, 2994], [1.60, 1.60, 44.81], [2, 0, 0], [0, 1, 0], 24, 74),
+    (22, 1): ([74, 2994, 0, 74, 2994], [0.00, 1.60, 44.81], [2, 0, 0], [0, 1, 0], 17, 0),
+    (22, 3): ([74, 2994, 385, 459, 3379], [6.85, 8.45, 51.67], [2, 1, 0], [0, 1, 0], 16, 385),
+    (22, 4): ([0, 2994, 0, 0, 3379], [0.00, 0.00, 51.67], [2, 1, 0], [0, 0, 0], 16, 0),
+    (22, 5): ([0, 2994, 80, 80, 3459], [1.42, 1.42, 53.09], [2, 1, 0], [0, 0, 0], 8, 80),
+}
+
+
+def test_expanded_display_block(screen):
+    rows = {(r.branch, r.node): r for r in screen.rows if not r.end}
+    for key, (dist, loss, above, below, homes, ftg) in EXPANDED_BLOCKS.items():
+        b = rows[key].block
+        got = ([round(v) for v in b["distances"]], [round(v, 2) for v in b["losses"]],
+               b["above"], b["below"], b["homes"], round(b["same_cable"]))
+        assert got == (dist, loss, above, below, homes, ftg), key
+    # lines shown without one: no amplifier, coupler, or end of branch
+    for key in [(4, 21), (4, 22), (4, 23), (6, 6), (6, 7), (6, 8), (22, 2)]:
+        assert not rows[key].block, key
+
+
 def test_power_supply_info(screen):
     ps = next(r for r in screen.rows if (r.branch, r.node) == (18, 1))
     assert (ps.supply_label, ps.supply_type, ps.supply_name) == ("A", 3, "EXISTING  90v")

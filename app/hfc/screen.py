@@ -65,6 +65,7 @@ class Row:
     supply_pct: int | None = None
     powered_by: str = ""        # label of the supply whose area this node is in
     amp_info: dict = field(default_factory=dict)
+    block: dict = field(default_factory=dict)      # the expanded display's cyan block
     # checks
     flags: list = field(default_factory=list)      # (severity, message)
 
@@ -101,7 +102,7 @@ class Row:
             "supply": self.supply,
             "supply_label": self.supply_label, "supply_type": self.supply_type,
             "supply_name": self.supply_name, "powered_by": self.powered_by,
-            "amp_info": self.amp_info,
+            "amp_info": self.amp_info, "block": self.block,
             "supply_pct": self.supply_pct,
             "flags": [{"severity": s, "message": m} for s, m in self.flags + self.tap_notes],
             "severity": self.severity,
@@ -368,15 +369,37 @@ def build(design: Design) -> Screen:
     return scr
 
 
+def _active_kind(part) -> str:
+    """Bridger or line extender, as the expanded display counts them.
+
+    Nothing in the Actives file says which a part is -- AL004's BRIDGER and
+    LE records differ only in name, levels and power table -- so this goes
+    by the name until the program's own rule is known.
+    """
+    name = part.name.upper() if part else ""
+    if "BRIDGER" in name:
+        return "bridger"
+    if name.startswith("LE") or " LE" in name:
+        return "line_extender"
+    return ""
+
+
 def _amp_info(design: Design, scr: Screen) -> None:
-    """What the info box shows with the cursor on an amplifier.
+    """What the info box shows with the cursor on an amplifier, and the cyan
+    block the expanded display (`/`) draws under a node.
 
     Checked on AL004's AL00416: 2027 ft to the node and to the start of the
     network, 1141 ft to the previous active or split (the DC-12 at 4.4),
-    cascade position 1, supply A, 120 homes downstream.
+    cascade position 1, supply A, 120 homes downstream.  The block, on 6.9,
+    4.24-4.26 and 22.1-22.5, every figure: the same five distances, cable
+    loss at the first design frequency over three of them, bridgers and
+    line extenders from the start down to the node and from the node on
+    (itself included both ways), homes from the node on, and footage on
+    the node's own cable back to the previous active or split.
     """
     lib = design.library
     rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+    mhz = scr.frequencies[0] if scr.frequencies else 0.0
 
     def upstream(b: int, n: int):
         """(branch, node) pairs from this node back to the start, nearest first."""
@@ -393,45 +416,75 @@ def _amp_info(design: Design, scr: Screen) -> None:
         cable = lib.cables.get(nd.cab_part)
         return (cable.cable_index if cable and cable.cable_index >= 0 else nd.cab % 100) % 2 == 0
 
-    def downstream_homes(b: int, n: int) -> int:
-        total, stack = 0, [(b, n)]
+    def loss(nd) -> float:
+        cable = lib.cables.get(nd.cab_part)
+        return cable.loss_db(mhz, nd.ftg) if cable and nd.ftg else 0.0
+
+    def kinds(nodes) -> list:
+        found = [_active_kind(lib.actives.get(nd.amp_part)) for nd in nodes if nd.amp]
+        # the third count is 0 on every node seen so far; what it counts is not known
+        return [found.count("bridger"), found.count("line_extender"), 0]
+
+    def downstream(b: int, n: int) -> list:
+        out, stack = [], [(b, n)]
         while stack:
             bb, first = stack.pop()
-            br = design.branch(bb)
-            for nd in br.nodes[first - 1:]:
-                total += nd.hc
+            for nd in design.branch(bb).nodes[first - 1:]:
+                out.append(nd)
                 stack += [(c.branch, 1) for c in nd.couplers if design.branch(c.branch)]
-        return total
+        return out
 
     for (b, n), r in rows.items():
         nd = node(b, n)
-        if not nd.amp:
+        last = n == len(design.branch(b).nodes)
+        # a branch's first node shows it at 22.1 (0 ft); whether that is for
+        # being first or for the 0 ft is not yet known, so only both
+        block = bool(nd.amp or nd.couplers or last or (n == 1 and not nd.ftg))
+        if not (nd.amp or block):
             continue
-        part = lib.actives.get(nd.amp_part)
         d = dict.fromkeys(("aerial_prev", "aerial_start", "total_split",
                            "total_prev", "total_start"), 0)
+        lost = dict.fromkeys(("split", "prev", "start"), 0.0)
+        same_cable = 0
         found_active = found_split = False
         cascade = 0
         first = True
         for bb, k in upstream(b, n):
             here = node(bb, k)
             if not first:
-                if here.amp and not found_active:
-                    found_active = True
-                    cascade += 0
                 if here.amp:
+                    found_active = True
                     cascade += 1
-                if (here.amp or here.couplers) and not found_split:
+                if here.amp or here.couplers:
                     found_split = True
-            ft = here.ftg
+            ft, db = here.ftg, loss(here)
             d["total_start"] += ft
             d["aerial_start"] += ft if aerial(here) else 0
+            lost["start"] += db
             if not found_active:
                 d["total_prev"] += ft
                 d["aerial_prev"] += ft if aerial(here) else 0
+                lost["prev"] += db
             if not found_split:
                 d["total_split"] += ft
+                lost["split"] += db
+                # the cable, not the code: 22.2's 505 counts for 22.3's 405
+                same_cable += ft if here.cab_part == nd.cab_part else 0
             first = False
+        below = downstream(b, n)
+        homes = sum(x.hc for x in below)
+        if block:
+            r.block = {
+                "distances": [d[k] for k in ("aerial_prev", "aerial_start", "total_split",
+                                             "total_prev", "total_start")],
+                "losses": [lost["split"], lost["prev"], lost["start"]],
+                "above": kinds(node(bb, k) for bb, k in upstream(b, n)),
+                "below": kinds(below),
+                "homes": homes, "same_cable": same_cable,
+            }
+        if not nd.amp:
+            continue
+        part = lib.actives.get(nd.amp_part)
         fibre = part is not None and part.fibre_fed
         pads = (nd.pads + [0, 0, 0, 0])[:4]
         r.amp_info = {
@@ -440,7 +493,7 @@ def _amp_info(design: Design, scr: Screen) -> None:
             **d,
             # the node itself is position 0; each active upstream adds one
             "cascade": 0 if fibre else max(cascade, 1),
-            "supply": r.powered_by, "homes_down": downstream_homes(b, n),
+            "supply": r.powered_by, "homes_down": homes,
         }
 
 

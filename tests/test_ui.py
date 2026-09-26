@@ -214,3 +214,26 @@ def test_design_keys_are_the_screen_menu(page):
     page.keyboard.press("Escape")
     assert not page.errors
 
+
+
+def test_expanded_display_draws_the_amplifier_and_its_block(page):
+    """AL004 22.3 with "/" on, as the program draws it."""
+    pair = SAMPLES / "AL004-WV750"
+    if not (pair / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "AL004.ntw"))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("WV750-2026.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    page.evaluate("gotoBranch(22, 3)")
+    page.wait_for_timeout(300)
+    _type(page, "/")
+    page.wait_for_timeout(300)
+    text = page.eval_on_selector_all("#grid tbody td.xtext", "els => els.map(e => e.textContent)")
+    assert "[           AL00429]" in text
+    assert "<                 A>" in text
+    assert "      [   74  2994  385  459  3379  6.85  8.45 51.67]" in text
+    assert "       2-1-0 0-1-0   16 385" in text
+    assert not page.errors

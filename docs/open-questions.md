@@ -55,11 +55,22 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    currents on branch 4 now match exactly, and AL00415 reads 86.78 V 0.79 A
    as on the map. The Parameters tabs have no resistance setting; Power
    Interpolation is Constant Wattage, as already modelled.
-4. **Pad/EQ values.** EQs are stored as indexes (AL00416: forward EQ #16 is
-   shown as 12, return EQ #3 as 4). The map tag of AL00415 shows forward pad 8,
-   EQ `SCS4`, return pad 7, EQ `2`; the file has pads 8 / 7 and EQ indexes
-   2 / 1 — so the return EQ shown is index + 1 both times, and the forward EQ
-   is a name from a table. Needs: Spec Edit → Actives, Pads/EQs Bank tabs.
+4. **Pad/EQ values.** EQs are stored as indexes. What the info box shows
+   against what the file holds (pads are shown as stored):
+
+   | amp | kind | fwd EQ stored → shown | ret EQ stored → shown |
+   |---|---|---|---|
+   | AL00415 (6.1) | bridger | 2 → `SCS4` (map tag) | 1 → 2 |
+   | AL00416 (4.13) | bridger | 16 → 12 | 3 → 4 |
+   | AL00419 (4.24) | bridger | 5 → 0 | 1 → 2 |
+   | AL00429 (22.3) | LE | 9 → 5 | 1 → 2 |
+
+   The return EQ is index + 1 all four times; the forward EQ comes from a
+   table. The expanded display names the parts: 4.24 `SPB-7 ! SEQ-750-0`
+   forward and `SPB-2 ! MEQ-42-2` return, 22.3 `SPB-2 ! SEQ-750-5` and
+   `SPB-1 ! MEQ-42-2` — the prefixes `SPB-`, `SEQ-750-`, `MEQ-42-` head the
+   second bank in the `.atv` (offset 102656), whose pad rows read 0–20.
+   Needs: Spec Edit → Actives, Pads/EQs Bank tabs.
 5. **Tap and port colours — closed.** The user's recording of Test (screen
    menu 5) lists 37 problems on AL004; the replica produces the same 37 lines,
    word for word, from three checks on each tap's port levels, compared to
@@ -87,38 +98,51 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 7. **Expanded display (`/`) — mostly answered.** Seven lines to a node: the
    node line; four tap-slot lines (port levels coloured per value, or dashes)
    with a cyan `(1)` under ftg; the level passed on (grey, taken after the
-   node's couplers: 4.24–4.26); a blank. An amplifier node puts its name,
-   supply and pad/EQ parts on lines 2–3 (4.24: `[AL00419]`,
-   `< SPB-7 ! SEQ-750-0 >`, `A>`, `< SPB-2 ! MEQ-42-2 >`).
-   A cyan block sits on lines 4–5 of every node with an amplifier or a
-   coupler and of each branch's last node. Checked on 6.9, 4.24, 4.25 and
-   4.26 — every number matches:
-   * line 1 `[a b c d e f g h]`: aerial distance to the previous active;
-     aerial distance to the network start; total distance to the previous
-     active or split; total to the previous active; total to the start;
-     cable loss at 750 over c, over d and over e. The first five are the
-     amplifier info box's distances.
-   * line 2 `A-B-C D-E-F homes ftg`: `homes` = housecounts from this node
-     on, couplers included; `ftg` = footage since the previous active or
-     split on this node's cable (6.9: 894 = the 106 spans, not 6.2's
-     121 ft of 114). `A-B-C` = actives from the network start down to this
-     node, itself included, `D-E-F` = actives from this node on (itself
-     and every branch below), each counted by kind: A, D = bridgers
-     (6.9: 1-0-0 = AL00415; 4.24: 2-0-0, 2-3-0 = 4.24 + 20.17, and the
-     three LEs 20.6, 20.11, 22.3). The node (Ripple) is not counted. A
-     "deepest cascade below" reading gives 2-2-0 at 4.24, not the 2-3-0
-     shown.
-   Open: (a) B = LEs on the way down is inferred, not yet seen — no node
-   shown so far has an LE above it; predicted for branch 22:
-   22.3 `[ 74 2994 385 459 3379 6.85 8.45 51.67]` `2-1-0 0-1-0 16 360`,
-   22.4 `[ 0 2994 0 0 3379 0.00 0.00 51.67]` `2-1-0 0-0-0 16 0`,
-   22.5 `[ 0 2994 80 80 3459 1.42 1.42 53.09]` `2-1-0 0-0-0 8 80`;
-   22.3's 360 is also the test of "this node's cable": 22.2 is cab 505,
-   the same EX P3 625 U as 22.3's 405 — 385 if the program matches the
-   cable rather than the code. (b) What C and F count (0 everywhere in
-   AL004). (c) How the program tells a bridger from an LE: no byte of the
-   `.atv` records differs between them apart from name, levels and power
-   table. (d) What `(1)` counts; AL004 has no node with two taps.
+   node's couplers: 4.24–4.26); a blank. The replica draws all of it except
+   the pad/EQ parts and the housing marker below.
+   * **Amplifier, lines 2–3**, from the lv column: `[` + name right-aligned
+     in 18 + `]` in olive (#7f7f00), then `<` + supply the same way + `>`
+     in white (4.24, 22.3); at column 16 the cyan pad/EQ parts
+     `<  SPB-2  ¦  SEQ-750-5  >` — see item 4.
+   * **Cyan block, lines 4–5**, six characters right of those, on every node
+     with an amplifier or a coupler, each branch's last node, and 22.1.
+     Checked on 6.9, 4.24–4.26 and 22.1–22.5, every figure
+     (`tests/test_ntw.py`):
+     `[%5d%6d%5d%5d%6d%6.2f%6.2f%6.2f]` = aerial distance to the previous
+     active; aerial to the start; total to the previous active or split;
+     total to the previous active; total to the start; cable loss at 750
+     over the third, the fourth and the fifth. Line 2 at columns 1, 7, 15
+     and 18: bridgers-LEs-? from the start down to the node, itself
+     included (22.3: `2-1-0`); the same from the node on, every branch
+     below included (4.24: `2-3-0` = 4.24, 20.17 and 20.6, 20.11, 22.3);
+     homes from the node on; footage on the node's cable since the
+     previous active or split — the cable, not the code (22.3: 385, with
+     22.2's 25 ft of 505 counted for 405, the same EX P3 625 U). The node
+     (Ripple) is not counted. "Deepest cascade below" would give 2-2-0 at
+     4.24, not 2-3-0.
+   * **Housing marker (hypothesis)**: white `(3)` at 22.3 and `(1)` at
+     22.5 in the Node column, on no other node shown. No node-record byte
+     holds them. They fit Parameters → Underground Housings: branch 22 is
+     the only underground cable shown; 22.3's LE is 11 points (plus 5 for
+     22.4's coupler at 0 ft) → TV-104, housing 3 (min 11); 22.5's 8-port tap
+     is 5 points → TV-60, housing 1 (min 4). "Smallest housing that holds
+     the points" would give 2 at 22.5, so it is the largest whose minimum
+     is reached. 22.4's coupler gets no marker of its own.
+
+   Open: (a) why 22.1 has a block — first node, or 0 ft? (b) the spacing
+   of a 3-digit home count (4.4: 127, 4.13: 120). (c) what the third
+   count of each triple is (0 everywhere in AL004). (d) how the program
+   tells a bridger from an LE — the `.atv` records differ only in name,
+   levels and power table; the replica goes by the name. (e) the housing
+   marker: branch 34 predicts `(1)` at 34.8 and 34.9 (2-port taps on
+   401 U), none at 34.3–34.6 (aerial). (f) what the cyan `(1)` counts; AL004
+   has no node with two taps. Predictions for branch 34, which also tests
+   (a) at 34.1 (first, 38 ft) and 34.4 (0 ft):
+   34.1 `[  384  4701   38  384  4701  0.57  5.72 69.90]` `2-0-0 0-2-0 3 38`,
+   34.3 `[  889  5206  543  889  5206  8.09 13.25 77.43]` `2-1-0 0-2-0 3 543`,
+   34.4 `[    0  5206    0    0  5206  0.00  0.00 77.43]` `2-1-0 0-1-0 3 0`,
+   34.6 `[  728  5934  728  728  5934 10.85 10.85 88.27]` `2-2-0 0-1-0 2 728`,
+   34.9 `[    0  5934  471  471  6405 10.17 10.17 98.45]` `2-2-0 0-0-0 1 471`.
    The small 3-option dialog in the old videos is still unidentified.
 8. **Keystrokes — partly answered.** Design mode's digits are the screen
    menu (`0 Alter`, `5 Test`, `.2 BkFeed`, `..5 Dsmry`; `./ Distance`), `/`

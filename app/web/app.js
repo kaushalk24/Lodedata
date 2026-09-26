@@ -143,10 +143,38 @@ function cellText(r, c) {
 // slots (port levels, or dashes), then the level it passes on, then a blank.
 function toggleExpanded() { S.expanded = !S.expanded; renderGrid(); }
 
+// The cyan block under an amplifier, a coupler or a branch's last node, as
+// the program lays it out (measured on 6.9, 4.24-4.26 and 22.1-22.5).
+function blockText(b) {
+  const w = (v, n) => String(v).padStart(n);
+  const [ap, as, ts, tp, tt] = b.distances.map(v => Math.round(v));
+  const one = '[' + w(ap, 5) + w(as, 6) + w(ts, 5) + w(tp, 5) + w(tt, 6) +
+    b.losses.map(v => w(v.toFixed(2), 6)).join('') + ']';
+  // homes sit at a fixed column; a 3-digit count has not been seen yet
+  const two = ' ' + b.above.join('-') + ' ' + b.below.join('-') + '   ' +
+    (b.homes + ' ').padEnd(3) + Math.round(b.same_cable);
+  return [one, two];
+}
+
 function expandedLines(r, cols) {
   const cell = (c, text, cls) => `<td class="${c.cls || ''} ${cls || ''}">${esc(text)}</td>`;
-  const line = (fill) => `<tr class="xline"><td class="gutter">${esc(r.gutter && r.gutter !== '└' ? '│' : '')}</td>` +
-    cols.map(c => fill(c)).join('') + '<td></td></tr>';
+  // text drawn from the lv column on, across the rest of the line
+  const at = cols.findIndex(c => c.key === 'lv');
+  const line = (fill, text, cls) => `<tr class="xline"><td class="gutter">${esc(r.gutter && r.gutter !== '└' ? '│' : '')}</td>` +
+    cols.slice(0, text ? at : cols.length).map(c => fill(c)).join('') +
+    (text ? `<td class="xtext ${cls}" colspan="${cols.length - at + 1}">${esc(text)}</td>` : '<td></td>') + '</tr>';
+  // lines 2-3: an amplifier's name and supply; lines 4-5: the cyan block,
+  // which starts six characters to the right of them
+  const text = [[], [], [], []];
+  if (r.amp_info && r.amp_info.name !== undefined) {
+    text[0] = ['[' + (r.amp_label || '').padStart(18) + ']', 'xname'];
+    text[1] = ['<' + (r.amp_info.supply || '').padStart(18) + '>', 'xsupply'];
+  }
+  if (r.block && r.block.distances) {
+    const [one, two] = blockText(r.block);
+    text[2] = ['      ' + one, 'xblock'];
+    text[3] = ['      ' + two, 'xblock'];
+  }
   const lines = [];
   for (let k = 0; k < 4; k++) {
     const lv = (r.tap_levels || [])[k];
@@ -159,7 +187,7 @@ function expandedLines(r, cols) {
       // which number this is -- the tap slot or its homes -- is not yet known
       if (c.key === 'ftg' && lv) return cell(c, `(${k + 1})`, 'xcyan');
       return cell(c, '');
-    }));
+    }, ...text[k]));
   }
   const out = r.out_levels || [];
   lines.push(line(c => c.key.startsWith('lvl:') && out.length

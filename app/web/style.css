@@ -139,6 +139,10 @@ td.xout{color:#bebebe!important}
 td.xcyan{color:#11f6de!important;text-align:left}
 td.xport.yellow{color:var(--yellow)!important}
 td.xport.red{color:var(--red)!important}
+table.grid td.xtext{text-align:left;white-space:pre;overflow:visible}
+td.xtext.xblock{color:#11f6de!important}
+td.xtext.xname{color:#7f7f00!important}
+td.xtext.xsupply{color:var(--white)!important}
 /* Select Tap */
 .seltap{min-width:520px}
 .seltap .sttitle{font-weight:600;margin-bottom:8px}
