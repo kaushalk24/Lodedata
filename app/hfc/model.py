@@ -177,6 +177,9 @@ class ActiveType:
     power_draw: list = field(default_factory=list)
     current_draw_a: float = 1.0                # used when no table is present
     min_operating_voltage: float = 42.0
+    # forward pad, return pad, forward EQ, return EQ: [part-number prefix,
+    # labels by the value a design stores] from the Pads/EQs Bank each uses
+    pad_eq: list = field(default_factory=list)
     source: str = "manual"
 
     @property

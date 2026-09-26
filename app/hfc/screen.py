@@ -498,10 +498,19 @@ def _amp_info(design: Design, scr: Screen) -> None:
             continue
         part = lib.actives.get(nd.amp_part)
         fibre = part is not None and part.fibre_fed
-        pads = (nd.pads + [0, 0, 0, 0])[:4]
+        # the stored values index the active's Pads/EQs Banks: the info box
+        # shows the label, the expanded display the prefix and label
+        # (AL00416: forward EQ 16 -> "12", SEQ-750-12)
+        shown_as = []
+        for c, v in enumerate((nd.pads + [0, 0, 0, 0])[:4]):
+            prefix, labels = part.pad_eq[c] if part and len(part.pad_eq) == 4 else ("", [])
+            label = labels[v].strip() if 0 <= v < len(labels) else str(v)
+            shown_as.append((label, prefix + label))
+        (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as
         r.amp_info = {
             "name": nd.amp_label, "type": part.name if part else "",
-            "fwd_pad": pads[0], "ret_pad": pads[1], "fwd_eq": pads[2], "ret_eq": pads[3],
+            "fwd_pad": fp, "ret_pad": rp, "fwd_eq": fe, "ret_eq": re_,
+            "parts": [fp_part, rp_part, fe_part, re_part],
             **d,
             # the node itself is position 0; each active upstream adds one
             "cascade": 0 if fibre else max(cascade, 1),

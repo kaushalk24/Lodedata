@@ -198,6 +198,7 @@ def library_from_spec_set(base: str | Path,
             source=f"lodedata:{base.name}.cpr",
         ))
 
+    banks = {b.number: b for b in spec.banks}
     for a in spec.actives:
         ins = a.input_levels or [0, 0, 0, 0]
         outs = a.output_levels or [0, 0, 0, 0]
@@ -218,6 +219,8 @@ def library_from_spec_set(base: str | Path,
             power_draw=a.power_draw,
             current_draw_a=next((amps for v, amps in a.power_draw
                                  if abs(v - 60.0) < 6), 0.0),
+            pad_eq=[[banks[n].prefixes[c], banks[n].labels[c]] if n in banks else ["", []]
+                    for c, n in enumerate(a.banks)],
             source=f"lodedata:{base.name}.atv",
         ))
 

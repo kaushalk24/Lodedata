@@ -367,6 +367,37 @@ Q6 NEW SPLICE, Q10–Q13 REMOVE/MOVE LE/BR markers. Placed in the amp column the
 device's loss applies before the node's taps; on AL004 6.8 that gives exactly
 the screen's 30.73 / 32.31 / 39.23 / 36.85 on 6.9.
 
+### 3.4c `.atv` Pads/EQs Banks 1–8
+
+The Actives window's Pads/EQs Bank tabs. Bank k starts at
+93884 + 8816·(k − 1): 129 rows of 68 bytes, then four part-number prefixes,
+char[11] each — forward pad, return pad, forward EQ, return EQ.
+
+| offset in row | type | field |
+|---|---|---|
+| 0 | char[5] | forward pad label, right-aligned as stored (`"   8"`) |
+| 5 | char[5] | return pad label |
+| 10 | i32[12] ×1e6 | values: +10 the forward pad's value (its label, 0–21); a forward EQ's tilt is +18 − +14 (the `SCS` cable simulators are +14, the EQs +18) |
+| 58 | char[5] | forward EQ label |
+| 63 | char[5] | return EQ label |
+
+Row 0 is `VOID`; a column ends at a row labelled `FLAG`. A design stores
+row − 1 in the node's pad bytes (network 112–123), so AL00416's forward EQ 16
+is row 17, `"  12"` — what its info box shows. The expanded display names the
+part as prefix + label: WV750 bank 1 is `SPB-`, `SPB-`, `SEQ-750-`,
+`MEQ-42-`, so 4.24 reads `SPB-7`, `SEQ-750-0`, `SPB-2`, `MEQ-42-2`. Checked on
+all six amplifiers whose pads the screens show.
+
+Each active names its banks in the four bytes before its name, less one:
++1, +2 the EQ banks and +3, +4 the pad banks (FM901e-B: pads 2 2, EQs 1 1 on
+the Actives tab, stored 0 0 1 1). Every WV750 active reads back as its
+Actives tab row. Its actives use the same bank forward and return, so which
+byte of each pair is forward is not proven.
+
+WV750's banks: 1 the LEs and bridgers (`SPB-`/`SEQ-750-`/`MEQ-42-`), 2 the
+FM901e and FML1G7J pads (`NPB-`), 3 the WiFi units, 4 the nodes (`NODE-`),
+5 the FM902s and FML332 (`NPB-`/`CE-120-`/`MEQ-85-`).
+
 ### 3.5 `.par` — system design parameters
 
 Mapped against screenshots of all six Spec Edit → Parameters tabs of

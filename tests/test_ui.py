@@ -232,8 +232,8 @@ def test_expanded_display_draws_the_amplifier_and_its_block(page):
     _type(page, "/")
     page.wait_for_timeout(300)
     text = page.eval_on_selector_all("#grid tbody td.xtext", "els => els.map(e => e.textContent)")
-    assert "[           AL00429]" in text
-    assert "<                 A>" in text
+    assert "[           AL00429]  <      SPB-2   \u00a6  SEQ-750-5   >" in text
+    assert "<                 A>  <      SPB-1   \u00a6   MEQ-42-2   >" in text
     assert "      [   74  2994  385  459  3379  6.85  8.45 51.67]" in text
     assert "       2-1-0 0-1-0   16 385" in text
     marks = page.eval_on_selector_all("#grid tbody td.xhousing", "els => els.map(e => e.textContent)")

@@ -161,20 +161,27 @@ function expandedLines(r, cols) {
   const cell = (c, text, cls) => `<td class="${c.cls || ''} ${cls || ''}">${esc(text)}</td>`;
   // text drawn from the lv column on, across the rest of the line
   const at = cols.findIndex(c => c.key === 'lv');
-  const line = (fill, text, cls) => `<tr class="xline"><td class="gutter">${esc(r.gutter && r.gutter !== '└' ? '│' : '')}</td>` +
-    cols.slice(0, text ? at : cols.length).map(c => fill(c)).join('') +
-    (text ? `<td class="xtext ${cls}" colspan="${cols.length - at + 1}">${esc(text)}</td>` : '<td></td>') + '</tr>';
-  // lines 2-3: an amplifier's name and supply; lines 4-5: the cyan block,
-  // which starts six characters to the right of them
-  const text = [[], [], [], []];
-  if (r.amp_info && r.amp_info.name !== undefined) {
-    text[0] = ['[' + (r.amp_label || '').padStart(18) + ']', 'xname'];
-    text[1] = ['<' + (r.amp_info.supply || '').padStart(18) + '>', 'xsupply'];
+  // segs: [text, class] runs drawn from there on
+  const line = (fill, segs) => `<tr class="xline"><td class="gutter">${esc(r.gutter && r.gutter !== '└' ? '│' : '')}</td>` +
+    cols.slice(0, segs ? at : cols.length).map(c => fill(c)).join('') +
+    (segs ? `<td class="xtext" colspan="${cols.length - at + 1}">` +
+      segs.map(([t, cls]) => `<span class="${cls}">${esc(t)}</span>`).join('') + '</td>' : '<td></td>') + '</tr>';
+  // lines 2-3: an amplifier's name and supply, then its pad and EQ parts,
+  // forward then return; lines 4-5: the cyan block, which starts six
+  // characters to the right of the name (columns as 4.24, 22.3, 34.3 show)
+  const text = [null, null, null, null];
+  const a = r.amp_info;
+  if (a && a.name !== undefined) {
+    const [fp, rp, fe, re] = a.parts || ['', '', '', ''];
+    text[0] = [['[' + (r.amp_label || '').padStart(18) + ']', 'xname'],
+               ['  <      ' + fp.padEnd(8) + '\u00a6  ' + fe.padEnd(12) + '>', 'xblock']];
+    text[1] = [['<' + (a.supply || '').padStart(18) + '>', 'xsupply'],
+               ['  <      ' + rp.padEnd(8) + '\u00a6   ' + re.padEnd(11) + '>', 'xblock']];
   }
   if (r.block && r.block.distances) {
     const [one, two] = blockText(r.block);
-    text[2] = ['      ' + one, 'xblock'];
-    text[3] = ['      ' + two, 'xblock'];
+    text[2] = [['      ' + one, 'xblock']];
+    text[3] = [['      ' + two, 'xblock']];
   }
   const lines = [];
   for (let k = 0; k < 4; k++) {
@@ -190,7 +197,7 @@ function expandedLines(r, cols) {
       // an underground location's housing, under the node number
       if (c.key === 'node' && k === 0 && r.housing) return cell(c, `(${r.housing})`, 'xhousing');
       return cell(c, '');
-    }, ...text[k]));
+    }, text[k]));
   }
   const out = r.out_levels || [];
   lines.push(line(c => c.key.startsWith('lvl:') && out.length
@@ -322,8 +329,8 @@ function infoAmp(r) {
   const line = (label, v) => `${label.padEnd(36)}${v === undefined || v === null ? '' : v}\n`;
   return `${r.branch}.${r.node}\n` +
     line('Amp Name:', a.name) + line('Amp Type:', a.type || r.amp_name) +
-    line('Forward Pad:', a.fwd_pad) + line('Forward Eq:', a.fwd_eq === undefined ? '' : '#' + a.fwd_eq) +
-    line('Return Pad:', a.ret_pad) + line('Return Eq:', a.ret_eq === undefined ? '' : '#' + a.ret_eq) +
+    line('Forward Pad:', a.fwd_pad) + line('Forward Eq:', a.fwd_eq) +
+    line('Return Pad:', a.ret_pad) + line('Return Eq:', a.ret_eq) +
     line('Aerial Dist to Previous Active:', a.aerial_prev) +
     line('Aerial Dist to Start of Network:', a.aerial_start) +
     line('Tot Dist to Previous Act-split:', a.total_split) +

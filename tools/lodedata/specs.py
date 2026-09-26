@@ -73,6 +73,12 @@ ATV_INDEX_BASE = 6
 ATV_CONFIG_BASE = 214
 ATV_CONFIG_STRIDE = 18
 ATV_CONFIG_SLOTS = 8
+# Before the name, the banks the Actives tab's Fwd Pad / Ret Pad / Fwd EQ /
+# Ret EQ columns name, one byte each, less one: the EQ pair at +1, +2 and
+# the pad pair at +3, +4 (WV750: FM901e-B shows pads 2 2, EQs 1 1 and
+# stores 0 0 1 1).  Every WV750 active has the same bank forward and
+# return, so which byte of a pair is forward is not proven.
+ATV_EQ_BANKS, ATV_PAD_BANKS = 1, 3
 
 
 def _records(data: bytes, kind: str):
@@ -180,6 +186,8 @@ class ActiveSpec:
     # [[volts, amps], ...] -- actives are constant-power, so the draw is a curve
     power_draw: list = field(default_factory=list)
     values: list = field(default_factory=list)
+    # Pads/EQs Bank used for forward pad, return pad, forward EQ, return EQ
+    banks: list = field(default_factory=lambda: [1, 1, 1, 1])
 
 
 # The .atv file holds more than the Actives table -- the manual describes
@@ -237,6 +245,8 @@ def read_actives(data: bytes) -> list:
             output_levels=levels[4:8],
             power_draw=table,
             values=nums,
+            banks=[seg[ATV_PAD_BANKS] + 1, seg[ATV_PAD_BANKS + 1] + 1,
+                   seg[ATV_EQ_BANKS] + 1, seg[ATV_EQ_BANKS + 1] + 1],
         ))
     return out
 
@@ -363,6 +373,55 @@ def read_inline(data: bytes) -> list:
         losses = [round(_fx(v), 3) for v in struct.unpack_from("<4i", data, o + ATV_INLINE_LOSS)]
         if name and all(abs(v) < 60 for v in losses):
             out.append(InlineSpec(number=k, name=name, losses=losses))
+    return out
+
+
+# Pads/EQs Banks 1-8, the Actives window's tabs: 129 rows of 68 bytes each,
+# then the four part-number prefixes, char[11] each -- forward pad, return
+# pad, forward EQ, return EQ (WV750 bank 1: SPB- SPB- SEQ-750- MEQ-42-; bank
+# 4, the nodes': NODE-; bank 5, the FM902s': NPB- NPB- CE-120- MEQ-85-).
+# A row is its four labels, char[5] each and right-aligned as stored
+# ("   8"), at +0, +5 (pads) and +58, +63 (EQs), with twelve numbers
+# between; a column ends at a row labelled FLAG.  Row 0 is VOID; a design
+# stores row - 1, so AL004's AL00416,
+# forward EQ 16, is row 17, "  12" -- what its info box shows.
+ATV_BANKS, ATV_BANK_COUNT, ATV_BANK_STRIDE = 93884, 8, 8816
+ATV_BANK_ROW, ATV_BANK_ROWS = 68, 129
+ATV_BANK_LABELS = (0, 5, 58, 63)
+
+
+@dataclass
+class PadEqBank:
+    number: int
+    prefixes: list       # forward pad, return pad, forward EQ, return EQ
+    labels: list         # per column, the labels by stored value (row 1 on)
+    values: list         # per row from row 1, the twelve numbers
+
+
+def _label(raw: bytes) -> str:
+    return raw.split(b"\0")[0].decode("latin-1")
+
+
+def read_pad_eq_banks(data: bytes) -> list:
+    out = []
+    for k in range(ATV_BANK_COUNT):
+        base = ATV_BANKS + ATV_BANK_STRIDE * k
+        end = base + ATV_BANK_ROW * ATV_BANK_ROWS
+        if end + 44 > len(data):
+            break
+        rows = [data[base + ATV_BANK_ROW * r:base + ATV_BANK_ROW * (r + 1)]
+                for r in range(1, ATV_BANK_ROWS)]
+        labels = []
+        for o in ATV_BANK_LABELS:       # each column ends at a FLAG row
+            column = [_label(row[o:o + 5]) for row in rows]
+            labels.append(column[:column.index("FLAG")] if "FLAG" in column else
+                          [x for x in column if x.strip()])
+        out.append(PadEqBank(
+            number=k + 1,
+            prefixes=[_label(data[end + 11 * i:end + 11 * i + 11]) for i in range(4)],
+            labels=labels,
+            values=[[round(_fx(v), 3) for v in struct.unpack_from("<12i", row, 10)]
+                    for row in rows]))
     return out
 
 
@@ -550,6 +609,7 @@ class SpecSet:
     taps: list = field(default_factory=list)
     supplies: list = field(default_factory=list)
     inline: list = field(default_factory=list)
+    banks: list = field(default_factory=list)
     frequencies: dict = field(default_factory=dict)
     levels: list = field(default_factory=list)
     tap_margin: float = 0.0
@@ -592,4 +652,5 @@ def load_spec_set(base: str | Path) -> SpecSet:
                     READERS[ext](data))
             if ext == "atv":
                 spec.inline = read_inline(data)
+                spec.banks = read_pad_eq_banks(data)
     return spec

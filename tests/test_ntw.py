@@ -523,7 +523,7 @@ def test_amplifier_info_box(screen):
     row = next(r for r in screen.rows if (r.branch, r.node) == (4, 13))
     a = row.amp_info
     assert (a["name"], a["type"]) == ("AL00416", "BRIDGER 750 MHz")
-    assert (a["fwd_pad"], a["ret_pad"]) == (4, 14)
+    assert (a["fwd_pad"], a["ret_pad"], a["fwd_eq"], a["ret_eq"]) == ("4", "14", "12", "4")
     assert (a["aerial_prev"], a["aerial_start"], a["total_split"],
             a["total_prev"], a["total_start"]) == (2027, 2027, 1141, 2027, 2027)
     assert (a["cascade"], a["supply"], a["homes_down"]) == (1, "A", 120)
@@ -605,6 +605,47 @@ def test_underground_housing_marker(screen):
     seen = set(HOUSINGS) | set(NO_BLOCK) | {(22, 1), (22, 2), (22, 4), (34, 3), (34, 6),
                                             (4, 4), (4, 24), (4, 25), (4, 26), (6, 9)}
     assert {k: rows[k].housing for k in seen if rows[k].housing} == HOUSINGS
+
+
+# Pads and EQs as the screens show them: the info box's labels (6.1 from its
+# map tag) and the expanded display's part names, forward pad, return pad,
+# forward EQ, return EQ.  The stored values index Pads/EQs Bank 1.
+PADS_EQS = {
+    (6, 1): ("8", "7", "SCS4", "2"),
+    (4, 13): ("4", "14", "12", "4"),
+    (4, 24): ("7", "2", "0", "2"),
+    (22, 3): ("2", "1", "5", "2"),
+    (34, 3): ("8", "10", "7", "2"),
+    (34, 6): ("16", "14", "4", "2"),
+}
+PAD_EQ_PARTS = {
+    (4, 24): ["SPB-7", "SPB-2", "SEQ-750-0", "MEQ-42-2"],
+    (22, 3): ["SPB-2", "SPB-1", "SEQ-750-5", "MEQ-42-2"],
+    (34, 3): ["SPB-8", "SPB-10", "SEQ-750-7", "MEQ-42-2"],
+}
+
+
+def test_pads_and_eqs_are_bank_labels(screen):
+    rows = {(r.branch, r.node): r for r in screen.rows if not r.end}
+    for key, want in PADS_EQS.items():
+        a = rows[key].amp_info
+        assert (a["fwd_pad"], a["ret_pad"], a["fwd_eq"], a["ret_eq"]) == want, key
+    for key, want in PAD_EQ_PARTS.items():
+        assert rows[key].amp_info["parts"] == want, key
+
+
+def test_actives_use_the_banks_the_actives_tab_shows():
+    spec = load_spec_set(SPEC)
+    banks = {a.index: a.banks for a in spec.actives}
+    # Fwd Pad, Ret Pad, Fwd EQ, Ret EQ on the Actives tab
+    assert banks[1] == banks[13] == banks[42] == [1, 1, 1, 1]
+    assert banks[15] == banks[19] == banks[40] == [2, 2, 1, 1]
+    assert banks[16] == banks[22] == banks[23] == [4, 4, 4, 4]
+    assert banks[20] == banks[21] == banks[30] == [5, 5, 5, 5]
+    assert banks[37] == banks[38] == [3, 3, 3, 3]
+    b = spec.banks[0]
+    assert b.prefixes == ["SPB-", "SPB-", "SEQ-750-", "MEQ-42-"]
+    assert spec.banks[4].prefixes == ["NPB-", "NPB-", "CE-120-", "MEQ-85-"]
 
 
 def test_power_supply_info(screen):

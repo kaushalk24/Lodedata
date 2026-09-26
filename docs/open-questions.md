@@ -55,35 +55,22 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    currents on branch 4 now match exactly, and AL00415 reads 86.78 V 0.79 A
    as on the map. The Parameters tabs have no resistance setting; Power
    Interpolation is Constant Wattage, as already modelled.
-4. **Pad/EQ values.** EQs are stored as indexes. What the info box shows
-   against what the file holds (pads are shown as stored):
-
-   | amp | kind | fwd EQ stored → shown | ret EQ stored → shown |
-   |---|---|---|---|
-   | AL00415 (6.1) | bridger | 2 → `SCS4` (map tag) | 1 → 2 |
-   | AL00416 (4.13) | bridger | 16 → 12 | 3 → 4 |
-   | AL00419 (4.24) | bridger | 5 → 0 | 1 → 2 |
-   | AL00429 (22.3) | LE | 9 → 5 | 1 → 2 |
-   | AL00410 (34.3) | LE | 11 → 7 | 1 → 2 |
-   | AL00411 (34.6) | LE | 8 → 4 | 1 → 2 |
-
-   The return EQ is index + 1 all six times. The forward EQ is a table:
-   16 → 12, 9 → 5, 11 → 7, 8 → 4, but 5 → 0 on AL00419 — the same part as
-   AL00416 — and 2 → `SCS4`. Pads are shown as stored. The expanded display
-   names the parts, forward then return:
-
-   | amp | forward | return |
-   |---|---|---|
-   | 4.24 | `SPB-7 ¦ SEQ-750-0` | `SPB-2 ¦ MEQ-42-2` |
-   | 22.3 | `SPB-2 ¦ SEQ-750-5` | `SPB-1 ¦ MEQ-42-2` |
-   | 34.3 | `SPB-8 ¦ SEQ-750-7` | `SPB-10 ¦ MEQ-42-2` |
-   | 34.6 | `SPB-  16¦ SEQ-750-   4` | `SPB-14 ¦ MEQ-42-2` |
-
-   34.6's forward names keep the label's leading spaces (the bank stores
-   labels right-aligned in 4, `"  16"`) where every other name trims them.
-   The prefixes `SPB-`, `SEQ-750-`, `MEQ-42-` head the second bank in the
-   `.atv` (offset 102656), whose pad rows read 0–20.
-   Needs: Spec Edit → Actives, Pads/EQs Bank tabs.
+4. **Pad/EQ values — answered.** The Actives tab's Fwd Pad / Ret Pad /
+   Fwd EQ / Ret EQ columns are bank numbers; LEs and bridgers use Pads/EQs
+   Bank 1. A node stores the bank row less one, and the screens show that
+   row's label: the info box the label, the expanded display prefix + label
+   (file-formats 3.4c). Every pad and EQ on the six amplifiers seen reads
+   back as shown (`tests/test_ntw.py`).
+   Still open: (a) 34.6's forward names keep the label's leading spaces
+   (`SPB-  16`, `SEQ-750-   4`) where every other name trims them — its node
+   record differs from 34.3's only in ids, footage and the values
+   themselves; is it the same after reopening the file? (b) Which byte of
+   each bank pair is forward. (c) How the program picks them (for designing
+   later): the forward EQ is the row whose tilt is nearest what the active
+   needs, (In 750 − In 54) − (input 750 − input 54), on all 27 LEs and
+   bridgers in AL004; the pad is ⌊input 750 − In 750⌋ on 17 of them and a
+   little lower on the rest (6.1, before an `SCS4`, three lower), so the
+   EQ's own loss comes off first — the other bank values are not mapped.
 5. **Tap and port colours — closed.** The user's recording of Test (screen
    menu 5) lists 37 problems on AL004; the replica produces the same 37 lines,
    word for word, from three checks on each tap's port levels, compared to
