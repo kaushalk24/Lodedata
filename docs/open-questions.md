@@ -80,7 +80,8 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    Both settings proven by a second Test with the 5 MHz return window at
    15.50 and Max. Crossover at 3.50: "36 Errors" — a new yellow
    "Tap(5) 0.29 below window at 3.6" (a return port below max − window),
-   and the 3.18, 3.34 and 3.40 crossovers gone. Within a node the list runs
+   and the 3.18, 3.34 and 3.40 crossovers gone — all 36 lines reproduced
+   word for word. Within a node the list runs
    min/max, then windows, then crossover.
 6. **The "ntw map AL004" file** mentioned earlier has not arrived.
 7. **Expanded display (`/`) — mostly answered.** Seven lines to a node: the
