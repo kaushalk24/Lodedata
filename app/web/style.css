@@ -120,3 +120,13 @@ table.grid td.stop{width:10px;padding:0 2px;text-align:center}
 table.grid td.spill{white-space:pre}
 .tbset[hidden]{display:none}
 .tbset{display:inline-flex;gap:6px;align-items:center}
+/* Test Results: numbered rows on white, the network and error on black */
+.testres{min-width:560px}
+.testres .trtitle{font-weight:600;margin-bottom:8px}
+.testres table{border-collapse:collapse;width:100%;font:13px Tahoma,Verdana,sans-serif}
+.testres th{background:#f0f0f0;border:1px solid var(--chromeline);text-align:left;
+  font-weight:400;padding:2px 6px}
+.testres td{border:1px solid #808080;padding:2px 6px;background:#000}
+.testres td:first-child{background:#fff;color:#000}
+.testres tr.red td:not(:first-child){color:var(--red)}
+.testres tr.yellow td:not(:first-child){color:var(--yellow)}

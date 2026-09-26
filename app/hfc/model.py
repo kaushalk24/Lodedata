@@ -334,6 +334,12 @@ class DesignParameters:
     # less than the tap margin is marginal (yellow), beyond it red.
     levels: list = field(default_factory=lambda: [[15.0, 9.0, 45.0, 45.0]])
     tap_margin_db: float = 0.5
+    # the tap windows of F1, F2, R1, R2 (0 = none) and Max. Crossover (0 =
+    # not checked): a forward port above its minimum plus its window is "over
+    # window"; forward low above forward high by more than Max. Crossover is
+    # a "Crossover".  Both marginal (yellow).
+    tap_windows: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
+    max_crossover_db: float = 0.0
     # cable series (the hundreds of a cable ID) not counted as mileage: the
     # ones not ticked under the Parameters file's Strand/Trench Types
     # (WV750: 000 200 300 400 ticked, so 1xx and 5xx-9xx are not mileage)

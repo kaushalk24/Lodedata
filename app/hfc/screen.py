@@ -46,6 +46,7 @@ class Row:
     port_levels: list = field(default_factory=list)   # that line: last tap's port output
     port_severity: list = field(default_factory=list)
     tap_notes: list = field(default_factory=list)  # (severity, message) about taps
+    tap_port_severity: list = field(default_factory=list)  # per tap, per column
     tap_ports: list = field(default_factory=list)
     tap_parts: list = field(default_factory=list)  # part numbers, for the panel
     couplers: list = field(default_factory=list)   # e.g. "200[2]"
@@ -83,6 +84,7 @@ class Row:
             "amp_label": self.amp_label,
             "taps": self.taps, "couplers": self.couplers,
             "tap_severity": self.tap_severity, "end": self.end,
+            "tap_port_severity": self.tap_port_severity,
             "tap_levels": [[round(v, 2) for v in t] for t in self.tap_levels],
             "power_stop": self.power_stop,
             "port_levels": [round(v, 2) for v in self.port_levels],
@@ -108,12 +110,14 @@ class Screen:
     branches: list = field(default_factory=list)      # paging metadata
     problems: list = field(default_factory=list)
     totals: dict = field(default_factory=dict)
+    tests: list = field(default_factory=list)         # (severity, message): Test Results
 
     def as_dict(self) -> dict:
         return {"rows": [r.as_dict() for r in self.rows],
                 "frequencies": self.frequencies,
                 "branches": self.branches,
-                "problems": self.problems, "totals": self.totals}
+                "problems": self.problems, "totals": self.totals,
+                "tests": [{"severity": v, "message": m} for v, m in self.tests]}
 
 
 def _freqs(p) -> list:
@@ -247,12 +251,14 @@ def build(design: Design) -> Screen:
                 # a tap sees the level after whatever precedes it on the line:
                 # the amplifier, an in-line Q device, an earlier tap
                 ports = _tap_ports(p, freqs, levels, tap)
-                sev, why = _check_tap(p, node.lv, freqs, ports)
+                per_port, errors = _tap_checks(p, node.lv, freqs, ports)
+                sev = _worst(per_port)
                 row.tap_severity.append(sev)
                 row.tap_levels.append([ports[f] for f in freqs])
-                if why:
-                    row.tap_notes.append((sev, f"{shown}: {why}"))
-                last_tap = (tap, ports)
+                row.tap_port_severity.append(per_port)
+                for e_sev, e_msg in errors:
+                    row.tap_notes.append((e_sev, f"{e_msg} at {branch.number}.{row.node}."))
+                last_tap = (tap, ports, per_port)
                 if tap.self_terminating:
                     levels = {f: 0.0 for f in freqs}
                     continue
@@ -317,10 +323,9 @@ def build(design: Design) -> Screen:
                   depth=depth, end=True)
         end.levels = dict(levels)
         if last_tap:
-            ports = last_tap[1]
+            _, ports, per_port = last_tap
             end.port_levels = [ports[f] for f in freqs]
-            end.port_severity = [_port_severity(p, branch.nodes[-1].lv, freqs, ports, f)
-                                 for f in freqs]
+            end.port_severity = list(per_port)
         scr.rows.append(end)
 
     feeder = design.branches.get(1)
@@ -334,6 +339,9 @@ def build(design: Design) -> Screen:
         walk(feeder, start, 0, 0.0, False)
 
     _gutter(scr)
+    # the Test Results list runs in branch, then node order
+    for r in sorted((r for r in scr.rows if not r.end), key=lambda r: (r.branch, r.node)):
+        scr.tests.extend(r.tap_notes)
     _powering(design, scr)
     _totals(design, scr)
     order = []
@@ -440,32 +448,59 @@ def _level_row(p, lv: int) -> list:
     return rows[lv] if 0 <= lv < len(rows) and any(rows[lv]) else rows[0]
 
 
-def _port_severity(p, lv: int, freqs, ports: dict, f: float) -> str:
-    """Against the System Levels for this node's lv: forward outputs must reach
-    the minimum, return inputs stay under the maximum.  Out by less than the
-    tap margin is marginal."""
-    mins = _level_row(p, lv)
-    i = freqs.index(f)
-    limit = mins[i] if i < len(mins) else 0.0
-    if _is_forward(p, f):
-        short = limit - ports[f]
-    else:
-        short = ports[f] - limit
-    if short <= 1e-9:
-        return ""
-    return "yellow" if short <= p.tap_margin_db else "red"
+def _worst(severities) -> str:
+    return "red" if "red" in severities else ("yellow" if "yellow" in severities else "")
 
 
-def _check_tap(p, lv: int, freqs, ports: dict) -> tuple:
-    worst, why = "", ""
-    for f in freqs:
-        sev = _port_severity(p, lv, freqs, ports, f)
-        if sev and (not worst or sev == "red"):
-            worst = sev
-            limit = _level_row(p, lv)[freqs.index(f)]
-            side = "below the minimum" if _is_forward(p, f) else "above the maximum"
-            why = f"port {ports[f]:.2f} dBmV at {f:g} is {side} {limit:g} (lv {lv})"
-    return worst, why
+def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
+    """Lode Data's tap test, as its Test Results window words it.  Checked
+    against all 37 lines of AL004's list:
+
+      Tap(750) 6.16 below min   a forward port under the System Levels minimum
+                                for the node's lv (a return port over the
+                                maximum is "above max"): yellow within the tap
+                                margin, red beyond it
+      Tap(54) 0.82 over window  a forward port above its minimum plus the tap
+                                window (Parameters, System Levels): yellow
+      Crossover of 3.18         the forward low port above the forward high by
+                                more than Max. Crossover: yellow, on both
+
+    Levels are compared as shown, to the hundredth (16.63 - 12.84 is a 3.79
+    crossover at 3.5, not the 3.80 the unrounded levels give).  Returns the
+    colour of each column's port value and the messages, in the list's order.
+    """
+    lim = _level_row(p, lv)
+    shown = {f: round(ports[f], 2) for f in freqs}
+    per = [""] * len(freqs)
+    errors = []
+
+    def mark(i, sev):
+        if sev == "red" or not per[i]:
+            per[i] = sev
+
+    for i, f in enumerate(freqs):
+        limit = lim[i] if i < len(lim) else 0.0
+        out = limit - shown[f] if _is_forward(p, f) else shown[f] - limit
+        if out > 0.005:
+            sev = "red" if out > p.tap_margin_db + 0.005 else "yellow"
+            mark(i, sev)
+            side = "below min" if _is_forward(p, f) else "above max"
+            errors.append((sev, f"Tap({f:g}) {out:5.2f} {side}"))
+    windows = getattr(p, "tap_windows", None) or []
+    for i, f in enumerate(freqs):
+        if not _is_forward(p, f) or i >= len(windows) or not windows[i]:
+            continue
+        over = shown[f] - (lim[i] + windows[i])
+        if over > 0.005:
+            mark(i, "yellow")
+            errors.append(("yellow", f"Tap({f:g}) {over:5.2f} over window"))
+    hi, lo = freqs.index(p.forward_high_mhz), freqs.index(p.forward_low_mhz)
+    cross = shown[freqs[lo]] - shown[freqs[hi]]
+    if getattr(p, "max_crossover_db", 0) and cross > p.max_crossover_db + 0.005:
+        mark(hi, "yellow")
+        mark(lo, "yellow")
+        errors.append(("yellow", f"Crossover of {cross:5.2f}"))
+    return per, errors
 
 
 def _gutter(scr: Screen) -> None:

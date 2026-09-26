@@ -245,6 +245,11 @@ function infoBranch(r, k) {
   return out.join('\n\n');
 }
 
+// an in-line device (Qn) in the amp column, as AL004 6.8 shows Q2
+function infoInline(r) {
+  return `${r.branch}.${r.node}\n${'Inline EQ Type:'.padEnd(33)}${r.amp_name || ''}`;
+}
+
 function infoSupply(r) {
   return `${r.branch}.${r.node}\n\n\nPower Supply Information\n` +
     `Power Supply:${' '.repeat(30)}${r.supply_label || ''}\n` +
@@ -293,6 +298,7 @@ function renderInfo() {
     let text = null;
     if (/^tap\d$/.test(c.key) && (r.taps || [])[+c.key.slice(3)]) text = infoTap(r, +c.key.slice(3));
     else if (/^cplr\d$/.test(c.key)) text = r.supply ? infoSupply(r) : infoBranch(r, +c.key.slice(4));
+    else if (c.key === 'amp' && /^Q\d/.test(r.amp || '')) text = infoInline(r);
     else if ((c.key === 'amp' || c.key === 'ampname' || c.key === 'tsg') && r.amp_info && r.amp_info.type) text = infoAmp(r);
     else if (c.key === 'supply' && r.supply) text = infoSupply(r);
     box.textContent = text || infoNode(r);
@@ -479,7 +485,10 @@ function moveToNextField() {
 
 // ---------------------------------------------------------------- keyboard
 document.addEventListener('keydown', async ev => {
-  if (!$('#modal').hidden) return;
+  if (!$('#modal').hidden) {            // Esc closes a window, as in the program
+    if (ev.key === 'Escape') closeModal();
+    return;
+  }
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
   const cols = columns();
   const k = ev.key;
@@ -728,7 +737,21 @@ function distance() {
   const r = curRow(); if (!r) return;
   msg(`${r.branch}.${r.node}: ${r.cumulative_ft} ft from the start of the network`);
 }
+// Test (screen menu 5): the "Design Assistant Test Results" window, one line
+// per problem found at a tap -- red beyond the tap margin, yellow within it,
+// over a tap window or crossed over.  Esc closes it.
 function test() {
+  if (S.mode === 'power') return testPower();
+  const tests = (S.scr && S.scr.tests) || [];
+  const net = (S.net && S.net.name) || '';
+  modal(`<div class="testres">
+    <div class="trtitle">Design Assistant Test Results - ${tests.length} Errors</div>
+    <table><thead><tr><th>Number</th><th>Network</th><th>Error</th></tr></thead><tbody>${
+      tests.map((t, i) => `<tr class="${t.severity}"><td>${i + 1}</td><td>${esc(net)}</td>` +
+        `<td>${esc(t.message)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="row"><button id="mClose" class="primary">Close</button></div>`);
+}
+function testPower() {
   const bad = S.scr.rows.filter(r => r.severity);
   if (!bad.length) { msg('Test: no errors'); return; }
   modal(`<h2>Test — ${bad.length} node(s) flagged</h2>

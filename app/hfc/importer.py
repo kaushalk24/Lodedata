@@ -109,6 +109,9 @@ def parameters_from_spec_set(base: str | Path,
         # (WV750: 100, 500-900) is not mileage
         params.non_mileage_series = [n for n in range(10) if n not in par["strand_series"]]
         params.power_interpolation = par["power_interpolation"]
+        w = par["tap_windows"]
+        params.tap_windows = [w["F1"], w["F2"], w["R1"], w["R2"]]
+        params.max_crossover_db = par["max_crossover"]
     return params
 
 
