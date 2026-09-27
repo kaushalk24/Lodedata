@@ -17,6 +17,7 @@ const S = {
   branch: 1,          // the branch page on screen -- one at a time, as in the program
   row: 0, col: 0, buffer: null,
   dot: false,         // the "." prefix that turns a nav key into a branch move
+  tips: true,         // View > Show Tips: the info box
 };
 
 // rows of the branch currently on screen
@@ -259,11 +260,25 @@ function renderGrid() {
   }).join('');
 
   $$('#grid tbody td[data-r]').forEach(td => td.onclick = () => {
+    const typing = S.buffer !== null;
     S.row = +td.dataset.r; S.col = +td.dataset.c; S.buffer = null;
-    renderGrid(); renderInfo();
+    if (typing) { renderGrid(); return; }
+    // move the cursor in place: redrawing the grid would swallow a double-click
+    $$('#grid td.cur').forEach(x => x.classList.remove('cur'));
+    $$('#grid tr.onrow').forEach(x => x.classList.remove('onrow'));
+    td.classList.add('cur'); td.parentElement.classList.add('onrow');
+    renderInfo();
   });
   renderInfo();
 }
+
+// a coupler's tip: "<double-click or [.][LT] or [.][RT] to enter branch>"
+$('#grid tbody').ondblclick = ev => {
+  const td = ev.target.closest('td[data-r]');
+  const c = td && columns()[+td.dataset.c];
+  if (!c || !/^cplr\d$/.test(c.key) || !(curRow().couplers || [])[+c.key.slice(4)]) return;
+  enterBranch(+c.key.slice(4));
+};
 
 // The info box follows the cursor's column, as the program's does: a tap
 // shows its port levels, a coupler previews the branch it feeds, an
@@ -284,33 +299,32 @@ function infoTap(r, k) {
     `<double-click or [.][ENTER] to edit branches>`;
 }
 
+// One branch, the first in the cell: on 4.14's 3-[11]<12> the program's box
+// reads "Feeds Branch: 11" only.
 function infoBranch(r, k) {
   const text = (r.couplers || [])[k] || '';
-  const nums = [...text.matchAll(/[\[<({](\d+)[\]>)}]/g)].map(m => +m[1]);
-  if (!nums.length) return null;
+  const found = /[\[<({](\d+)[\]>)}]/.exec(text);
+  if (!found) return null;
   const fq = (S.scr && S.scr.frequencies) || [];
-  const out = [];
-  for (const b of nums) {
-    const m = branchMeta(b) || {};
-    const rows = S.scr.rows.filter(x => x.branch === b);
-    out.push(`${r.branch}.${r.node}\n${m.coupler || ''}\nFeeds Branch: ${b}\n` +
-      `Start   ${fq.map(f => pad(f, 7)).join(' ')}\n` +
-      `Levels  ${(m.start || []).map(v => pad(f2(v), 7)).join(' ')}\n` + '-'.repeat(96) + '\n' +
-      `Node ${fq.map(f => pad(f, 7)).join(' ')}   ftg  hc cab lv amp  tap1 tap2 tap3 tap4   cplr[Br]   cplr[Br]\n` +
-      rows.map(x => {
-        const lv = x.levels.map(v => pad(f2(v), 7)).join(' ');
-        if (x.end) return `     ${lv}`;
-        const taps = [0, 1, 2, 3].map(i => {
-          const t = (x.taps || [])[i];
-          if (!t) return '     ';
-          const br = PREVIEW_TAP[(x.tap_ports || [])[i]] || '[]';
-          return pad(br[0] + t.replace(/[\/\[\]<>{}()]/g, '').trim() + br[1], 5);
-        }).join('');
-        return `${pad(x.node, 4)} ${lv} ${pad(x.ftg, 5)} ${pad(x.hc, 3)} ${pad(x.cab, 3)} ${pad(x.lv, 2)} ` +
-          `${pad(x.amp || '', 4)} ${taps} ${pad((x.couplers || [])[0] || '', 10)} ${pad((x.couplers || [])[1] || '', 10)}`;
-      }).join('\n') + '\n<double-click or [.][LT] or [.][RT] to enter branch>');
-  }
-  return out.join('\n\n');
+  const b = +found[1];
+  const m = branchMeta(b) || {};
+  const rows = S.scr.rows.filter(x => x.branch === b);
+  return `${r.branch}.${r.node}\n${m.coupler || ''}\nFeeds Branch: ${b}\n` +
+    `Start   ${fq.map(f => pad(f, 7)).join(' ')}\n` +
+    `Levels  ${(m.start || []).map(v => pad(f2(v), 7)).join(' ')}\n` + '-'.repeat(96) + '\n' +
+    `Node ${fq.map(f => pad(f, 7)).join(' ')}   ftg  hc cab lv amp  tap1 tap2 tap3 tap4   cplr[Br]   cplr[Br]\n` +
+    rows.map(x => {
+      const lv = x.levels.map(v => pad(f2(v), 7)).join(' ');
+      if (x.end) return `     ${lv}`;
+      const taps = [0, 1, 2, 3].map(i => {
+        const t = (x.taps || [])[i];
+        if (!t) return '     ';
+        const br = PREVIEW_TAP[(x.tap_ports || [])[i]] || '[]';
+        return pad(br[0] + t.replace(/[\/\[\]<>{}()]/g, '').trim() + br[1], 5);
+      }).join('');
+      return `${pad(x.node, 4)} ${lv} ${pad(x.ftg, 5)} ${pad(x.hc, 3)} ${pad(x.cab, 3)} ${pad(x.lv, 2)} ` +
+        `${pad(x.amp || '', 4)} ${taps} ${pad((x.couplers || [])[0] || '', 10)} ${pad((x.couplers || [])[1] || '', 10)}`;
+    }).join('\n') + '\n<double-click or [.][LT] or [.][RT] to enter branch>';
 }
 
 // an in-line device (Qn) in the amp column, as AL004 6.8 shows Q2
@@ -371,6 +385,7 @@ function renderInfo() {
     else if (c.key === 'supply' && r.supply) text = infoSupply(r);
     box.textContent = text || infoNode(r);
   }
+  box.hidden = !S.tips || !box.textContent;
   const total = (S.scr && S.scr.branches.length) || 1;
   $('#stBranch').textContent = `Branch ${S.branch} of ${total}`;
   $('#stFeeder').textContent = 'Feeder 1.1';
@@ -706,11 +721,11 @@ function stepBranch(delta) {
   if (next === S.branch) { msg(delta < 0 ? 'first branch' : 'last branch'); return; }
   gotoBranch(next);
 }
-function enterBranch() {
+function enterBranch(k = 0) {
   const r = curRow();
-  if (!r || !r.couplers.length) { msg('no branch begins on this node'); return; }
+  if (!r || !r.couplers[k]) { msg('no branch begins on this node'); return; }
   // the branch number is what sits inside the brackets
-  const m = /[[({<](\d+)[\])}>]/.exec(r.couplers[0]);
+  const m = /[[({<](\d+)[\])}>]/.exec(r.couplers[k]);
   if (!m) { msg('no branch on this node'); return; }
   gotoBranch(+m[1]);
 }
@@ -1151,7 +1166,7 @@ const MENU_ACTIONS = {
             ['Network Tilt Report...', NYI('Network Tilt Report')],
             ['Multi-Net Network Spec Report', NYI('Multi-Net Network Spec Report')]],
   view: [['Show Grid', () => { document.body.classList.toggle('nogrid'); }],
-         ['Show Tips', NYI('Show Tips')]],
+         ['Show Tips', () => { S.tips = !S.tips; renderInfo(); }, () => S.tips]],
   help: [['Contents and Index', showHelp], ["What's New...", NYI("What's New")],
          ['About Windows...', NYI('About Windows')], ['Key Info...', showHelp],
          ['About Design Assistant/Viewer...', () => msg('Design Assistant — web replica')]],
@@ -1163,9 +1178,10 @@ function dropdown(items, x, y) {
   box.className = 'dropdown';
   box.style.left = x + 'px'; box.style.top = y + 'px';
   box.innerHTML = items.map((it, i) => it === '-' ? '<div class="sepr"></div>' : (() => {
-    const [label, act] = it;
+    const [label, act, checked] = it;
     const [text, key] = label.split('\t');
     return `<div class="di${Array.isArray(act) ? ' sub' : ''}" data-i="${i}">` +
+      (checked ? `<span class="chk">${checked() ? '\u2713' : ''}</span>` : '') +
       `<span>${esc(text)}</span><span class="k">${esc(key || '')}` +
       `${Array.isArray(act) ? ' ›' : ''}</span></div>`;
   })()).join('');

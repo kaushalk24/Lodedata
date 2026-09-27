@@ -443,3 +443,36 @@ def test_the_next_amplifier_is_offered_the_last_name_and_steps_it(page):
     page.wait_for_timeout(400)
     assert page.inner_text(".msgbox .mbbody span:last-child") == "Amplifier AL00500 already exists at 34.6."
     assert not page.errors
+
+
+def test_double_clicking_a_coupler_enters_its_branch_and_show_tips_hides_the_box(page):
+    """The coupler's tip reads "<double-click or [.][LT] or [.][RT] to enter
+    branch>".  On 4.14's 3-[11]<12> the program's box previews branch 11
+    only.  View > Show Tips turns the box off and on."""
+    _open_al004(page)
+    _goto(page, 4, 14, "cplr0")
+    box = page.inner_text("#info")
+    assert "Feeds Branch: 11" in box and "Feeds Branch: 12" not in box
+    # the preview draws 2/4/8-port taps (17) [8] {15}, as the program's box
+    assert "(17)" in box and "{15}" in box and "[8]" in box
+    assert box.rstrip().endswith("<double-click or [.][LT] or [.][RT] to enter branch>")
+    i = page.evaluate("pageRows().findIndex(r => r.node === 14 && !r.end)")
+    j = page.evaluate("columns().findIndex(c => c.key === 'cplr0')")
+    page.dblclick(f'#grid td[data-r="{i}"][data-c="{j}"]')
+    page.wait_for_timeout(400)
+    assert page.evaluate("S.branch") == 11
+
+    def show_tips():
+        page.click('.mi[data-menu="view"]')
+        page.wait_for_timeout(200)
+        item = page.locator('.dropdown .di:has-text("Show Tips")')
+        checked = item.locator(".chk").inner_text()
+        item.click()
+        page.wait_for_timeout(200)
+        return checked
+
+    assert show_tips() == "✓"
+    assert page.evaluate("document.getElementById('info').hidden")
+    assert show_tips() == ""
+    assert not page.evaluate("document.getElementById('info').hidden")
+    assert not page.errors

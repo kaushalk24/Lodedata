@@ -17,6 +17,13 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 * The info boxes: tap port levels, coupler branch preview (start levels and
   the branch table), power supply information, amplifier definition, and the
   node box (address, cable; on an amplifier's node its distances and homes).
+  The box is the program's tip: #ffffe1, black text, as wide as its text, in
+  the bottom right; View → Show Tips turns it off and on. On a coupler it
+  previews one branch — 4.14's `3-[11]<12>` shows "Feeds Branch: 11" only —
+  and a double-click enters that branch, as its last line says. Still to
+  confirm: on a two-branch coupler, what `. ←` / `. →` do (the replica keeps
+  `. ←` = back to the parent, `. →` = into the first branch), and whether a
+  double-click on the second bracket enters the second branch.
 * Screen colours, measured from the screenshots: text #00bf00, the cab
   column #00ff00, amplifier names white, marginal #ffff00, out #ff0000.
 * Power currents on all 29 lines of branch 4.
@@ -151,7 +158,9 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
      not the tap cascade (34.9 is the second tap after 34.6 and still reads
      `(1)`). The tap slot or the TSG. The replica prints the slot.
    * The small 3-option dialog seen in the user's old videos (earlier
-     session; the videos are no longer here).
+     session; the videos are no longer here). Possibly the manual's
+     NETWORK MODIFIED menu (3 Restore, 7 Save, 9 Switch), which Num Lock
+     opens.
 8. **Keystrokes — answered.** Design mode's digits are the screen
    menu (`0 Alter`, `5 Test`, `.2 BkFeed`, `..5 Dsmry`; `./ Distance`), `/`
    toggles the expanded display, Esc closes a window. `0` on a tap prompts

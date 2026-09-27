@@ -97,7 +97,7 @@ class Row:
             "cab_name": self.cab_name, "lv": self.lv, "tsg": self.tsg,
             "amp": self.amp, "amp_name": self.amp_name, "fixed": self.fixed,
             "amp_label": self.amp_label,
-            "taps": self.taps, "couplers": self.couplers,
+            "taps": self.taps, "tap_ports": self.tap_ports, "couplers": self.couplers,
             "tap_severity": self.tap_severity, "end": self.end,
             "tap_port_severity": self.tap_port_severity,
             "out_levels": [as_shown(self.out_levels[f]) for f in self.freq_order]
