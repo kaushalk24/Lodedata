@@ -1,5 +1,12 @@
 # Lodedata
 
+This repository holds two independent projects:
+
+- **[Overload](overload/)**: a free, offline-first workout tracker (installable web app) modelled on Setgraph,
+  with a screen-by-screen [teardown](overload/docs/01-setgraph-teardown.md) and an
+  [improvement plan](overload/docs/02-improvements.md).
+- **HFC Plant Designer** (below): a clean-room take on the Lode Data *Design Assistant*.
+
 Clean-room reverse engineering of the Lode Data *Design Assistant*, the basis for our own
 HFC (hybrid fiber-coax) network design tool.
 

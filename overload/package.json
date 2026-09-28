@@ -1,0 +1,10 @@
+{
+  "name": "overload",
+  "private": true,
+  "type": "module",
+  "description": "Offline-first workout tracker (PWA). No build step: serve this folder.",
+  "scripts": {
+    "test": "node --test",
+    "start": "npx --yes serve -l 5173 ."
+  }
+}
