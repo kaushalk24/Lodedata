@@ -104,10 +104,20 @@ class NtwBranch:
     end_id: int = 0           # the id of its end line (the last node's next)
 
 
+# The files it was saved with, as the program's "Spec File Mismatch" box
+# lists them: Parameters, Actives, Taps, Couplers, Cables, Prices,
+# Performance, Map Grid -- 8 x char[261] (AL004: WV750-2026 five times, then
+# Untitled three times).
+SAVED_WITH = 42366
+SAVED_WITH_FILES = ("Parameters", "Actives", "Taps", "Couplers", "Cables",
+                    "Prices", "Performance", "Map Grid")
+
+
 @dataclass
 class NtwNetwork:
     name: str = ""
     spec_names: list = field(default_factory=list)
+    saved_with: list = field(default_factory=list)    # the 8 file names, in SAVED_WITH_FILES order
     branches: dict = field(default_factory=dict)      # number -> NtwBranch
 
     @property
@@ -184,6 +194,9 @@ def read_network(plain: bytes) -> NtwNetwork:
     net = NtwNetwork()
     net.spec_names = [_text(plain[PAYLOAD_START + 261 * k:PAYLOAD_START + 261 * k + 40])
                       for k in range(5)]
+    if len(plain) > SAVED_WITH + 261 * 8:
+        net.saved_with = [_text(plain[SAVED_WITH + 261 * k:SAVED_WITH + 261 * (k + 1)])
+                          for k in range(8)]
 
     b = _first_branch(r)
     number = 1

@@ -1396,7 +1396,9 @@ function importNtw() {
     if (!out.imported) {
       $('#ntwOut').textContent = `${out.network || f.name}: ${out.branches} branches, ` +
         `${out.nodes} nodes.\nIt was saved with spec set ${out.spec_set_needed} — ` +
-        `pick those five files and import again.`;
+        `pick those five files and import again.` +
+        (out.mismatch && out.mismatch.length ? '\n\nSpec File Mismatch\n' +
+          out.mismatch.map(([what, text]) => `${(what + ':').padStart(13)}  ${text}`).join('\n') : '');
       return;
     }
     const r = out.report;
@@ -1405,7 +1407,20 @@ function importNtw() {
     await open(out.id);
     msg(`${r.network}: ${r.branches} branches, ${r.nodes} nodes read against ${r.spec_set}` +
         (r.unresolved.length ? ` — ${r.unresolved.length} unresolved: ${r.unresolved[0]}` : ''));
+    if (r.mismatch && r.mismatch.length) specMismatch(r.mismatch);
   };
+}
+
+// The program's warning on opening a network with other spec files than it
+// was saved with (the user: it tells the designer which spec set the
+// network was saved with; it does not stop another set being used, as for
+// a node upgrade).
+function specMismatch(lines) {
+  modal(`<div class="msgbox"><div class="mbtitle">Spec File Mismatch</div>
+    <div class="mbbody"><span class="mbicon warn">!</span><table class="mismatch">${
+      lines.map(([what, text]) => `<tr><td>${esc(what)}:</td><td>${esc(text)}</td></tr>`).join('')
+    }</table></div><div class="row"><button id="mbOk">OK</button></div></div>`);
+  $('#mbOk').onclick = closeModal; $('#mbOk').focus();
 }
 
 // ---------------------------------------------------------------- saving

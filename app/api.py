@@ -46,6 +46,9 @@ def db() -> sqlite3.Connection:
     return con
 
 
+LAYOUT_FILE = "__layout__"      # the last .ntw opened: a new network is written in its layout
+
+
 def ntw_file(design_id: str) -> bytes | None:
     con = db()
     row = con.execute("SELECT data FROM ntw_files WHERE id=?", (design_id,)).fetchone()
@@ -438,6 +441,8 @@ async def import_ntw(file: UploadFile = File(...),
     d.id = new_id("ntw")
     save(d)
     keep_ntw_file(d.id, data)
+    # the layout a network keyed in from scratch is written in
+    keep_ntw_file(LAYOUT_FILE, data)
     return {"imported": True, "id": d.id, "name": d.name, "report": report, **info}
 
 
@@ -453,12 +458,15 @@ def save_ntw(nid: str, filename: str | None = None):
     """
     d = load(nid)
     stem = Path(filename).stem if filename else None
-    source = ntw_file(nid)
+    source, fresh = ntw_file(nid), False
     if source is None:
-        raise HTTPException(409, "this network was not opened from a .ntw file, and a "
-                                 "new network cannot be written as one yet")
+        # keyed in from scratch: written in the layout of the last .ntw opened
+        source, fresh = ntw_file(LAYOUT_FILE), True
+        if source is None:
+            raise HTTPException(409, "open any Lode Data .ntw here once first: a new "
+                                     "network is written in the layout of one")
     try:
-        data, report = export_ntw(d, source, name=stem)
+        data, report = export_ntw(d, source, name=stem or d.name, fresh=fresh)
     except ExportError as e:
         raise HTTPException(400, str(e))
     if stem:

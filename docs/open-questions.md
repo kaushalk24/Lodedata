@@ -223,15 +223,33 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     saved under other names. A save now writes the name it is saved under.
 
     Branch numbers (the user): deleting a branch moves the later ones up — with
-    2(3), 8(4), 12(5), deleting 2(3) gives 8(3), 12(4). The replica does the
-    same. Still to confirm:
-    * the number a newly placed coupler's branch gets: the user's example
-      reads "2(4)" when 2 is put back above 8(3); the replica gives the next
-      number after the highest;
+    2(3), 8(4), 12(5), deleting 2(3) gives 8(3), 12(4). A newly placed
+    coupler's branch takes the next number after the highest (AL004: a DC-8
+    at 4.9 feeds 46). The replica does both. The new branch's first line
+    starts on the coupler line's cable (46.1 on 4.9's 410).
+
+    Save and Save As were tried in Lode Data: it reads the files and shows
+    the changes. The file keeps the spec set it was saved with (8 names at
+    42366: Parameters … Cables, Prices, Performance, Map Grid); a save
+    writes the set now in use. Opened with other files, Lode Data warns
+    "Spec File Mismatch", one line per file, and carries on; the replica
+    shows the same box.
+
+    A network keyed in from scratch saves too, written in the layout of the
+    last .ntw opened. The user's recording 2 network, keyed in the replica,
+    gives Lode Data's figures exactly (2.1 46.41 37.35 17.55 17.19, its /23/
+    23.41 14.45 40.45 38.29; 2.2 42.70 36.25 18.55 17.80; end 41.60 35.55
+    19.25 18.50).
+
+    Still to confirm:
+    * an empty network saved from Lode Data, to lay new networks out exactly;
+    * hc drawn red (2.2: 3 homes on a 2-port tap) — the rule;
+    * Lode Data opens a .ntw with no spec set (levels 0.00) and takes the set
+      afterwards; the replica asks for the set first;
+    * Lode Data shows Project Settings on startup ("Show on startup") and an
+      "Errors Loading Project" box after Set All Files;
     * what Lode Data writes when it saves one of these files itself;
     * which new lines get their house list filled in;
     * the four undecoded preamble blocks;
     * where TSG, Map, Loc, address and notes go (listed as not written);
     * a new power supply's record;
-    * a network started in the app needs a file to build on: an empty network
-      saved from Lode Data.

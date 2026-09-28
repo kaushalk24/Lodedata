@@ -180,8 +180,15 @@ class Design:
     def add_branch(self, parent_branch: int, parent_node: int,
                    style: str = BRANCH_NORMAL) -> Branch:
         n = self.next_branch_number()
+        # its first line starts on the coupler line's cable, as Lode Data
+        # does it: a DC-8 placed at AL004 4.9 (410) opens 46.1 on 410
+        first = Node(seq=1)
+        parent = self.branches.get(parent_branch)
+        if parent is not None and 0 < parent_node <= len(parent.nodes):
+            first.cab = parent.nodes[parent_node - 1].cab
+            first.cab_part = parent.nodes[parent_node - 1].cab_part
         b = Branch(number=n, parent_branch=parent_branch,
-                   parent_node=parent_node, style=style, nodes=[Node(seq=1)])
+                   parent_node=parent_node, style=style, nodes=[first])
         self.branches[n] = b
         return b
 

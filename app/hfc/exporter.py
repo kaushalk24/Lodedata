@@ -28,7 +28,8 @@ class ExportError(ValueError):
     pass
 
 
-def export_ntw(design: Design, source: bytes, name: str | None = None) -> tuple[bytes, dict]:
+def export_ntw(design: Design, source: bytes, name: str | None = None,
+               fresh: bool = False) -> tuple[bytes, dict]:
     """The design as a .ntw file, built over ``source`` (the .ntw it came
     from, as read from disk), to be saved as ``name``.ntw.  Returns the file
     and a report; the design's
@@ -117,7 +118,7 @@ def export_ntw(design: Design, source: bytes, name: str | None = None) -> tuple[
             parent=(number.get(br.parent_branch, 0), br.parent_node) if b != numbers[0] else (0, 0)))
 
     try:
-        plain_out, ids = W.build(raw, outs, name=name)
+        plain_out, ids = W.build(raw, outs, name=name, spec=lib.name or None, fresh=fresh)
     except W.WriteError as e:
         raise ExportError(str(e))
     for b, node_ids, end in zip(numbers, ids["nodes"], ids["ends"]):

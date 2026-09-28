@@ -63,8 +63,10 @@ P_TAPS = 23513                          # (u16, u16) [512 tap rows][4 port codes
 P_TAP_PORTS = 31705                     # (u16, u16) [4 port codes]
 P_COUPLERS = 31721                      # (u16, u16) at +4 x coupler record
 P_NAME = 44542                          # the network's file name, without .ntw
+P_SPECS = (512, 42366)                  # twice, 5 x char[261]: the spec set it was saved with
 P_BRANCHES = 41405                      # u32 number of branches
 P_NEXT_ID = 41409                       # u32 next free id, counting down
+P_FIRST_ID = 41413                      # u32 the id the count starts from (127999)
 
 
 def _u32(b, o):
@@ -192,12 +194,18 @@ def _tail(extended: bool) -> int:
     return EXT_SIZE if extended else 0
 
 
-def build(source: RawNetwork, branches: list, name: str | None = None) -> tuple[bytes, dict]:
+def build(source: RawNetwork, branches: list, name: str | None = None,
+          spec: str | None = None, fresh: bool = False) -> tuple[bytes, dict]:
     """Write ``branches`` (BranchOut, branch 1 first) over ``source``.
 
     ``name`` is the file name it is saved as, without .ntw.  The program
     keeps it in the file and, opening a file whose name differs, says
     "Filename AL004 has changed to ... Setting all PCDs to open."
+    ``spec`` is the spec set the network now uses (its base name): the file
+    keeps it, and the program warns when a file is opened with another set.
+    ``fresh`` writes a network that did not come from ``source`` (one keyed
+    in from scratch): only the file's layout is taken from it, every line is
+    new and the ids start again from the first.
 
     Returns the decoded file and the ids handed out: ``{"nodes": [[id per
     node] per branch], "ends": [end id per branch]}`` so the caller can keep
@@ -208,10 +216,10 @@ def build(source: RawNetwork, branches: list, name: str | None = None) -> tuple[
     if len(source.header) + len(source.preamble) != PREAMBLE_END:
         raise WriteError("the file this network came from is not laid out as "
                          "a Design 12.11 file: nothing written")
-    records = source.records()
-    heads = {b.end_id: b for b in source.branches}
+    records = {} if fresh else source.records()
+    heads = {} if fresh else {b.end_id: b for b in source.branches}
     pre = bytearray(source.header + source.preamble)
-    next_id = _u32(pre, P_NEXT_ID)
+    next_id = _u32(pre, P_FIRST_ID if fresh else P_NEXT_ID)
 
     def take() -> int:
         nonlocal next_id
@@ -229,9 +237,16 @@ def build(source: RawNetwork, branches: list, name: str | None = None) -> tuple[
         used.add(got)
         return got
 
-    for br in branches:
-        ends.append(own(br.end_rec, heads))
-        ids.append([own(nd.rec, records) for nd in br.nodes])
+    for k, br in enumerate(branches):
+        # AL004: branch 1's first line is 127999 and its end line 127998;
+        # a branch placed later takes its end line's id first (2.1 127996,
+        # its end 127997)
+        if k == 0:
+            ids.append([own(nd.rec, records) for nd in br.nodes])
+            ends.append(own(br.end_rec, heads))
+        else:
+            ends.append(own(br.end_rec, heads))
+            ids.append([own(nd.rec, records) for nd in br.nodes])
     number = {k + 1: k for k in range(len(branches))}
 
     out = bytearray(pre)
@@ -240,7 +255,8 @@ def build(source: RawNetwork, branches: list, name: str | None = None) -> tuple[
         if not br.nodes:
             raise WriteError(f"branch {k + 1} has no lines")
         src = heads.get(br.end_rec) if ends[k] == br.end_rec else None
-        head = bytearray(src.head if src else template_head)
+        head = bytearray(src.head if src else
+                         source.branches[0].head if k == 0 else template_head)
         if k == 0:
             parent_id = 0
         else:
@@ -265,12 +281,18 @@ def build(source: RawNetwork, branches: list, name: str | None = None) -> tuple[
     struct.pack_into("<I", out, P_NEXT_ID, next_id)
     if name is not None and name != _stored_name(out):
         _text_into(out, P_NAME, name, width=261)
+    if spec:
+        for base in P_SPECS:
+            for k in range(5):
+                at = base + 261 * k
+                if _stored_name(out, at) != spec:
+                    _text_into(out, at, spec, width=261)
     _totals(out, _counts(outs_from_plain(join(source))), _counts(branches))
     return bytes(out), {"nodes": ids, "ends": ends}
 
 
-def _stored_name(plain) -> str:
-    return bytes(plain[P_NAME:P_NAME + 261]).split(b"\0", 1)[0].decode("latin-1")
+def _stored_name(plain, at: int = P_NAME) -> str:
+    return bytes(plain[at:at + 261]).split(b"\0", 1)[0].decode("latin-1")
 
 
 def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,

@@ -652,3 +652,62 @@ def test_save_network_as_takes_the_new_name(page):
     assert page.evaluate("window.__asked") == 1
     assert [w[0] for w in page.evaluate("window.__written")] == ["AL004_B.ntw", "AL004_B.ntw"]
     assert not page.errors
+
+
+def test_other_spec_files_bring_up_the_spec_file_mismatch_box(page, tmp_path):
+    """Opened with a spec set of another name, the network still opens and
+    the box says which set it was saved with (the user: a node upgrade uses
+    another set on purpose)."""
+    import shutil
+    pair = SAMPLES / "AL004-WV750"
+    if not (pair / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    specs = []
+    for f in sorted(pair.glob("WV750-2026.*")):
+        specs.append(tmp_path / f"UPGRADE{f.suffix}")
+        shutil.copy(f, specs[-1])
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "AL004.ntw"))
+    page.set_input_files("#ntwSpecs", [str(f) for f in specs])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    assert page.inner_text(".msgbox .mbtitle") == "Spec File Mismatch"
+    rows = page.eval_on_selector_all(".msgbox table.mismatch tr",
+                                     "trs => trs.map(t => t.innerText.replace(/\\s+/g, ' ').trim())")
+    assert rows[0] == "Parameters: Project spec file loaded does not match spec file 'WV750-2026' saved with"
+    assert rows[5:] == ["Prices: Loaded.", "Performance: Loaded.", "Map Grid: Loaded."]
+    page.click("#mbOk")
+    assert page.evaluate("S.scr.rows.length") > 0 and "AL004" in page.inner_text("#title")
+    assert not page.errors
+
+
+def test_a_network_keyed_from_scratch_saves_as_ntw(server):
+    """File > New, a spec set, a few lines; Save Network writes a .ntw in the
+    layout of the last .ntw opened, and it reads back."""
+    import requests
+    pair = SAMPLES / "AL004-WV750"
+    if not (pair / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    specs = [("specs", (f.name, f.read_bytes())) for f in sorted(pair.glob("WV750-2026.*"))]
+    r = requests.post(f"{server}/api/import/ntw",
+                      files=[("file", ("AL004.ntw", (pair / "AL004.ntw").read_bytes()))] + specs)
+    assert r.json()["imported"]
+    nid = requests.post(f"{server}/api/networks", json={"name": "Untitled"}).json()["id"]
+    requests.post(f"{server}/api/networks/{nid}/library/spec",
+                  files=[("files", s[1]) for s in specs]).raise_for_status()
+    base = f"{server}/api/networks/{nid}"
+    requests.patch(f"{base}/nodes/1/1", json={"amp_code": "70"}).raise_for_status()
+    requests.patch(f"{base}/nodes/1/1", json={"amp_label": "AL004", "cab": 2}).raise_for_status()
+    requests.post(f"{base}/branches/1/nodes", json={"after": 1, "cable_from_previous": True}).raise_for_status()
+    requests.put(f"{base}/nodes/1/2/coupler", json={"slot": 0, "code": "100"}).raise_for_status()
+    requests.patch(f"{base}/nodes/2/1", json={"ftg": 120, "hc": 2}).raise_for_status()
+    requests.put(f"{base}/nodes/2/1/tap", json={"slot": 0, "code": "2.23"}).raise_for_status()
+    r = requests.post(f"{base}/ntw", params={"filename": "SCRATCH.ntw"})
+    assert r.status_code == 200, r.text
+    net = _ntw_lines(r.content)
+    assert [len(b.nodes) for b in net.branches.values()] == [2, 1]
+    first = net.branches[2].nodes[0]
+    assert (first.ftg, first.hc, first.cable) == (120, 2, 2)      # the coupler line's cable
+    assert net.branches[1].nodes[0].label == "AL004"
+    assert requests.get(base).json()["name"] == "SCRATCH"

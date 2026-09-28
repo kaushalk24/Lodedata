@@ -23,7 +23,7 @@ from lodedata import specs as ld_specs                     # noqa: E402
 
 from dataclasses import asdict
 
-from lodedata.network import read_network                  # noqa: E402
+from lodedata.network import read_network, SAVED_WITH_FILES  # noqa: E402
 
 from .model import (Library, CableType, TapType, PassiveType, ActiveType,
                     PowerSupplyType, InlineType, DesignParameters, new_id)
@@ -277,7 +277,8 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
 
     report = {"network": net.name, "saved_with": net.spec_names[0] if net.spec_names else "",
               "spec_set": Path(spec_base).name, "branches": len(net.branches),
-              "nodes": net.node_count, "unresolved": []}
+              "nodes": net.node_count, "unresolved": [],
+              "mismatch": spec_mismatch(net, Path(spec_base).name)}
     if report["saved_with"] and report["saved_with"] != report["spec_set"]:
         report["unresolved"].append(
             f"the design was saved with spec set {report['saved_with']}, "
@@ -354,6 +355,20 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
     return design, report
 
 
+def spec_mismatch(net, loaded: str) -> list:
+    """The program's "Spec File Mismatch" box, line for line: each file the
+    network was saved with against the one loaded now.  Only the five spec
+    files are loaded here; Prices, Performance and Map Grid stay Untitled.
+    Empty when everything matches -- the box is not shown then."""
+    if not net.saved_with:
+        return []
+    now = [loaded or "Untitled"] * 5 + ["Untitled"] * 3
+    lines = [[what, "Loaded." if (was or "Untitled") == cur else
+              f"Project spec file loaded does not match spec file '{was}' saved with"]
+             for what, was, cur in zip(SAVED_WITH_FILES, net.saved_with, now)]
+    return lines if any(text != "Loaded." for _, text in lines) else []
+
+
 def inspect_ntw(path: str | Path) -> dict:
     """Header plus payload statistics for a .ntw design file."""
     path = Path(path)
@@ -389,7 +404,8 @@ def _network_summary(plain: bytes) -> dict:
     except ValueError as e:
         return {"network_error": str(e)}
     return {"network": net.name, "spec_set_needed": net.spec_names[0] if net.spec_names else "",
-            "branches": len(net.branches), "nodes": net.node_count}
+            "branches": len(net.branches), "nodes": net.node_count,
+            "mismatch": spec_mismatch(net, "")}
 
 
 def _tokens(name: str) -> frozenset:

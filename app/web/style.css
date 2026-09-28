@@ -181,3 +181,8 @@ table.grid td.xhousing{color:var(--white)!important;text-align:left}
 .msgbox .mbicon{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;
   border-radius:50%;background:#d42020;color:#fff;font-size:18px;font-weight:700;flex:none}
 .msgbox .row{justify-content:flex-end}
+/* "Spec File Mismatch": the yellow warning triangle, the files right-aligned */
+.msgbox .mbicon.warn{border-radius:0;background:#f5c518;color:#000;
+  clip-path:polygon(50% 0,100% 100%,0 100%);padding-top:8px}
+.msgbox table.mismatch td{padding:1px 6px;border:0;white-space:nowrap}
+.msgbox table.mismatch td:first-child{text-align:right}

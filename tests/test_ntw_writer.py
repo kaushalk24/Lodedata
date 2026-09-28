@@ -258,3 +258,69 @@ def test_deleting_a_branch_closes_up_the_numbers():
     net = links_ok(data)
     assert len(net.branches) == 44 and net.branches[44].parent == (5, 9)
     assert screen_of(reread(data)) == screen_of(d)
+
+
+def _keyed_from_scratch():
+    """The network keyed in Lode Data in the user's recording 2: a Ripple
+    named AL004, two MULTI OUT couplers on lines of cable 2, and branch 2 of
+    120 ft (2 homes, a /23/) and 130 ft (3 homes, a /20/)."""
+    from hfc.importer import library_from_spec_set, parameters_from_spec_set
+    from hfc.plant import Design
+    from hfc.entry import resolve_active, resolve_coupler, resolve_tap
+    params = parameters_from_spec_set(SPEC)
+    d = Design(name="Untitled", parameters=params, library=library_from_spec_set(SPEC, params))
+    d.ensure_feeder()
+    lib = d.library
+    b1 = d.branch(1)
+    ripple = resolve_active(lib, "70")
+    n = b1.nodes[0]
+    n.amp, n.amp_part, n.amp_label = ripple.active_id, ripple.id, "AL004"
+    n.cab, n.cab_part = 2, line(d, 2).cab_part
+    for k in (2, 3):
+        b1.nodes.append(line(d, 2, seq=k))
+        part, _ = resolve_coupler(lib, "100")
+        child = d.add_branch(1, k)
+        b1.nodes[k - 1].couplers.append(CouplerPlacement(part_id=part.id, coupler_id=100,
+                                                         branch=child.number))
+    b2 = d.branch(2)
+    b2.nodes[0].ftg, b2.nodes[0].hc = 120, 2
+    b2.nodes.append(line(d, 2, seq=2, ftg=130, hc=3))
+    for node, code in ((b2.nodes[0], "2.23"), (b2.nodes[1], "2.20")):
+        tap = resolve_tap(lib, code, node.hc)
+        node.taps = [TapPlacement(part_id=tap.id, ports=tap.ports, value_db=tap.tap_value_db)]
+    return d
+
+
+def test_a_network_keyed_from_scratch_is_written_in_the_layout_of_another():
+    d = _keyed_from_scratch()
+    # Lode Data's own figures for it (recording 2)
+    rows = {(r.branch, r.node, r.end): r for r in build(d).rows}
+    assert tuple(round(v, 2) for v in rows[(2, 1, False)].levels.values()) == (46.41, 37.35, 17.55, 17.19)
+    assert tuple(round(v, 2) for v in rows[(2, 2, False)].levels.values()) == (42.70, 36.25, 18.55, 17.80)
+    assert tuple(round(v, 2) for v in rows[(2, 3, True)].levels.values()) == (41.60, 35.55, 19.25, 18.50)
+    assert [round(v, 2) for v in rows[(2, 1, False)].tap_levels[0]] == [23.41, 14.45, 40.45, 38.29]
+    data, report = export_ntw(d, NTW.read_bytes(), name="SCRATCH", fresh=True)
+    net = links_ok(data)
+    assert len(net.branches) == 3 and [len(b.nodes) for b in net.branches.values()] == [3, 2, 1]
+    ids = sorted(n.id for b in net.branches.values() for n in b.nodes)
+    assert ids[-1] == 127999 and ids[0] > 127980          # counted again from the first
+    p = plain(data)
+    assert W._stored_name(p) == "SCRATCH"
+    assert net.saved_with == ["WV750-2026"] * 5 + ["Untitled"] * 3
+    back = reread(data)
+    assert screen_of(back) == screen_of(d)
+    assert back.branch(1).nodes[0].amp_label == "AL004"
+    # and saving it again builds on the file it now is
+    again, _ = export_ntw(d, data, name="SCRATCH")
+    assert again == data
+
+
+def test_the_spec_file_mismatch_lines():
+    """The program's box on opening with other spec files: one line a file."""
+    from hfc.importer import spec_mismatch
+    net = N.read_network(plain(NTW.read_bytes()))
+    assert spec_mismatch(net, "WV750-2026") == []
+    lines = spec_mismatch(net, "")
+    assert lines[:5] == [[w, "Project spec file loaded does not match spec file 'WV750-2026' saved with"]
+                         for w in ("Parameters", "Actives", "Taps", "Couplers", "Cables")]
+    assert lines[5:] == [["Prices", "Loaded."], ["Performance", "Loaded."], ["Map Grid", "Loaded."]]
