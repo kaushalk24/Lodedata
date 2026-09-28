@@ -1,6 +1,6 @@
 # Roadmap: extra features and AI
 
-Status: **plan only**. Nothing in this document is built yet.
+Status: ✅ marks what shipped in v1.1 (12 features from sections 1 and 2). Everything else is still a plan.
 
 The rule stays the same as before: logging a set is **open exercise → + → ✓**, and no feature may add a step to it.
 New features either run in the background, sit one tap away, or are opt-in.
@@ -11,14 +11,14 @@ Effort: **S** = a day or less, **M** = a few days, **L** = a week or more.
 
 | Feature | Why it matters | Effort |
 |---|---|---|
-| **Set types**: timed (plank 60 s), distance (farmer's carry 40 m), assisted (pull-up −20 kg), left/right for single-arm work | Today a plank logs "reps". Assisted machines get logged as positive weight, so a stronger lifter looks weaker | M |
-| **Supersets and circuits**: link 2–3 exercises; saving one opens the next, and rest starts after the last | Common in the templates ("Burn Fat" is a circuit) and in Setgraph's own Shortcuts examples | M |
-| **Warm-up ramp**: from today's working weight, suggest bar × 10, 50% × 5, 70% × 3, 85% × 1 with plates per side | Removes mental math before every heavy lift | S |
-| **RPE / reps in reserve** as an optional chip | Better progression targets ("8 reps at RPE 7 → add weight") | S |
+| ✅ **Set types**: timed (plank 60 s), distance (farmer's carry 40 m), assisted (pull-up −20 kg), left/right for single-arm work | Today a plank logs "reps". Assisted machines get logged as positive weight, so a stronger lifter looks weaker | M |
+| ✅ **Supersets and circuits**: link 2–3 exercises; saving one opens the next, and rest starts after the last | Common in the templates ("Burn Fat" is a circuit) and in Setgraph's own Shortcuts examples | M |
+| ✅ **Warm-up ramp**: from today's working weight, suggest bar × 10, 40% × 5, 60% × 5, 80% × 3 with plates per side | Removes mental math before every heavy lift | S |
+| ✅ **RPE / reps in reserve** as an optional chip | Better progression targets ("8 reps at RPE 7 → add weight") | S |
 | **Dumbbell and machine steps per gym** (e.g. dumbbells in 2.5 kg steps, stack in 5 kg steps) | The target then suggests weights that exist at your gym | S |
 | **Move or copy sets to another day**; edit a whole session at once | Fixes a day logged on the wrong date | S |
 | **Exercise links**: a YouTube link or form cues per exercise | Quick form reminder without leaving the app | S |
-| **Body measurements and progress photos**, stored only on the phone, with side-by-side compare | Weight alone misses recomposition | M |
+| ✅ **Body measurements and progress photos**, stored only on the phone, with side-by-side compare | Weight alone misses recomposition | M |
 | **Monthly and yearly recap card** (sessions, tonnage, PRs, most-improved lift) | Motivation, and something to share | S |
 | **Strength levels** (e.g. bench 1.0× bodyweight = intermediate) on the Records view | Gives records context | S |
 
@@ -28,14 +28,14 @@ These feel like AI but are statistics over your own log. They need no server, co
 
 | Feature | How it works | Effort |
 |---|---|---|
-| **Typo guard** | Before saving, compare with recent working weights. At 275 kg when you usually lift 27.5, ask "Did you mean 27.5?" | S |
-| **Duplicate finder** | Fuzzy name matching flags pairs like *Forearm curls 1 / 2* or *Jm / Jm press* and offers a one-tap merge | S |
-| **Learned rest** | Median real rest per exercise (your average is about 5 min, against a 2:45 default). Offers to set per-exercise timers | S |
-| **Plateau and deload detector** | Trend line of estimated 1RM over the last 6 sessions. If it's flat or falling for 3 or more, suggest a deload week or a new rep range | M |
+| ✅ **Typo guard** | Before saving, compare with recent working weights. At 275 kg when you usually lift 27.5, ask "Did you mean 27.5?" | S |
+| ✅ **Duplicate finder** | Fuzzy name matching flags pairs like *Forearm curls 1 / 2* or *Jm / Jm press* and offers a one-tap merge | S |
+| ✅ **Learned rest** | Median real rest per exercise (your average is about 5 min, against a 2:45 default). Offers to set per-exercise timers | S |
+| ✅ **Plateau and deload detector** | If estimated 1RM hasn't beaten its best for 4 or more sessions over at least 2 weeks, suggest a lighter week (about 90%) or a new rep range | M |
 | **Load jump warning** | Weekly hard sets per muscle compared with your 4-week average: "Back volume is up 60% this week" | S |
-| **What to train today** | Recovery map plus your split rotation picks the folder: "Chest shoulders: rested, last done 4 days ago" | S |
-| **Goal projection** | Set "Bench 100 kg"; your trend estimates the date you'll hit it and whether you're on pace | M |
-| **Quick text logging** | A text field that understands "8 at 60", "3x10 25" or "same again". Works with the iPhone keyboard's dictation button, so it covers voice too | M |
+| ✅ **What to train today** | Recovery map plus your split rotation picks the folder: "Chest shoulders: rested, last done 4 days ago" | S |
+| ✅ **Goal projection** | Set "Bench 100 kg"; your trend estimates the date you'll hit it and whether you're on pace | M |
+| ✅ **Quick text logging** | A text field that understands "8 at 60", "3x10 25" or "same again". Works with the iPhone keyboard's dictation button, so it covers voice too | M |
 
 ## 3. Claude-powered features (optional)
 

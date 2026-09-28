@@ -5,10 +5,13 @@ rebuilt to run on your phone. No account, no subscription, no server.
 
 - **Sets**: workout folders, My Exercises with a 130-exercise library, templates, and an offline plan designer.
 - **Exercise**: history grouped by day with *Compared to previous*, a chart, 1RM with a percentage table, and records.
-- **Set entry**: custom keypad prefilled from your last set, a "beat last time" target, a live PR badge, labels,
-  a plate calculator, bodyweight sets, kg/lb, backdating and a rest timer.
+- **Set entry**: custom keypad prefilled from your last set, a "beat last time" target (RPE-aware), a live PR badge,
+  labels, warm-up ramp, plate calculator, set types (weight, bodyweight, assisted, timed, distance, left/right),
+  kg/lb, backdating, a typo guard, and "type or say it" logging.
+- **Smart, offline**: Up next (most recovered workout), plateau detection, goal dates, learned rest times and a
+  duplicate finder. Supersets and circuits move you to the next exercise automatically.
 - **Sessions**: timed activities such as strength training, tennis or a run.
-- **Body**: recovery map, weekly sets per muscle, bodyweight log.
+- **Body**: recovery map, weekly sets per muscle, bodyweight, measurements and progress photos (kept on the phone).
 - **Today**: week strip, day stats, set details, calendar and a share card.
 
 See [docs/01-setgraph-teardown.md](docs/01-setgraph-teardown.md) for the screen-by-screen analysis,
@@ -60,11 +63,13 @@ overload/
   css/app.css                               tokens (dark + light) and components
   js/
     util.js      escaping, units, dates, CSV            stats.js    records, PRs, 1RM, plates, progression, recovery, streaks
+    smart.js     typo guard, duplicates, learned rest,  parse.js    typed / dictated set logging
+                 plateau, goal date, up next, warm-up
     library.js   exercises, muscles, templates          planner.js  offline plan designer
     store.js     state, IndexedDB, mutations            dataio.js   CSV import/export, demo data
     ui.js        navigation, sheets, dialogs, toasts    timer.js    rest timer
     chart.js     SVG chart                              bodymap.js  SVG muscle map
-    screens/     home, exercises, exercise, setentry, sessions, body, today, settings
+    screens/     home, exercises, exercise, setentry, flow (supersets), sessions, body, today, settings
   tests/         node --test suites
   docs/          teardown and improvement notes
 ```

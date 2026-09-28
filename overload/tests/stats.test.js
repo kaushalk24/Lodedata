@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   compareToPrevious, recordRanges, prSetIds, wouldBePR, e1rm, platesPerSide, suggestTarget,
-  daySummary, collapseSets, weeklyStreak, recoveryState, muscleReport, bestEfforts, groupByDay,
+  daySummary, collapseSets, weeklyStreak, recoveryState, muscleReport, bestEfforts, groupByDay, summarize,
 } from '../js/stats.js';
 
 const at = (y, m, d, hh = 7, mm = 0) => new Date(y, m - 1, d, hh, mm).getTime();
@@ -37,8 +37,8 @@ test('PRs: nothing on day one, heavier-for-reps later, first time at a new rep c
   const f = set(at(2026, 1, 9), 5, 28);        // lighter than 6x30, so not a PR
   const ids = prSetIds([a, b, c, d, e, f]);
   assert.deepEqual([...ids].sort(), [d.id, e.id].sort());
-  assert.equal(wouldBePR([a, b, c, d, e, f], 6, 30.5), true);
-  assert.equal(wouldBePR([a, b, c, d, e, f], 6, 30), false);
+  assert.equal(wouldBePR([a, b, c, d, e, f], { reps: 6, weight: 30.5 }), true);
+  assert.equal(wouldBePR([a, b, c, d, e, f], { reps: 6, weight: 30 }), false);
 });
 
 test('bodyweight PRs count reps', () => {
@@ -103,4 +103,41 @@ test('best efforts and grouping', () => {
   assert.equal(b.setVolume.value, 500); assert.equal(b.sessionVolume.value, 1000); assert.equal(b.maxWeight.value, 100);
   const g = groupByDay(s);
   assert.equal(g.length, 2); assert.equal(g[0].sets[0].reps, 12); assert.equal(g[1].sets[0].reps, 10);
+});
+
+test('records for assisted, timed and distance sets', () => {
+  // Assisted: less help is progress. Weight is stored as -assistance with bw=true.
+  const a1 = set(at(2026, 1, 1), 8, -30, { bw: true }), a2 = set(at(2026, 1, 3), 8, -20, { bw: true }), a3 = set(at(2026, 1, 5), 8, -25, { bw: true });
+  assert.deepEqual([...prSetIds([a1, a2, a3], 75, 'assisted')], [a2.id]);
+  assert.equal(wouldBePR([a1, a2], { reps: 8, weight: -15, bw: true }, 75, 'assisted'), true);
+  // Volume never goes negative when bodyweight is unknown.
+  assert.equal(summarize([a1], 0).volume, 0);
+  assert.equal(summarize([a1], 80).volume, 400);
+  // Timed: longer holds are records; reps are 0.
+  const t1 = set(at(2026, 1, 1), 0, 0, { sec: 60 }), t2 = set(at(2026, 1, 3), 0, 0, { sec: 75 }), t3 = set(at(2026, 1, 5), 0, 0, { sec: 70 });
+  assert.deepEqual([...prSetIds([t1, t2, t3], 0, 'time')], [t2.id]);
+  assert.equal(summarize([t1, t2]).sec, 135);
+  // Distance with load: farther at the same weight, or heavier at the same distance.
+  const d1 = set(at(2026, 1, 1), 0, 30, { dist: 40 }), d2 = set(at(2026, 1, 3), 0, 32, { dist: 40 }), d3 = set(at(2026, 1, 5), 0, 30, { dist: 50 });
+  assert.deepEqual([...prSetIds([d1, d2, d3], 0, 'distance')].sort(), [d2.id, d3.id].sort());
+});
+
+test('RPE and failure shape the target', () => {
+  const easy = [set(1, 10, 50, { rpe: 7 })];
+  assert.deepEqual(pick(suggestTarget(easy, 0)), { reps: 10, weight: 52.5, why: 'easy' });
+  const hard = [set(1, 10, 50, { rpe: 10 })];
+  assert.deepEqual(pick(suggestTarget(hard, 0)), { reps: 10, weight: 50, why: 'hard' });
+  const failed = [set(1, 9, 50, { label: 'failure' })];
+  assert.deepEqual(pick(suggestTarget(failed, 0)), { reps: 9, weight: 50, why: 'hard' });
+  const mid = [set(1, 9, 50, { rpe: 8 })];
+  assert.deepEqual(pick(suggestTarget(mid, 0)), { reps: 10, weight: 50, why: 'rep' });
+  // Easy but below the rep range: add reps first.
+  assert.deepEqual(pick(suggestTarget([set(1, 6, 50, { rpe: 6 })], 0)), { reps: 7, weight: 50, why: 'rep' });
+});
+
+test('collapse keeps timed, distance and sides apart', () => {
+  const s1 = set(1, 0, 0, { sec: 60 }), s2 = set(2, 0, 0, { sec: 60 }), s3 = set(3, 0, 0, { sec: 45 });
+  assert.deepEqual(collapseSets([s1, s2, s3]).map(x => [x.count, x.sec]), [[2, 60], [1, 45]]);
+  const l = set(4, 10, 12, { side: 'L' }), r = set(5, 10, 12, { side: 'R' });
+  assert.equal(collapseSets([l, r]).length, 2);
 });

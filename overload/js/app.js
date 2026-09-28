@@ -79,6 +79,7 @@ async function boot() {
   document.addEventListener('visibilitychange', () => { syncWakeLock(); if (document.visibilityState === 'hidden') store.save(); else refreshAll(); });
   window.addEventListener('pagehide', () => store.save());
   document.addEventListener('pointerdown', unlockAudio, { once: true });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented) back(); });
   trackKeyboard();
   syncWakeLock();
   restoreRest();

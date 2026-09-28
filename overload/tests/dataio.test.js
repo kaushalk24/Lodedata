@@ -39,3 +39,63 @@ test('date parsing', () => {
   assert.equal(parseDate('03/04/2026', '', true), t(2026, 3, 3));
   assert.equal(parseDate('03/04/2026', '', false), t(2026, 2, 4));
 });
+
+test('new set fields survive export and import', () => {
+  const base = defaultState();
+  const st = { ...base, exercises: [{ id: 'p', name: 'Plank' }, { id: 'c', name: "Farmer's Carry" }, { id: 'a', name: 'Assisted Pull-Up' }, { id: 'r', name: 'Single Arm Dumbbell Row' }], sets: [] };
+  const t = new Date(2026, 8, 1, 7).getTime();
+  st.sets.push({ id: '1', exId: 'p', ts: t, reps: 0, sec: 75, weight: 0, label: null });
+  st.sets.push({ id: '2', exId: 'c', ts: t + 60000, reps: 0, dist: 40, weight: 32, label: null });
+  st.sets.push({ id: '3', exId: 'a', ts: t + 120000, reps: 8, weight: -20, bw: true, label: null, rpe: 8.5 });
+  st.sets.push({ id: '4', exId: 'r', ts: t + 180000, reps: 10, weight: 22.5, side: 'L', label: null });
+  st.sets.push({ id: '5', exId: 'r', ts: t + 190000, reps: 10, weight: 22.5, side: 'R', label: null });
+  const r = buildImport(setsToCSV(st), null, { exercises: [], sets: [] });
+  assert.equal(r.newSets.length, 5);
+  const by = n => r.newSets.find(s => r.newExercises.find(e => e.id === s.exId).name === n);
+  assert.equal(by('Plank').sec, 75);
+  assert.equal(by("Farmer's Carry").dist, 40);
+  assert.deepEqual([by('Assisted Pull-Up').weight, by('Assisted Pull-Up').bw, by('Assisted Pull-Up').rpe], [-20, true, 8.5]);
+  assert.deepEqual(r.newSets.filter(s => s.side).map(s => s.side), ['L', 'R']);
+  const kinds = Object.fromEntries(r.newExercises.map(e => [e.name, e.kind]));
+  assert.deepEqual(kinds, { Plank: 'time', "Farmer's Carry": 'distance', 'Assisted Pull-Up': 'assisted', 'Single Arm Dumbbell Row': undefined });
+});
+
+test('identical sets in the same minute import as separate sets, once', () => {
+  const csv = 'Date,Exercise,Reps,Weight\n2026-09-01 07:00:00,Curl,10,12\n2026-09-01 07:00:00,Curl,10,12\n2026-09-01 07:00:00,Curl,10,12\n';
+  const first = buildImport(csv, null, { exercises: [], sets: [] });
+  assert.equal(first.newSets.length, 3);
+  const again = buildImport(csv, null, { exercises: first.newExercises, sets: first.newSets });
+  assert.equal(again.newSets.length, 0);
+  assert.equal(again.skipped, 3);
+});
+
+test('Strong-style seconds and distance columns', () => {
+  const m = detectMapping(['Date', 'Workout Name', 'Duration', 'Exercise Name', 'Set Order', 'Weight', 'Reps', 'Distance', 'Seconds', 'Notes', 'RPE']);
+  assert.equal(m.sec, 8);    // not the workout "Duration"
+  assert.equal(m.dist, 7);
+  assert.equal(m.rpe, 10);
+  const hevy = detectMapping(['title', 'start_time', 'exercise_title', 'weight_kg', 'reps', 'distance_km', 'duration_seconds', 'rpe']);
+  assert.equal(hevy.sec, 6);
+  assert.equal(hevy.distScale, 1000);
+});
+
+test('demo data shows off the smart features', async () => {
+  const { plateauInfo, findDuplicates } = await import('../js/smart.js');
+  const now = new Date(2026, 8, 28, 10, 31).getTime();
+  const s = demoState(defaultState(), now);
+  const ex = n => s.exercises.find(e => e.name === n);
+  const setsFor = id => s.sets.filter(x => x.exId === id);
+  assert.ok(plateauInfo(setsFor(ex('Dumbbell Lateral Raise').id)), 'lateral raise should be stalled');
+  assert.equal(plateauInfo(setsFor(ex('Lat Pulldown').id)), null);
+  const dups = findDuplicates(s.exercises, setsFor).map(p => [p.keep.name, p.drop.name]);
+  assert.deepEqual(dups, [['Seated Calf Raise', 'Seated calf raises']]);
+  assert.ok(setsFor(ex('Plank').id).every(x => x.sec > 0 && x.reps === 0));
+  assert.ok(setsFor(ex("Farmer's Carry").id).every(x => x.dist === 40));
+  const row = setsFor(ex('Single Arm Dumbbell Row').id).filter(x => x.label !== 'warmup');
+  assert.equal(row.filter(x => x.side === 'L').length, row.filter(x => x.side === 'R').length);
+  assert.equal(s.workouts.find(w => w.name === 'Arms').supersets.length, 1);
+  assert.ok(s.measures.length >= 16);
+  assert.ok([...s.measures, ...s.body, ...s.sets].every(x => x.ts <= now), 'nothing in the future');
+  const early = demoState(defaultState(), new Date(2026, 8, 28, 5, 10).getTime());
+  assert.ok([...early.measures, ...early.body, ...early.sets].every(x => x.ts <= new Date(2026, 8, 28, 5, 10).getTime()), 'nothing in the future at 5 am');
+});

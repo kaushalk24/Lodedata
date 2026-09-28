@@ -1,12 +1,19 @@
 /* Training analytics. Pure functions over plain set objects:
- *   { id, exId, ts, reps, weight (kg), label, note, gymId, bw }
+ *   { id, exId, ts, reps, weight (kg), label, note, gymId, bw, sec, dist, side, rpe }
  * label: 'warmup' | 'amrap' | 'failure' | 'drop' | 'pr' | null
- * bw: true when `weight` is added load on top of bodyweight (pull-ups, dips). */
+ * bw: true when `weight` is load relative to bodyweight: added (+10 on dips) or assistance (-20 on an
+ *     assisted pull-up machine). sec / dist: duration in seconds / distance in metres for timed and
+ *     distance exercises, which log reps = 0. side: 'L' | 'R' for one-sided sets. rpe: 6-10.
+ * kind (per exercise): 'weight' | 'bodyweight' | 'assisted' | 'time' | 'distance'. */
 
 import { dayKey, startOfWeek, addDays, daysBetween, round } from './util.js';
 
 export const effWeight = (s, bodyKg = 0) => s.weight + (s.bw ? bodyKg : 0);
-export const setVolume = (s, bodyKg = 0) => s.reps * effWeight(s, bodyKg);
+/** Assisted sets with no bodyweight on file would go negative; they count as zero volume instead. */
+export const setVolume = (s, bodyKg = 0) => s.reps * Math.max(0, effWeight(s, bodyKg));
+export const isRepKind = kind => kind !== 'time' && kind !== 'distance';
+/** What a set is measured in: reps, or seconds / metres for timed and distance exercises. */
+export const metricOf = (s, kind = 'weight') => kind === 'time' ? s.sec || 0 : kind === 'distance' ? s.dist || 0 : s.reps;
 const byTs = (a, b) => a.ts - b.ts;
 
 /** Days newest-first, sets oldest-first inside each day (set 1, 2, 3...). */
@@ -23,7 +30,9 @@ export function groupByDay(sets) {
 export function summarize(sets, bodyKg = 0) {
   const reps = sets.reduce((a, s) => a + s.reps, 0);
   const volume = sets.reduce((a, s) => a + setVolume(s, bodyKg), 0);
-  return { sets: sets.length, reps: round(reps, 1), volume: round(volume, 2), perRep: reps ? round(volume / reps, 1) : 0 };
+  const sec = sets.reduce((a, s) => a + (s.sec || 0), 0);
+  const dist = sets.reduce((a, s) => a + (s.dist || 0), 0);
+  return { sets: sets.length, reps: round(reps, 1), volume: round(volume, 2), perRep: reps ? round(volume / reps, 1) : 0, sec, dist: round(dist, 1) };
 }
 
 const delta = (cur, prev) => ({ diff: round(cur - prev, 2), pct: prev ? round(((cur - prev) / prev) * 100, 1) : null });
@@ -37,6 +46,7 @@ export function compareToPrevious(sets, bodyKg = 0) {
     cur, prev,
     sets: delta(cur.sets, prev.sets), reps: delta(cur.reps, prev.reps),
     volume: delta(cur.volume, prev.volume), perRep: delta(cur.perRep, prev.perRep),
+    sec: delta(cur.sec, prev.sec), dist: delta(cur.dist, prev.dist),
   };
 }
 
@@ -69,39 +79,33 @@ export function recordRanges(sets, bodyKg = 0) {
 }
 
 /**
- * Sets that were personal records when performed: heavier than anything done before for that
- * many reps or more. Bodyweight-only sets (0 kg) count as a PR on reps instead.
- * Nothing on the exercise's first day is a PR (there is nothing to beat yet).
+ * A set is a record when no earlier set matched or beat it on both counts: as many reps (or seconds,
+ * or metres) and as much load. For reps this is "heavier than anything done for that many reps or
+ * more"; at bodyweight it becomes "more reps"; on an assisted machine less assistance counts as
+ * heavier. Nothing on the exercise's first day is a record, since there is nothing to beat yet.
  */
-export function prSetIds(sets, bodyKg = 0) {
+export function prSetIds(sets, bodyKg = 0, kind = 'weight') {
   const sorted = [...sets].sort(byTs);
   const ids = new Set();
   if (!sorted.length) return ids;
   const firstDay = dayKey(sorted[0].ts);
-  const best = []; let maxRepsAtZero = 0;
+  let frontier = []; // earlier sets nothing has beaten yet: [metric, load]
   for (const s of sorted) {
-    const w = effWeight(s, bodyKg), r = Math.floor(s.reps);
-    if (dayKey(s.ts) !== firstDay && r >= 1) {
-      if (w > 0) {
-        let prior = null;
-        for (let i = r; i < best.length; i++) if (best[i] != null && (prior == null || best[i] > prior)) prior = best[i];
-        if (prior == null || w > prior) ids.add(s.id);
-      } else if (s.reps > maxRepsAtZero) ids.add(s.id);
-    }
-    for (let i = 1; i <= r; i++) if (best[i] == null || w > best[i]) best[i] = w;
-    if (w <= 0) maxRepsAtZero = Math.max(maxRepsAtZero, s.reps);
+    const m = metricOf(s, kind), w = effWeight(s, bodyKg);
+    if (!(m > 0)) continue;
+    if (frontier.some(([pm, pw]) => pm >= m && pw >= w)) continue;
+    if (dayKey(s.ts) !== firstDay) ids.add(s.id);
+    frontier = frontier.filter(([pm, pw]) => !(m >= pm && w >= pw));
+    frontier.push([m, w]);
   }
   return ids;
 }
 
-/** Would logging (reps, weight) right now beat every earlier set? Used for the live PR badge. */
-export function wouldBePR(sets, reps, weight, bodyKg = 0, bw = false) {
-  if (!sets.length || !(reps >= 1)) return false;
-  const w = weight + (bw ? bodyKg : 0), r = Math.floor(reps);
-  if (w <= 0) return reps > Math.max(0, ...sets.filter(s => effWeight(s, bodyKg) <= 0).map(s => s.reps));
-  let prior = null;
-  for (const s of sets) if (Math.floor(s.reps) >= r) { const sw = effWeight(s, bodyKg); if (prior == null || sw > prior) prior = sw; }
-  return prior == null || w > prior;
+/** Would this set, logged now, be a record? Drives the live badge in the set sheet. */
+export function wouldBePR(sets, set, bodyKg = 0, kind = 'weight') {
+  const m = metricOf(set, kind), w = effWeight(set, bodyKg);
+  if (!sets.length || !(m > 0)) return false;
+  return !sets.some(s => metricOf(s, kind) >= m && effWeight(s, bodyKg) >= w);
 }
 
 /* ---------- 1RM ---------- */
@@ -159,11 +163,17 @@ export function bestEfforts(sets, bodyKg = 0) {
  * are already logged today, so set 3 today is compared with set 3 last time.
  */
 export function suggestTarget(prevDaySets, todayWorkingCount, { step = 2.5, low = 8, high = 12 } = {}) {
-  const working = prevDaySets.filter(s => s.label !== 'warmup');
+  const working = prevDaySets.filter(s => s.label !== 'warmup' && s.reps > 0);
   if (!working.length) return null;
   const ref = working[Math.min(todayWorkingCount, working.length - 1)];
   const reps = Math.floor(ref.reps);
-  if (ref.weight > 0 && reps >= high) return { ref, reps: low, weight: round(ref.weight + step, 3), why: 'weight' };
+  const loaded = ref.weight > 0 && !ref.bw;
+  // How hard it felt (RPE, or a Failure label) adjusts the plan: easy sets jump in weight,
+  // all-out sets are matched before trying to beat them.
+  const rpe = ref.label === 'failure' ? 10 : ref.rpe;
+  if (rpe >= 9.5) return { ref, reps, weight: ref.weight, why: 'hard' };
+  if (loaded && rpe && rpe <= 7 && reps >= low) return { ref, reps, weight: round(ref.weight + step, 3), why: 'easy' };
+  if (loaded && reps >= high) return { ref, reps: low, weight: round(ref.weight + step, 3), why: 'weight' };
   return { ref, reps: reps + 1, weight: ref.weight, why: 'rep' };
 }
 
@@ -206,10 +216,12 @@ export function daySummary(daySets, prIds, bodyKg = 0) {
 /** "Set Details": consecutive identical sets collapse into "3 sets: 9 rep 105 kg". */
 export function collapseSets(sets) {
   const out = [];
+  const same = (a, b) => a.reps === b.reps && a.weight === b.weight && !!a.bw === !!b.bw
+    && (a.sec || 0) === (b.sec || 0) && (a.dist || 0) === (b.dist || 0) && (a.side || null) === (b.side || null);
   for (const s of [...sets].sort(byTs)) {
     const last = out[out.length - 1];
-    if (last && last.reps === s.reps && last.weight === s.weight && !!last.bw === !!s.bw) last.count++;
-    else out.push({ reps: s.reps, weight: s.weight, bw: s.bw, count: 1 });
+    if (last && same(last, s)) last.count++;
+    else out.push({ reps: s.reps, weight: s.weight, bw: s.bw, sec: s.sec, dist: s.dist, side: s.side, count: 1 });
   }
   return out;
 }

@@ -15,6 +15,15 @@ export const EQUIPMENT = {
   bodyweight: 'Bodyweight', kettlebell: 'Kettlebell', band: 'Band', other: 'Other',
 };
 
+/** How sets are logged. Mirrors the exercise types in Hevy and Strong, merged where they overlap. */
+export const KINDS = {
+  weight: { name: 'Weight & reps', short: 'Weight', hint: 'Bench press, curls, machines' },
+  bodyweight: { name: 'Bodyweight', short: 'Bodyweight', hint: 'Pull-ups, dips, push-ups. Add weight when you wear a belt' },
+  assisted: { name: 'Assisted', short: 'Assisted', hint: 'Assisted pull-up or dip machine. Log the assistance' },
+  time: { name: 'Timed', short: 'Timed', hint: 'Plank, wall sit, dead hang' },
+  distance: { name: 'Distance', short: 'Distance', hint: "Farmer's carry, sled push" },
+};
+
 // [name, primary muscles, secondary muscles, equipment]
 const RAW = [
   ['Barbell Bench Press', 'chest', 'triceps shoulders', 'barbell'],
@@ -200,6 +209,20 @@ export function guessMuscles(name) {
   }
   return { primary: [], secondary: [], equipment: guessEquipment(n) };
 }
+/** Guess how an exercise is logged from its name (a plank is timed, a carry is distance). */
+export function guessKind(name, equipment) {
+  const n = ' ' + norm(name) + ' ';
+  if (/assist/.test(n)) return 'assisted';
+  if (/plank|wall sit|dead hang| hang |hollow|l sit| hold |isometric/.test(n)) return 'time';
+  if (/carry|farmer|suitcase|sled|yoke/.test(n)) return 'distance';
+  if (equipment === 'bodyweight') return 'bodyweight';
+  return 'weight';
+}
+/** One arm or one leg at a time, so each side is logged on its own. */
+export const guessUnilateral = name => /single (arm|leg)|one (arm|leg)|unilateral|\b1 arm\b|bulgarian|pistol|concentration/.test(norm(name).replace(/-/g, ' '));
+export const kindOf = ex => (ex && (ex.kind || guessKind(ex.name, ex.equipment))) || 'weight';
+export const unilateralOf = ex => !!ex && (ex.unilateral ?? guessUnilateral(ex.name));
+
 function guessEquipment(n) {
   if (/smith/.test(n)) return 'smith';
   if (/dumbbell|dumbell|\bdb\b/.test(n)) return 'dumbbell';

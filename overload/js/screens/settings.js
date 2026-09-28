@@ -6,11 +6,28 @@ import { openSheet, toast, choose, confirmDialog, promptDialog, circle, toggle }
 import { setsToCSV, buildImport, detectMapping, demoState } from '../dataio.js';
 import { parseCSV } from '../util.js';
 import { streakSheet } from './home.js';
+import { erasePhotos } from './body.js';
+import { learnedRest } from '../smart.js';
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 const row = (a, ic, label, meta = '', extra = '') => html`<button class="row" data-a="${a}" ${raw(extra)}><span class="row-icon">${icon(ic)}</span><span class="row-main">${label}</span>${meta ? html`<span class="row-meta">${meta}</span>` : ''}<span class="chev">${icon('chevronRight')}</span></button>`;
 const swRow = (a, ic, label, on) => html`<div class="row static"><span class="row-icon">${icon(ic)}</span><span class="row-main">${label}</span>${toggle(a, on)}</div>`;
+/** "Learned from your sets": real median rest per exercise, where it differs from the timer by 30 s or more. */
+function learnedSection(s) {
+  const { byEx, overall } = learnedRest(store.allSets());
+  if (!overall) return '';
+  const rows = [...byEx].map(([id, r]) => ({ ex: store.exercise(id), r })).filter(x => x.ex)
+    .map(x => ({ ...x, timer: x.ex.restSec ?? s.restSec })).filter(x => Math.abs(x.timer - x.r.sec) >= 30)
+    .sort((a, b) => Math.abs(b.timer - b.r.sec) - Math.abs(a.timer - a.r.sec)).slice(0, 8);
+  return html`<div class="section-label">Learned from your sets</div>
+    <div class="card list"><div class="row static"><span class="row-main"><span class="row-title">Your typical rest</span><span class="row-sub">Median gap between sets of the same exercise</span></span>
+      <b class="learned">${fmtClock(overall)}</b>${overall !== s.restSec ? html`<button class="pill-btn small" data-a="use-typical" data-s="${overall}">Use</button>` : ''}</div>
+    ${rows.map(x => html`<div class="row static"><span class="row-main"><span class="row-title">${x.ex.name}</span><span class="row-sub">You rest ${fmtClock(x.r.sec)} · timer ${fmtClock(x.timer)}</span></span>
+      <button class="pill-btn small" data-a="apply-rest" data-id="${x.ex.id}" data-s="${x.r.sec}">Apply</button></div>`)}
+    ${rows.length > 1 ? html`<button class="row accent" data-a="apply-all-rest"><span class="row-main">Apply to all exercises</span></button>` : ''}</div>`;
+}
+
 const THEMES = { system: 'Match Device', dark: 'Dark', light: 'Light' };
 
 const PAGES = {
@@ -102,6 +119,7 @@ const PAGES = {
           <div class="row static"><span class="row-main">Seconds</span><span class="stepper"><button data-a="rest" data-d="-15" aria-label="Minus 15 seconds">${icon('minus')}</button><b>${s.restSec % 60}</b><button data-a="rest" data-d="15" aria-label="Plus 15 seconds">${icon('plus')}</button></span></div>
         </div>
         <p class="hint">Select the interset rest duration you'd like to use the majority of the time. Individual exercises can override it from their ••• menu.</p>
+        ${learnedSection(s)}
         <div class="section-label">Default Recommendations</div>
         <div class="card list">${recs.map(([t, sub, sec, c]) => html`<button class="row" data-a="rest-set" data-s="${sec}"><span class="row-main"><span class="row-title">${t}</span><span class="row-sub">${sub}</span></span>
           <span class="rec" style="--c:${c}">${sec / 60} minute${sec > 60 ? 's' : ''}</span></button>`)}</div>
@@ -115,6 +133,8 @@ const PAGES = {
       const s = store.settings(), u = s.unit;
       return html`<div class="card list">${swRow('targets-on', 'target', 'Show “beat last time” target', s.showTargets)}</div>
         <p class="hint">When you log a set, the app shows what you did in the same set last session and suggests one step more: another rep, or more weight once you reach the top of your rep range. Tap it to fill the numbers in.</p>
+        <div class="card list">${swRow('rpe-on', 'bolt', 'Rate effort (RPE)', s.rpeOn)}</div>
+        <p class="hint">Adds a one-tap effort row to the set sheet. RPE 10 means nothing left in the tank, 9 means one more rep was possible, 8 means two. Sets that felt easy (7 or less) get a weight jump next time; all-out sets (9.5 or 10) are matched before trying to beat them.</p>
         <div class="card list">
           <div class="row static"><span class="row-main">Rep range, bottom</span><span class="stepper"><button data-a="rep" data-k="repLow" data-d="-1" aria-label="Lower">${icon('minus')}</button><b>${s.repLow}</b><button data-a="rep" data-k="repLow" data-d="1" aria-label="Higher">${icon('plus')}</button></span></div>
           <div class="row static"><span class="row-main">Rep range, top</span><span class="stepper"><button data-a="rep" data-k="repHigh" data-d="-1" aria-label="Lower">${icon('minus')}</button><b>${s.repHigh}</b><button data-a="rep" data-k="repHigh" data-d="1" aria-label="Higher">${icon('plus')}</button></span></div>
@@ -154,6 +174,11 @@ const PAGES = {
         <h3>Machine settings</h3><p>Use an exercise's pinned note for seat and pin positions so they're always at the top.</p>
         <h3>Several gyms</h3><p>Add each gym under Gyms &amp; Plates. Sets remember the gym, and the filter on an exercise compares like with like.</p>
         <h3>Records</h3><p>A trophy marks a set that beat every earlier set with at least as many reps. The Records view lists your best weight for each rep count.</p>
+        <h3>Type or say a set</h3><p>In the set sheet, tap <b>Type or say it</b> and write it the way you'd say it: <b>8 at 60</b>, <b>3x10 25</b>, <b>10, 9, 8 at 25</b>, <b>60 for 8</b> or <b>same again</b>. Tap the microphone on the iPhone keyboard to dictate. You see what will be logged before it's saved.</p>
+        <h3>Planks, carries and assisted machines</h3><p>Tap the type chip in the set sheet (it says <b>Weight</b> by default) to switch an exercise to Timed, Distance, Bodyweight or Assisted. One-arm and one-leg exercises can log left and right separately; the sheet alternates sides for you.</p>
+        <h3>Supersets</h3><p>In a workout, tap ••• › Create superset. After each set the next exercise opens, and the rest timer only runs after the last one.</p>
+        <h3>Warm-ups</h3><p>With your working weight in the sheet, tap <b>Warm-up</b> for a 40% / 60% / 80% ramp with plates per side. Tap ✓ on each one as you do it.</p>
+        <h3>Smart checks</h3><p>The app flags a weight that looks like a typo, exercises that look like duplicates, lifts that have stalled, and your real rest times. All of it runs on your phone.</p>
       </div>`;
     },
   },
@@ -207,6 +232,16 @@ const ACTIONS = {
   sound: () => store.setSetting('sound', !store.settings().sound),
   remind: el => store.setSetting('remindDays', Math.min(30, Math.max(1, store.settings().remindDays + +el.dataset.d))),
   'rest-on': () => store.setSetting('restOn', !store.settings().restOn),
+  'rpe-on': () => store.setSetting('rpeOn', !store.settings().rpeOn),
+  'apply-rest': el => { store.updateExercise(el.dataset.id, { restSec: +el.dataset.s }); toast(`Rest set to ${fmtClock(+el.dataset.s)}`, { iconName: 'timer' }); },
+  'apply-all-rest': () => {
+    const { byEx } = learnedRest(store.allSets());
+    const changes = {};
+    for (const [id, r] of byEx) { const ex = store.exercise(id); if (ex && (ex.restSec ?? store.settings().restSec) !== r.sec) changes[id] = r.sec; }
+    const n = store.setRestTimes(changes);
+    toast(n ? `Updated ${n} exercise timer${n === 1 ? '' : 's'}` : 'Timers already match', { iconName: 'timer' });
+  },
+  'use-typical': el => store.setSetting('restSec', +el.dataset.s),
   rest: el => store.setSetting('restSec', Math.min(900, Math.max(15, store.settings().restSec + +el.dataset.d))),
   'rest-set': el => { store.setSetting('restSec', +el.dataset.s); toast(`Rest set to ${fmtClock(+el.dataset.s)}`, { iconName: 'timer' }); },
   article: (el, ev, p, inst) => { p.open = !p.open; inst.rerender(); },
@@ -230,9 +265,9 @@ const ACTIONS = {
     store.replaceState(demoState(store.getState())); toast('Demo data loaded');
   },
   erase: async () => {
-    if (!(await confirmDialog({ title: 'Erase everything?', message: 'All exercises, sets, workouts and settings on this device will be deleted.', confirm: 'Erase All Data' }))) return;
-    const { defaultState } = await import('../store.js');
-    store.replaceState(defaultState()); toast('All data erased');
+    if (!(await confirmDialog({ title: 'Erase everything?', message: 'All exercises, sets, workouts, photos and settings on this device will be deleted.', confirm: 'Erase All Data' }))) return;
+    await erasePhotos();
+    store.replaceState(store.defaultState()); toast('All data erased');
   },
 };
 

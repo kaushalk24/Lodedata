@@ -96,6 +96,20 @@ export function push(name, params = {}) {
   return inst;
 }
 
+/** Swap the top screen for another without growing the stack (used to step through a superset). */
+export function replace(name, params = {}) {
+  const st = nav.stacks[nav.tab];
+  if (st.length < 2) return push(name, params); // a tab's root screen is never replaced
+  const old = st[st.length - 1];
+  const inst = makeScreen(name, params, nav.tab);
+  inst.el.classList.add('swap');
+  tabRoot(nav.tab).appendChild(inst.el);
+  st[st.length - 1] = inst;
+  old.def.unmount?.(old.el, old.p, old);
+  old.el.remove();
+  return inst;
+}
+
 export function pop() {
   const st = nav.stacks[nav.tab];
   if (st.length < 2) return false;

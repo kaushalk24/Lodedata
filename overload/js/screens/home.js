@@ -5,7 +5,8 @@ import * as store from '../store.js';
 import { registerScreen, renderScreen, push, openSheet, toast, confirmDialog, header, circle, toggle } from '../ui.js';
 import { TEMPLATES, libByName, MUSCLES } from '../library.js';
 import { generatePlan, planDayText, GOALS } from '../planner.js';
-import { weeklyStreak, heatmap, daysSinceLast } from '../stats.js';
+import { weeklyStreak, heatmap, daysSinceLast, muscleReport } from '../stats.js';
+import { whatToTrain } from '../smart.js';
 import { COLORS } from './common.js';
 
 const TIPS = [
@@ -38,6 +39,7 @@ registerScreen('home', {
       })}
       <div class="scroll"><div class="content">
         <h2 class="large-title">My Workouts</h2>
+        ${upNext()}
         ${showReminder ? html`<div class="banner">
           <span class="banner-icon">${icon('bell')}</span>
           <div><b>${since} days since your last workout</b><p>Everything has recovered, so today is a good day to train.</p></div>
@@ -93,6 +95,27 @@ function lastTrained(w) {
   if (!ts) return 'Not trained yet';
   const r = relTime(ts);
   return r.includes('/') ? `Trained on ${r}` : `Trained ${r === 'Yesterday' ? 'yesterday' : r}`;
+}
+
+/** "Up next": the workout whose muscles are most recovered. Hidden once you've trained today. */
+function upNext() {
+  const st = store.getState();
+  const sets = store.allSets();
+  if (!sets.length || !st.workouts.length || dayKey(sets[sets.length - 1].ts) === dayKey(Date.now())) return '';
+  const rep = muscleReport(sets, store.muscleMap);
+  const last = Object.fromEntries(Object.entries(rep).map(([m, v]) => [m, v.last]));
+  const pick = whatToTrain(st.workouts, store.exercise, last, store.lastTs);
+  if (!pick) return '';
+  if (pick.rest) {
+    return html`<div class="card next rest"><span class="next-icon">${icon('moon')}</span><span class="row-main"><b>Rest day suggested</b>
+      <span class="muted small">${pick.sore.map(m => MUSCLES[m]).join(', ')} still recovering</span></span></div>`;
+  }
+  const w = pick.workout;
+  const when = pick.lastTs ? `last done ${relTime(pick.lastTs).toLowerCase()}` : 'not done yet';
+  return html`<button class="card next c-${w.color}" data-a="open-workout" data-id="${w.id}"><span class="next-icon">${icon('bolt')}</span>
+    <span class="row-main"><span class="muted small">Up next</span><b>${w.name}</b>
+    <span class="muted small">${pick.readiness >= 0.99 ? 'Muscles rested' : `${Math.round(pick.readiness * 100)}% recovered`} · ${when}</span></span>
+    <span class="next-go">Start ${icon('chevronRight')}</span></button>`;
 }
 
 /* ---------- workout editor ---------- */

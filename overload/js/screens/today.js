@@ -4,14 +4,14 @@ import { icon } from '../icons.js';
 import * as store from '../store.js';
 import { daySummary, prSetIds, collapseSets, summarize } from '../stats.js';
 import { registerScreen, renderScreen, push, openSheet, toast, header, backBtn, circle, emptyState, showTab } from '../ui.js';
-import { unit, setText } from './common.js';
+import { unit, setText, kindFor } from './common.js';
 
 function dayData(ts) {
   const k = dayKey(ts);
   const sets = store.allSets().filter(s => dayKey(s.ts) === k);
   const bodyKg = store.bodyKg();
   const prIds = new Set();
-  for (const exId of new Set(sets.map(s => s.exId))) for (const id of prSetIds(store.setsFor(exId), bodyKg)) prIds.add(id);
+  for (const exId of new Set(sets.map(s => s.exId))) for (const id of prSetIds(store.setsFor(exId), bodyKg, kindFor(store.exercise(exId)))) prIds.add(id);
   const sum = daySummary(sets, prIds, bodyKg);
   const sessions = store.getState().sessions.filter(s => dayKey(s.start) === k);
   const sessionSec = sessions.reduce((a, s) => a + ((s.end || Date.now()) - s.start) / 1000, 0);
@@ -52,7 +52,7 @@ registerScreen('today', {
         ${d.sets.length ? html`<h3 class="section-title">Set Details</h3>
           <div class="card set-details">${d.order.map(exId => { const ex = store.exercise(exId); const sets = d.sets.filter(s => s.exId === exId); return html`
             <button class="sd" data-a="open-exercise" data-id="${exId}"><b>${ex?.name || 'Deleted exercise'}</b>
-            ${collapseSets(sets).map(g => html`<span>${g.count > 1 ? `${g.count} sets: ` : ''}${fmtReps(g.reps)} rep ${g.bw ? `BW${g.weight ? ` +${fmtW(g.weight, u)}` : ''}` : `${fmtW(g.weight, u)} ${u}`}</span>`)}
+            ${collapseSets(sets).map(g => html`<span>${g.count > 1 ? `${g.count} sets: ` : ''}${g.sec || g.dist || g.bw || g.side ? setText(g) : `${fmtReps(g.reps)} rep ${fmtW(g.weight, u)} ${u}`}</span>`)}
             ${sets.some(s => d.prIds.has(s.id)) ? html`<span class="gold">${icon('trophy')} Record</span>` : ''}</button>`; })}</div>`
         : emptyState(isToday ? 'Nothing logged yet today' : 'Rest day', isToday ? 'Open a workout and log your first set. Stats fill in as you go.' : 'No sets were logged on this day.',
           isToday ? html`<button class="btn accent" data-a="go-sets">Open My Workouts</button>` : '', isToday ? 'tabToday' : 'moon')}
@@ -144,7 +144,8 @@ export function drawShareCard(ts) {
   const shown = d.order.slice(0, 7);
   for (const id of shown) {
     const sets = d.sets.filter(s => s.exId === id);
-    const best = sets.reduce((a, s) => (!a || s.weight > a.weight ? s : a), null);
+    const m = x => x.sec || x.dist || x.reps;
+    const best = sets.reduce((a, s) => (!a || s.weight > a.weight || (s.weight === a.weight && m(s) > m(a)) ? s : a), null);
     g.fillStyle = '#ffffff'; g.font = font(700, 40); g.fillText(truncate(g, store.exercise(id)?.name || '', 600), 80, y);
     g.fillStyle = '#ff9f0a'; g.font = font(700, 38); g.textAlign = 'right'; g.fillText(best ? setText(best) : '', 1000, y); g.textAlign = 'left';
     g.fillStyle = '#8e8e93'; g.font = font(500, 28); g.fillText(`${sets.length} set${sets.length === 1 ? '' : 's'}${sets.some(s => d.prIds.has(s.id)) ? '  ·  new record' : ''}`, 80, y + 42);

@@ -674,3 +674,139 @@ select { background: var(--card-2); color: var(--text); border: 0; border-radius
 /* Rounded numerals (SF Pro Rounded on iPhone) for the numbers read at a glance. */
 .set-row .reps b, .set-row .wt b, .num-field .nv, .stat b, .tb-main b, .big-set, .onerm b, .streak-hero b, .sess-time, .live-time,
 .key, .plates-total b, .cmp b, .total-line b, .pw, .wd b, .cd, .tile b, .plate-key, .pcount, .row-meta.strong { font-family: var(--font-num); }
+
+/* ---------- smart features & set types ---------- */
+.screen.swap { animation: swap .22s ease-out; }
+@keyframes swap { from { opacity: .4; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+body.kb-open .sheet.open .sheet-panel { bottom: var(--kb, 0px); max-height: calc(100% - var(--kb, 0px) - env(safe-area-inset-top, 0px) - 12px); }
+.btn.small { height: 32px; padding: 0 12px; font-size: 14px; border-radius: 10px; }
+.pill-btn.small { height: 32px; padding: 0 12px; font-size: 14px; font-weight: 600; background: var(--accent-soft); color: var(--accent); flex-shrink: 0; }
+.learned { font-family: var(--font-num); font-size: 17px; margin-right: 4px; font-variant-numeric: tabular-nums; }
+
+/* set entry */
+.entry-title .ss-tag { font-size: 11px; font-weight: 700; color: var(--purple); background: color-mix(in srgb, var(--purple) 16%, transparent); padding: 3px 8px; border-radius: 9px; white-space: nowrap; flex-shrink: 0; }
+.typo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 12px; border-radius: 12px; font-size: 14px;
+  background: color-mix(in srgb, var(--orange) 16%, var(--card)); color: var(--text); }
+.typo > .i { color: var(--orange); width: 20px; height: 20px; }
+.typo > span:first-of-type { flex: 1 1 180px; line-height: 1.3; }
+.typo-btns { display: flex; gap: 8px; margin-left: auto; }
+.rpe-row { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.rpe-label { font-size: 12.5px; color: var(--text-2); white-space: nowrap; min-width: 0; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.rpe-label b { color: var(--text); font-family: var(--font-num); }
+.rpe-opts { display: flex; gap: 3px; flex: 0 0 auto; }
+.rpe-opts button { min-width: 28px; height: 30px; padding: 0 3px; border-radius: 15px; background: var(--card-2); font-size: 13px; font-weight: 600; font-family: var(--font-num); font-variant-numeric: tabular-nums; transition: background-color .15s, transform .12s; }
+.rpe-opts button:active { transform: scale(.92); }
+.rpe-opts button.on { background: var(--purple); color: #fff; }
+.text-btn { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px 0 8px; border-radius: 18px; color: var(--text-2); font-size: 14px; font-weight: 600; }
+.text-btn .i { width: 24px; height: 24px; }
+.text-btn:active { background: var(--card-2); }
+.text-entry { display: flex; flex-direction: column; gap: 10px; }
+.text-input { font-size: 19px; min-height: 54px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--accent-sel); }
+.text-preview { display: flex; flex-direction: column; gap: 6px; }
+.text-preview .chip { color: var(--text); }
+.text-err { color: var(--orange); font-size: 14px; padding: 0 4px; }
+.text-entry .text-btn.back { align-self: flex-start; }
+.save.warn { background: var(--orange); }
+.warm-row .warm-pct { width: 40px; font-size: 13px; font-weight: 700; color: var(--orange); font-variant-numeric: tabular-nums; }
+.warm-row .row-title { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.warm-row.done .row-title { color: var(--text-2); text-decoration: line-through; }
+.warm-log { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid var(--text-3); color: var(--text-3); display: grid; place-items: center; flex-shrink: 0; }
+.warm-log .i { width: 18px; height: 18px; }
+.warm-log.on, .warm-log:disabled { background: var(--orange); border-color: var(--orange); color: #fff; opacity: 1; }
+
+/* set rows */
+.badge.side { --c: var(--blue); }
+.set-row .reps .rpe { font-size: 11px; color: var(--purple); margin-left: 3px; font-weight: 600; }
+.stalled { color: var(--orange); font-weight: 600; }
+
+/* exercise screen */
+.ss-strip { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: -2px -16px 0; padding: 0 16px; }
+.ss-strip::-webkit-scrollbar { display: none; }
+.ss-label { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0; }
+.ss-label .i { width: 15px; height: 15px; }
+.ss-strip .chip.on { --chip: var(--purple); }
+.card.stall { display: flex; gap: 12px; align-items: flex-start; padding: 12px 12px 12px 14px; background: color-mix(in srgb, var(--orange) 12%, var(--card)); }
+.card.stall > div { flex: 1; }
+.card.stall b { font-size: 15px; }
+.card.stall p { font-size: 13.5px; color: var(--text-2); margin-top: 3px; line-height: 1.4; }
+.card.stall p b { color: var(--text); font-size: 13.5px; }
+.stall-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--orange); background: color-mix(in srgb, var(--orange) 18%, transparent); flex-shrink: 0; }
+.stall-icon .i { width: 18px; height: 18px; }
+.goal-empty { display: flex; align-items: center; gap: 12px; padding: 14px; text-align: left; }
+.goal-empty > .i:first-child { color: var(--gold); width: 26px; height: 26px; }
+.goal-empty > span { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.goal-empty .muted { font-size: 13px; }
+.goal-empty > .i:last-child { color: var(--text-3); width: 15px; height: 15px; }
+.goal-card { display: flex; flex-direction: column; gap: 8px; padding: 14px; text-align: left; }
+.goal-card .goal-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
+.goal-card .goal-head b { font-size: 22px; font-family: var(--font-num); color: var(--gold); font-variant-numeric: tabular-nums; }
+.goal-card .goal-bar { height: 8px; border-radius: 4px; background: var(--card-2); overflow: hidden; }
+.goal-card .goal-bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 60%, var(--orange)), var(--gold)); }
+.goal-card .goal-meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.goal-card .goal-status { font-size: 14px; line-height: 1.35; }
+
+/* workout folder supersets */
+.ss-group { box-shadow: inset 3px 0 0 var(--purple); }
+.ss-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 16px 2px; font-size: 12px; font-weight: 700; color: var(--purple); text-transform: uppercase; letter-spacing: .04em; }
+.ss-head > span { display: inline-flex; align-items: center; gap: 5px; }
+.ss-head .i { width: 15px; height: 15px; }
+.ss-head .link { font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 600; }
+.order { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--text-3); display: grid; place-items: center; font-weight: 700; font-size: 14px; flex-shrink: 0; font-family: var(--font-num); }
+.order.on { background: var(--purple); border-color: var(--purple); color: #fff; }
+
+/* home: up next */
+.card.next { display: flex; align-items: center; gap: 12px; padding: 12px 14px; text-align: left; background: linear-gradient(120deg, color-mix(in srgb, var(--wc, var(--accent)) 16%, var(--card)), var(--card) 70%); }
+.card.next .row-main b { font-size: 17px; }
+.next-icon { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--wc, var(--accent)); background: color-mix(in srgb, var(--wc, var(--accent)) 20%, transparent); flex-shrink: 0; }
+.next-icon .i { width: 20px; height: 20px; }
+.next-go { display: inline-flex; align-items: center; gap: 2px; font-size: 14px; font-weight: 600; color: var(--wc, var(--accent)); }
+.next-go .i { width: 14px; height: 14px; }
+.card.next.rest { --wc: var(--blue); }
+
+/* duplicates */
+.dup { gap: 12px; }
+.dup-pair { display: flex; flex-direction: column; gap: 6px; }
+.dup-pair > div { display: flex; flex-direction: column; gap: 2px; }
+.dup-eq { color: var(--text-3); }
+.dup-eq .i { width: 16px; height: 16px; }
+.dup-row { display: flex; align-items: center; gap: 12px; }
+.dup-row > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dup-row b { overflow-wrap: anywhere; }
+.link.center { align-self: center; font-size: 14px; }
+
+/* measurements & photos */
+.m-row { gap: 8px; }
+.m-input { width: 84px; height: 36px; border-radius: 9px; border: 0; background: var(--card-2); color: var(--text); font: 17px var(--font-num); text-align: right; padding: 0 10px; -webkit-appearance: none; appearance: none; }
+.m-input::placeholder { color: var(--text-3); }
+.m-unit { width: 26px; color: var(--text-2); font-size: 14px; }
+.photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.photo { position: relative; aspect-ratio: 3 / 4; border-radius: 12px; overflow: hidden; background: var(--card); max-width: 100%; }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo span { position: absolute; left: 6px; bottom: 6px; font-size: 11px; font-weight: 600; color: #fff; background: rgba(0, 0, 0, .5); padding: 2px 6px; border-radius: 6px; }
+.photo-full { width: 100%; border-radius: 16px; display: block; }
+.compare-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.compare-pair figure { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.compare-pair img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 12px; }
+.compare-pair figcaption { font-size: 12px; color: var(--text-2); text-align: center; }
+label.circle { cursor: pointer; }
+label.btn { cursor: pointer; }
+
+/* Short screens (iPhone SE, Safari with toolbars): keep the whole set sheet reachable. */
+.entry .sheet-panel { overflow-y: auto; overscroll-behavior: contain; }
+@media (max-height: 740px) {
+  .entry .sheet-panel { gap: 7px; }
+  .keypad { gap: 6px; }
+  .key { height: 42px; font-size: 23px; }
+  .num-field .nv { font-size: 30px; }
+  .num-field.len-4 .nv { font-size: 27px; }
+  .num-field.len-5 .nv, .num-field.len-6 .nv { font-size: 24px; }
+  .ef { padding-top: 6px; padding-bottom: 6px; }
+  .note-chips { display: none; }
+  .entry-note .note-input, .entry-note .save { height: 42px; }
+  .keypad-foot { margin-top: -6px; }
+}
+@media (max-height: 620px) {
+  .key { height: 36px; font-size: 21px; }
+  .target { padding: 6px 10px; }
+  .rpe-opts button { height: 26px; }
+}

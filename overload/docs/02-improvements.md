@@ -52,6 +52,26 @@ going wrong. Everything here is free, with no account, subscription or AI servic
 | ✅ | **Share card**: a 1080×1350 image of the day plus caption-ready text. | Same as Setgraph, without the Pro upsell. |
 | ✅ | **PWA**: add to Home Screen, full screen, works offline, keeps the screen awake (Notepad Mode). | No App Store, and no $99/year Apple developer fee just to run your own app. |
 
+## Added in v1.1
+
+Each one follows how the leading apps do it (Hevy, Strong, Fitbod, StrongLifts), kept to one extra tap at most.
+
+| Feature | How it works | Modelled on |
+|---|---|---|
+| **Set types** | Weight & reps, Bodyweight (+kg), Assisted (kg of help, stored as negative load), Timed (typed like a timer: 130 = 1:30) and Distance (m). Picked from the type chip in the set sheet, guessed from the name (Plank is timed, Farmer's Carry is distance), and never overriding what your history shows | Hevy's exercise types |
+| **Left / right** | One-arm and one-leg exercises log each side; the sheet alternates L and R, targets compare side with side, and switching sides isn't counted as rest | |
+| **Supersets and circuits** | Workout ••• › Create superset. After a set the next exercise opens by itself; the rest timer only runs after the last one | Hevy's smart superset scrolling |
+| **Warm-up ramp** | 40% × 5, 60% × 5, 80% × 3 of the working weight (plus the empty bar for barbells), rounded to loadable weights with plates per side. Tap ✓ per set | Hevy's default formula; Strong/StrongLifts empty-bar sets |
+| **RPE** | Optional one-tap row (6–10, half steps), off by default. Easy sets (≤ 7) get a weight jump next time; all-out sets (9.5–10) are matched first | Hevy's RPE column |
+| **Measurements and photos** | Body fat and tape measurements (cm or in) with charts; progress photos stored only on the phone, with compare-to-first | Strong's Measure tab |
+| **Typo guard** | On save, a weight 2.2× your usual (or a slipped decimal) asks "275 kg? Did you mean 27.5?" with Use / Keep | |
+| **Duplicate finder** | Flags names that are the same exercise (typos, plurals, "curls 1/2", "Jm / Jm press"), never pairs done together on two days; one-tap merge | Strong's Transfer Exercise Data |
+| **Learned rest** | Median real rest per exercise (back-to-back sets only). Offered in the exercise rest menu and in Settings with Apply / Apply to all | |
+| **Plateau detector** | No better estimated 1RM for 4 sessions over 2+ weeks → "Stalled" tag and a lighter-week suggestion (~10% less) | e1RM-stall detection in progression apps |
+| **Up next** | Picks the workout whose muscles are most recovered (72 h), oldest first; suggests rest if everything is sore | Fitbod's recovery model |
+| **Goal date** | Set a 1RM goal; a trend line through the last 120 days projects the date | |
+| **Type or say it** | "8 at 60", "3x10 25", "185x5x3", "10, 9, 8 at 25", "60 for 8", "same again", spoken numbers, labels, RPE and sides, with a preview before saving | Gym shorthand (3x8@135, 185x5x3) |
+
 ## Next steps, in order of value
 
 The full plan, including optional AI features, is in [03-roadmap.md](03-roadmap.md).
