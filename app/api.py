@@ -390,22 +390,77 @@ def load_sample(nid: str):
     return d.library.to_dict()
 
 
+# Project Settings' spec files, as its "Errors Loading Project" box names them
+PROJECT_FILES = (("Parameters", ".par"), ("Actives", ".atv"), ("Taps", ".tap"),
+                 ("Couplers", ".cpr"), ("Cables", ".cbl"), ("Pricing", None),
+                 ("Performance", None), ("Map Grid", None))
+
+
 @app.post("/api/networks/{nid}/library/spec")
 async def attach_spec(nid: str, files: list[UploadFile] = File(...)):
+    """Project Settings > Set All Files > OK: load a spec set for the network.
+
+    A network read from a .ntw (or with no spec set yet) is read again
+    against the new set by position, as the program does -- tap row, coupler
+    record, actives index -- keeping every edit; the program's "Errors
+    Loading Project" lines come back with it.  Pricing, Performance and Map
+    Grid files are not read here, so those keep Untitled.
+    """
     d = load(nid)
+    was = d.library.name or "Untitled"
     with tempfile.TemporaryDirectory() as tmp:
-        base = None
+        base, have = None, set()
         for f in files:
             name = Path(f.filename).name
             (Path(tmp) / name).write_bytes(await f.read())
             base = Path(tmp) / Path(name).stem
+            have.add(Path(name).suffix.lower())
         if base is None:
             raise HTTPException(400, "no files uploaded")
-        lib = library_from_spec_set(base, d.parameters)
-    report = relink_library(d, lib)
+        whole = all(ext in have for _, ext in PROJECT_FILES if ext)
+        errors = []
+        for what, ext in PROJECT_FILES:
+            if ext and whole:
+                errors.append(f"{what} file [{base.name}] Loaded..")
+            else:
+                kept = was if ext else "Untitled"
+                errors.append(f"{what} file [{base.name}] Not found or Invalid.. File {kept} retained.")
+        if not whole:
+            return {"library": d.library.to_dict(), "errors": errors, "loaded": False}
+        feeder = d.branches.get(1)
+        by_position = bool(feeder and feeder.nodes) and (
+            ntw_file(nid) is not None or not d.has_specs or
+            any(p.source.startswith("lodedata:") for p in d.library.actives.values()))
+        if by_position:
+            try:
+                d = _read_again(nid, d, base)
+            except (ExportError, ValueError) as e:
+                raise HTTPException(400, str(e))
+        else:
+            relink_library(d, library_from_spec_set(base, d.parameters))
     save(d)
-    return {"library": lib.to_dict(), "matched": report["matched"],
-            "unmatched": report["unmatched"][:40]}
+    return {"library": d.library.to_dict(), "errors": errors, "loaded": True}
+
+
+def _read_again(nid: str, d: Design, base: Path) -> Design:
+    """The network written as a .ntw as it stands, and read back against
+    the spec set at ``base``: what the file holds by position is what the
+    network is under the new set.  What a .ntw does not hold yet (TSG, map,
+    location, address, notes) is carried across line by line."""
+    source = ntw_file(nid)
+    layout = ntw_file(LAYOUT_FILE)
+    data, _ = export_ntw(d, source, name=d.name,
+                         header=layout[:512] if source is None and layout else None)
+    new, _ = design_from_ntw(data, base, name=d.name)
+    new.id = d.id
+    for b, old in d.branches.items():
+        nb = new.branches.get(b)
+        for on, nn in zip(old.nodes, nb.nodes if nb else []):
+            nn.tsg, nn.map, nn.loc, nn.address, nn.note = on.tsg, on.map, on.loc, on.address, on.note
+        if nb:
+            nb.style, nb.label = old.style, old.label
+    keep_ntw_file(nid, data)
+    return new
 
 
 SPEC_EXTS = {".par", ".atv", ".tap", ".cpr", ".cbl", ".prc", ".per"}
@@ -418,8 +473,8 @@ async def import_ntw(file: UploadFile = File(...),
 
     A .ntw refers to equipment by its position in the spec files, so it reads
     right only against the spec set it was saved with; that set's name is in
-    the file.  Without spec files this just says what the file is and which
-    set it needs.
+    the file.  Without spec files it opens with none, as the program does,
+    and the set is attached later through Project Settings.
     """
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / Path(file.filename).name
@@ -433,9 +488,9 @@ async def import_ntw(file: UploadFile = File(...),
                 continue
             (Path(tmp) / name).write_bytes(await f.read())
             base = Path(tmp) / Path(name).stem
-        if base is None:
-            return {"imported": False, **info}
         try:
+            # with no spec files it opens as the program opens it: levels
+            # 0.00 and the Spec File Mismatch box naming the set it needs
             d, report = design_from_ntw(p, base)
         except ValueError as e:
             raise HTTPException(400, str(e))

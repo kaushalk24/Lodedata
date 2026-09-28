@@ -129,6 +129,9 @@ class Row:
 class Screen:
     rows: list = field(default_factory=list)
     frequencies: list = field(default_factory=list)   # column order
+    # the level column heads: the frequencies, or with no spec set the
+    # program's own "high low Rh Rl"
+    labels: list = field(default_factory=list)
     branches: list = field(default_factory=list)      # paging metadata
     problems: list = field(default_factory=list)
     totals: dict = field(default_factory=dict)
@@ -137,6 +140,7 @@ class Screen:
     def as_dict(self) -> dict:
         return {"rows": [r.as_dict() for r in self.rows],
                 "frequencies": self.frequencies,
+                "labels": self.labels or [f"{f:g}" for f in self.frequencies],
                 "branches": self.branches,
                 "problems": self.problems, "totals": self.totals,
                 "tests": [{"severity": v, "message": m} for v, m in self.tests]}
@@ -158,6 +162,8 @@ def build(design: Design) -> Screen:
     freqs = _freqs(p)
     scr = Screen(frequencies=freqs, problems=design.validate())
     lib = design.library
+    if not design.has_specs:
+        scr.labels = ["high", "low", "Rh", "Rl"]
     if not design.branches:
         return scr
 
@@ -209,9 +215,16 @@ def build(design: Design) -> Screen:
         last_tap = None
         for idx, node in enumerate(branch.nodes):
             last_tap = None
+            amp = node.amp
+            if not amp and node.kept_active and not design.has_specs:
+                # no spec set: the program's own Configuration Table, where
+                # an active's ID is its index + 48 (AL004's Ripple, index
+                # 22, shows 70; WV750 keeps that for all but the ones it
+                # renamed: 13 is 61, 15 63 ... 40 88)
+                amp = str(node.kept_active + 48)
             row = Row(freq_order=freqs, branch=branch.number, node=node.seq or idx + 1,
                       depth=depth, ftg=node.ftg, hc=node.hc, cab=node.cab,
-                      lv=node.lv, tsg=node.tsg, amp=node.amp, fixed=node.fixed,
+                      lv=node.lv, tsg=node.tsg, amp=amp, fixed=node.fixed,
                       power_stop=node.power_stop,
                       amp_label=node.amp_label, supply=node.supply_volts)
             ports = sum(lib.taps[s.part_id].ports if s.part_id in lib.taps else s.file_ports
@@ -313,8 +326,11 @@ def build(design: Design) -> Screen:
                     own = lib.passives.get(cp.part_id) or passive
                     cid = cp.coupler_id or (own.coupler_id if own else 0)
                     text = bracket(str(cp.branch), style)
+                    # with no spec set the program shows every coupler's ID
+                    # as 0: AL004's 1.2 - 1.5 read 0<2> 0[3] 0[4] 0[5]
+                    shown = cid or ("0" if not design.has_specs else "")
                     if i == 0 or not shared:
-                        row.couplers.append(f"{cid or ''}{mark if i == 0 else ''}{text}")
+                        row.couplers.append(f"{shown}{mark if i == 0 else ''}{text}")
                     else:
                         row.couplers[0] += text
                     if passive and i == 0:
@@ -365,6 +381,9 @@ def build(design: Design) -> Screen:
         start[lo] = design.source_dbmv - design.source_tilt_db
         start[p.return_high_mhz] = p.return_target_at_node_dbmv
         start[p.return_low_mhz] = p.return_target_at_node_dbmv
+        if not design.has_specs:
+            # nothing to compute from: the program shows 0.00 throughout
+            start = {f: 0.0 for f in freqs}
         walk(feeder, start, 0, 0.0, False)
 
     _gutter(scr)

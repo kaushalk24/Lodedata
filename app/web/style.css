@@ -116,6 +116,23 @@ body.nogrid table.grid td{border-color:transparent}
 .ps-row span{font-size:12px;color:#222}
 .ps-row input{font-size:12px}
 .ps-note{font-size:12px}
+.ps .pstitle{font-size:13px;margin-bottom:6px}
+.ps fieldset{margin:6px 0;padding:4px 10px}
+.ps .ps-row{margin:2px 0}
+.ps .ps-row input{padding:2px 4px}
+.ps .ps-row button,.ps fieldset>button{padding:2px 10px;font-size:12px}
+.ps .ps-note{margin:4px 0}
+.ps .row{margin-top:6px}
+.ps .psmenu{display:flex;gap:14px;font-size:13px;margin-bottom:4px}
+.ps .psmenu span,.ps .pstools span{cursor:default}
+.ps .pstools{display:flex;gap:4px;font-size:15px;margin-bottom:4px}
+.ps .psfoot{justify-content:flex-start;align-items:center;gap:40px}
+.ps .psfoot label{font-size:12px;display:flex;align-items:center;gap:4px;
+  text-transform:none;color:#222;margin:0}
+.ps .psfoot input[type=checkbox]{width:auto;margin:0}
+.msgbox .errlines div{font-size:13px;margin:6px 0}
+.msgbox .errfoot{justify-content:center;align-items:center;gap:10px}
+.msgbox .anykey{color:#2020c0;font-size:13px}
 
 /* the fixed-node arrow, between the levels and the footage */
 table.grid td.fx,table.grid th.fx{width:14px;padding:0 2px;text-align:center;color:var(--green)}

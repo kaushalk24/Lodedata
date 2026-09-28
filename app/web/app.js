@@ -35,7 +35,7 @@ function branchMeta(n) {
 // Each mode shows the same node lines with a different set of columns, as the
 // Design, Entry and Power screens do.
 function columns() {
-  const f = (S.scr && S.scr.frequencies) || [];
+  const f = (S.scr && (S.scr.labels || S.scr.frequencies)) || [];
   const lvl = f.map((mhz, i) => ({ key: 'lvl:' + i, head: String(mhz).replace('.0', ''),
                                    cls: '', edit: false }));
   const common = [
@@ -109,7 +109,8 @@ function cellText(r, c) {
     case 'node': return r.node;
     case 'ftg': return (r.ftg || (r.ftg === 0 ? '0' : '')) + (S.mode === 'power' ? '|' : '');
     case 'hc': return (r.hc || '') + (S.mode === 'power' ? '|' : '');
-    case 'cab': return (r.cab || (r.cab_name ? r.cab : '')) + (S.mode === 'power' ? '|' : '');
+    // cable 0 is left blank, as hc and lv are (AL004 1.2 - 1.5, recording 1)
+    case 'cab': return (r.cab || '') + (S.mode === 'power' ? '|' : '');
     case 'lv': return (r.lv || '') + (S.mode === 'power' ? '|' : '');
     case 'tsg': return r.tsg || '';
     case 'amp': return r.amp || '';
@@ -221,7 +222,9 @@ function renderGrid() {
     '<th class="l"></th></tr>';
 
   if (!S.net) { tbody.innerHTML = ''; return; }
-  if (!hasSpecs()) {
+  // a .ntw opened with no spec set shows its lines, levels 0.00, as the
+  // program does (recording 1)
+  if (!hasSpecs() && !(S.scr && S.scr.rows.length)) {
     tbody.innerHTML = `<tr><td class="gutter"></td><td class="l" colspan="${cols.length + 1}"
       style="color:var(--yellow);padding:18px 10px;white-space:normal;line-height:1.6">
       No spec file attached.<br><br>
@@ -1218,24 +1221,37 @@ $$('.menubar .mi').forEach(mi => mi.onclick = e => {
 });
 document.addEventListener('click', closeMenus);
 
-// File > Project Settings: where a network's spec files are chosen.
+// File > Project Settings: where a network's spec files are chosen.  As the
+// program lays it out (the user's recordings): File and Set All menus, the
+// folders, Spec Files with Set All Files and a line a file, Misc Folders, and
+// Show on startup.  Set All Files takes one spec set and fills every line
+// with its name; OK loads it and shows "Errors Loading Project".
+const PS_FILES = [['Parameters File', '.par'], ['Actives File', '.atv'], ['Taps File', '.tap'],
+  ['Couplers File', '.cpr'], ['Cables File', '.cbl'], ['Pricing File', ''],
+  ['Performance File', ''], ['Map Grid File', '']];
+// the spec set loaded, "" for none (the program's Untitled)
+function specName(lib) {
+  lib = lib || (S.net && S.net.library) || {};
+  const parts = ['cables', 'taps', 'passives', 'actives'].some(t => Object.keys(lib[t] || {}).length);
+  return parts ? (lib.name || '') : '';
+}
+function showOnStartup() {
+  try { return localStorage.getItem('ps.startup') !== '0'; } catch (_) { return true; }
+}
 function projectSettings() {
-  const lib = (S.net && S.net.library) || {};
-  const loaded = lib.name || '';
-  const row = (label, file) => `<div class="ps-row"><span>${label}</span>` +
-    `<input type="text" readonly value="${esc(file)}"><button disabled>Browse...</button></div>`;
-  modal(`<h2>Project Settings</h2>
-    <div class="ps">
-      ${row('Network Folder', '')}${row('PCD Folder', '')}
+  const loaded = specName();
+  const row = (label, file, id) => `<div class="ps-row"><span>${label}:</span>` +
+    `<input type="text" readonly value="${esc(file)}"${id ? ` id="${id}"` : ''}>` +
+    `<button disabled>Browse...</button></div>`;
+  modal(`<div class="ps"><div class="pstitle">Project Settings</div>
+      <div class="psmenu"><span>File</span><span>Set All</span></div>
+      <div class="pstools"><span title="New">&#128462;</span><span title="Open">&#128194;</span>` +
+      `<span title="Save">&#128190;</span></div>
+      <fieldset>${row('Network Folder', '')}${row('PCD Folder', '')}</fieldset>
       <fieldset><legend>Spec Files</legend>
         <button id="psSetAll">Set All Files</button>
         <input type="file" id="psFiles" multiple hidden accept=".par,.atv,.tap,.cpr,.cbl,.prc,.per">
-        ${row('Parameters File', loaded && loaded + '.par')}
-        ${row('Actives File', loaded && loaded + '.atv')}
-        ${row('Taps File', loaded && loaded + '.tap')}
-        ${row('Couplers File', loaded && loaded + '.cpr')}
-        ${row('Cables File', loaded && loaded + '.cbl')}
-        ${row('Pricing File', '')}${row('Performance File', '')}${row('Map Grid File', '')}
+        ${PS_FILES.map(([label, ext], k) => row(label, loaded && ext ? loaded + ext : '', 'psf' + k)).join('')}
       </fieldset>
       <fieldset><legend>Misc Folders</legend>
         <button disabled>Set All Folders</button>
@@ -1244,23 +1260,44 @@ function projectSettings() {
       <p class="ps-note">Set All Files takes one spec set: the .par .atv .tap .cpr .cbl
       files that share a base name. Or <a href="#" id="psSample">use the sample specs</a>
       (not for real design).</p>
-    </div>
-    <div class="row"><button class="primary" id="mClose">OK</button>
-      <button id="psCancel">Cancel</button></div>`);
+      <div class="row psfoot"><label><input type="checkbox" id="psStartup"${showOnStartup() ? ' checked' : ''}>
+        Show on startup</label>
+        <button class="primary" id="psOk">OK</button><button id="psCancel">Cancel</button></div>
+    </div>`);
+  let files = null;
   $('#psCancel').onclick = closeModal;
+  $('#psStartup').onchange = e => {
+    try { localStorage.setItem('ps.startup', e.target.checked ? '1' : '0'); } catch (_) {}
+  };
+  $$('.psmenu span, .pstools span').forEach(x => x.onclick = () => msg(`${x.textContent || x.title}: not yet`));
   $('#psSetAll').onclick = () => $('#psFiles').click();
   $('#psSample').onclick = async e => { e.preventDefault(); closeModal(); await sampleSpecs(); };
-  $('#psFiles').onchange = async () => {
-    const files = $('#psFiles').files;
+  $('#psFiles').onchange = () => {
+    files = [...$('#psFiles').files];
     if (!files.length) return;
-    const fd = new FormData(); [...files].forEach(f => fd.append('files', f));
-    const out = await api(`/api/networks/${S.nid}/library/spec`, { method: 'POST', body: fd });
-    closeModal(); await reload();
-    msg(`${out.library.name}: ${Object.keys(out.library.cables).length} cables, ` +
-        `${Object.keys(out.library.taps).length} taps, ` +
-        `${Object.keys(out.library.passives).length} couplers, ` +
-        `${Object.keys(out.library.actives).length} actives`);
+    // every line takes the set's name, as the program's Set All Files does
+    const base = files[0].name.replace(/\.[^.]*$/, '');
+    PS_FILES.forEach(([, ext], k) => { $('#psf' + k).value = base + ext; });
   };
+  $('#psOk').onclick = async () => {
+    if (!files || !files.length) { closeModal(); return; }
+    const fd = new FormData(); files.forEach(f => fd.append('files', f));
+    const out = await api(`/api/networks/${S.nid}/library/spec`, { method: 'POST', body: fd });
+    await reload();
+    errorsLoading(out.errors || []);
+  };
+}
+
+// The program's box after Project Settings' OK: a line a file.
+function errorsLoading(lines) {
+  modal(`<div class="msgbox"><div class="mbtitle">Errors Loading Project</div>
+    <div class="errlines">${lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>
+    <div class="row errfoot"><button id="mbOk">OK</button>
+      <span class="anykey">or Press any key to continue..</span></div></div>`);
+  const done = () => { document.removeEventListener('keydown', key, true); closeModal(); };
+  const key = e => { e.preventDefault(); e.stopPropagation(); done(); };
+  document.addEventListener('keydown', key, true);
+  $('#mbOk').onclick = done; $('#mbOk').focus();
 }
 
 function branchList() {
@@ -1368,9 +1405,10 @@ function fmtLib(p, c) {
 }
 function importNtw() {
   modal(`<h2>Import a .ntw network file</h2>
-    <p>A .ntw refers to its equipment by position in the spec files, so pick the
-    spec set it was saved with as well (.par .atv .tap .cpr .cbl). Pick just the
-    .ntw first to see which set it needs.</p>
+    <p>A .ntw refers to its equipment by position in the spec files. Pick the
+    spec set it was saved with as well (.par .atv .tap .cpr .cbl), or open the
+    .ntw alone, as the program does, and attach the set afterwards through
+    File &rarr; Project Settings &rarr; Set All Files.</p>
     <label>Network file <input type="file" id="ntwFile" accept=".ntw"></label>
     <label>Spec set <input type="file" id="ntwSpecs" multiple
       accept=".par,.atv,.tap,.cpr,.cbl,.prc,.per"></label>
@@ -1405,8 +1443,9 @@ function importNtw() {
     const r = out.report;
     if (picked && picked.name === f.name) await keepFile(out.id, picked);
     closeModal();
+    await loadList(out.id);
     await open(out.id);
-    msg(`${r.network}: ${r.branches} branches, ${r.nodes} nodes read against ${r.spec_set}` +
+    msg(`${r.network}: ${r.branches} branches, ${r.nodes} nodes, spec files ${r.spec_set}` +
         (r.unresolved.length ? ` — ${r.unresolved.length} unresolved: ${r.unresolved[0]}` : ''));
     if (r.mismatch && r.mismatch.length) specMismatch(r.mismatch);
   };
@@ -1530,8 +1569,8 @@ async function doRefresh() {
 }
 async function reload() {
   S.net = await api(`/api/networks/${S.nid}`);
-  const sn = S.net.library.name;
-  $('#stSpecs').textContent = sn ? `${sn} : ${sn} : ${sn} : ${sn} : ${sn} : Untitled` : 'no spec file attached';
+  const s = specName(S.net.library) || 'Untitled';
+  $('#stSpecs').textContent = `${s} : ${s} : ${s} : ${s} : ${s} : Untitled`;
   await refresh();
 }
 async function open(id) {
@@ -1552,7 +1591,7 @@ $('#selNet').onchange = e => open(e.target.value);
 $('#selMode').onchange = e => setMode(e.target.value);
 $('#tbNew').onclick = newNetwork;
 $('#tbOpen').onclick = openNetwork;
-$('#tbSave').onclick = () => msg('saved');
+$('#tbSave').onclick = () => saveNetwork(false);
 $('#tbInsert').onclick = insertNode;
 $('#tbDelete').onclick = deleteNode;
 
@@ -1565,4 +1604,7 @@ $('#tbDelete').onclick = deleteNode;
     id = await loadList(d.id);
   }
   await open(id);
+  // the program opens Project Settings on startup unless Show on startup
+  // was unticked there
+  if (showOnStartup()) projectSettings();
 })();

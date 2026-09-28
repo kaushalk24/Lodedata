@@ -79,14 +79,13 @@ def page(server):
         pg.on("pageerror", lambda e: errors.append(str(e)))
         pg.goto(server, wait_until="networkidle")
         pg.wait_for_timeout(600)
-        # attach the spec set as Lode Data does it:
-        # File -> Project Settings... -> Set All Files
-        pg.click('.mi[data-menu="file"]')
-        pg.wait_for_timeout(250)
-        pg.click('.dropdown .di:has-text("Project Settings")')
-        pg.wait_for_timeout(300)
+        # attach the spec set as Lode Data does it: Project Settings, open
+        # on startup -> Set All Files -> OK -> Errors Loading Project
         pg.set_input_files("#psFiles", files)
-        pg.wait_for_timeout(1800)
+        pg.click("#psOk")
+        pg.wait_for_selector("#mbOk", timeout=15000)
+        pg.click("#mbOk")
+        pg.wait_for_timeout(600)
         pg.errors = errors
         yield pg
         browser.close()
@@ -713,3 +712,72 @@ def test_a_network_keyed_from_scratch_saves_as_ntw(server):
     assert net.branches[1].nodes[0].label == "AL004"
     assert requests.get(base).json()["name"] == "SCRATCH"
     assert r.content[:512] == (pair / "AL004.ntw").read_bytes()[:512]
+
+
+def test_project_settings_set_all_files_and_errors_loading_project(page):
+    """File > Project Settings as the program lays it out; Set All Files
+    puts the set's name on every line, OK loads it and the program's
+    "Errors Loading Project" box lists each file (recording 1)."""
+    _file_menu(page, "Project Settings...")
+    labels = page.eval_on_selector_all(".ps-row span", "s => s.map(x => x.textContent)")
+    assert labels == ["Network Folder:", "PCD Folder:", "Parameters File:", "Actives File:",
+                      "Taps File:", "Couplers File:", "Cables File:", "Pricing File:",
+                      "Performance File:", "Map Grid File:", "Control File Folder:",
+                      "Report File Folder:"]
+    assert page.is_checked("#psStartup")
+    page.set_input_files("#psFiles", _spec_files())
+    assert page.input_value("#psf0") == "WV750-2026.par"
+    assert page.input_value("#psf7") == "WV750-2026"
+    page.click("#psOk")
+    page.wait_for_selector(".msgbox .errlines", timeout=15000)
+    assert page.inner_text(".msgbox .mbtitle") == "Errors Loading Project"
+    lines = page.eval_on_selector_all(".errlines div", "s => s.map(x => x.textContent)")
+    assert lines == ["Parameters file [WV750-2026] Loaded..", "Actives file [WV750-2026] Loaded..",
+                     "Taps file [WV750-2026] Loaded..", "Couplers file [WV750-2026] Loaded..",
+                     "Cables file [WV750-2026] Loaded..",
+                     "Pricing file [WV750-2026] Not found or Invalid.. File Untitled retained.",
+                     "Performance file [WV750-2026] Not found or Invalid.. File Untitled retained.",
+                     "Map Grid file [WV750-2026] Not found or Invalid.. File Untitled retained."]
+    assert "Press any key" in page.inner_text(".anykey")
+    page.keyboard.press("x")                         # any key closes it
+    assert page.is_hidden("#modal")
+    # unticked, it no longer opens on startup
+    _file_menu(page, "Project Settings...")
+    page.uncheck("#psStartup")
+    page.click("#psCancel")
+    page.reload(wait_until="networkidle")
+    page.wait_for_timeout(600)
+    assert page.is_hidden("#modal")
+    assert not page.errors
+
+
+def test_a_ntw_opens_without_a_spec_and_takes_one_later(server):
+    """As the program does (recording 1): AL004 alone opens with levels
+    0.00, high low Rh Rl, amp 70 and couplers 0<2> 0[3]..., the Spec File
+    Mismatch box naming WV750-2026; attaching WV750-2026 afterwards reads it
+    by position, levels and all, and saving changes nothing."""
+    import requests
+    pair = SAMPLES / "AL004-WV750"
+    if not (pair / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    src = (pair / "AL004.ntw").read_bytes()
+    r = requests.post(f"{server}/api/import/ntw", files=[("file", ("AL004.ntw", src))]).json()
+    assert r["imported"] and r["report"]["spec_set"] == "Untitled"
+    assert r["report"]["mismatch"][0][1] == "Project spec file loaded does not match spec file 'WV750-2026' saved with"
+    base = f"{server}/api/networks/{r['id']}"
+    scr = requests.get(f"{base}/screen").json()
+    assert scr["labels"] == ["high", "low", "Rh", "Rl"]
+    b1 = [x for x in scr["rows"] if x["branch"] == 1 and not x["end"]]
+    assert all(v == 0 for x in b1 for v in x["levels"])
+    assert b1[0]["amp"] == "70" and b1[0]["amp_label"] == "AL004"
+    assert [x["couplers"] for x in b1[1:]] == [["0<2>"], ["0[3]"], ["0[4]"], ["0[5]"]]
+    # saved as it is, it is the file it was
+    assert requests.post(f"{base}/ntw").content == src
+    specs = [("files", (f.name, f.read_bytes())) for f in sorted(pair.glob("WV750-2026.*"))]
+    out = requests.post(f"{base}/library/spec", files=specs).json()
+    assert out["loaded"] and out["errors"][0] == "Parameters file [WV750-2026] Loaded.."
+    scr = requests.get(f"{base}/screen").json()
+    assert scr["labels"] == ["750", "54", "40", "5"]
+    b1 = [x for x in scr["rows"] if x["branch"] == 1 and not x["end"]]
+    assert b1[1]["levels"] == [49.0, 38.0, 17.0, 17.0] and b1[1]["couplers"] == ["570<2>"]
+    assert requests.post(f"{base}/ntw").content == src

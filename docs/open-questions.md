@@ -235,21 +235,32 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     "Spec File Mismatch", one line per file, and carries on; the replica
     shows the same box.
 
-    A network keyed in from scratch saves too, written in the layout of the
-    last .ntw opened. The user's recording 2 network, keyed in the replica,
-    gives Lode Data's figures exactly (2.1 46.41 37.35 17.55 17.19, its /23/
-    23.41 14.45 40.45 38.29; 2.2 42.70 36.25 18.55 17.80; end 41.60 35.55
-    19.25 18.50).
+    A network keyed in from scratch saves too (the user keyed a few lines,
+    saved, and Lode Data opened it with them). The user's recording 2
+    network, keyed in the replica, gives Lode Data's figures exactly (2.1
+    46.41 37.35 17.55 17.19, its /23/ 23.41 14.45 40.45 38.29; 2.2 42.70
+    36.25 18.55 17.80; end 41.60 35.55 19.25 18.50). It is now written over
+    the program's own empty file (the user's BLANK test, rebuilt byte for
+    byte), not the last .ntw opened; only the header's licence and user
+    fields still come from that.
+
+    Settled by the user:
+    * hc is red when the homes are more than the ports of the line's taps
+      together (3 homes and no tap, or a 2-port tap: red; a 4- or 8-port
+      tap: green). Done.
+    * Lode Data opens a .ntw with no spec set (levels 0.00) and takes the set
+      afterwards; so does the replica, and attaching the set reads the
+      network again by position.
+    * Project Settings on startup ("Show on startup") and the "Errors
+      Loading Project" box after its OK: both copied from recording 1.
 
     Still to confirm:
-    * an empty network saved from Lode Data, to lay new networks out exactly;
-    * hc drawn red (2.2: 3 homes on a 2-port tap) — the rule;
-    * Lode Data opens a .ntw with no spec set (levels 0.00) and takes the set
-      afterwards; the replica asks for the set first;
-    * Lode Data shows Project Settings on startup ("Show on startup") and an
-      "Errors Loading Project" box after Set All Files;
+    * a new network's header with blank licence and user fields;
+    * without a spec set, an active shows its index + 48 (AL004's 70 at 1.1);
+      AL00416 at 4.13 would then read 61, and taps are not drawn;
+    * deleting a line that carries a coupler;
+    * 23481/23483 and the three pairs at 36121;
     * what Lode Data writes when it saves one of these files itself;
     * which new lines get their house list filled in;
-    * the four undecoded preamble blocks;
     * where TSG, Map, Loc, address and notes go (listed as not written);
     * a new power supply's record;

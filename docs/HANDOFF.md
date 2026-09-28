@@ -124,6 +124,15 @@ nodes (`Node.rec`) and branches (`Branch.end_rec`). AL004 comes back byte for
 byte, and the layout is in file-formats 3.8. Open question 11 lists what is
 still to be confirmed in Lode Data.
 
+Every total the preamble keeps is rebuilt on save (`writer.tallies`), bar
+two undecoded counts. A network keyed from scratch is written over
+`writer.blank()`, the program's own empty file. A .ntw opens without a spec
+set (`design_from_ntw(data, None)`); attaching one through Project Settings
+(`POST /api/networks/{id}/library/spec`) writes the network out and reads it
+back against the new set by position, as the program does. Parts a spec set
+cannot name are kept as the file has them (`Node.kept_active`,
+`TapPlacement.file_ports`, coupler record and supply type left in place).
+
 ## Next step
 
 Questions 1–5, 8 and the Parameters file are closed; item 7's leftovers are

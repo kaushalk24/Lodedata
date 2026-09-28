@@ -254,7 +254,7 @@ def library_from_spec_set(base: str | Path,
     return lib
 
 
-def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
+def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path | None,
                     name: str | None = None) -> tuple:
     """Read a Lode Data design against the spec set it was saved with.
 
@@ -262,13 +262,19 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
     row, coupler record, actives index -- so it only reads right against its
     own spec set.  Returns ``(design, report)``; the report lists anything the
     spec set could not resolve rather than guessing.
+
+    With no spec set (``spec_base`` None) it opens as the program opens it
+    before one is attached: every part kept as the file has it, levels 0.00.
     """
     data = Path(ntw).read_bytes() if not isinstance(ntw, (bytes, bytearray)) else bytes(ntw)
     plain = data[:PAYLOAD_START] + deobfuscate(data[PAYLOAD_START:])
     net = read_network(plain)
 
-    params = parameters_from_spec_set(spec_base)
-    lib = library_from_spec_set(spec_base, params)
+    if spec_base is None:
+        params, lib = DesignParameters(), Library(name="")
+    else:
+        params = parameters_from_spec_set(spec_base)
+        lib = library_from_spec_set(spec_base, params)
     taps = {(t.row, t.ports): t for t in lib.taps.values()}
     passives = {p.record: p for p in lib.passives.values()}
     actives = {a.index: a for a in lib.actives.values()}
@@ -276,17 +282,20 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
     supplies = {s.type_id: s for s in lib.power_supplies.values()}
     inline = {q.number: q for q in lib.inline.values()}
 
+    loaded = Path(spec_base).name if spec_base is not None else ""
     report = {"network": net.name, "saved_with": net.spec_names[0] if net.spec_names else "",
-              "spec_set": Path(spec_base).name, "branches": len(net.branches),
+              "spec_set": loaded or "Untitled", "branches": len(net.branches),
               "nodes": net.node_count, "unresolved": [],
-              "mismatch": spec_mismatch(net, Path(spec_base).name)}
-    if report["saved_with"] and report["saved_with"] != report["spec_set"]:
+              "mismatch": spec_mismatch(net, loaded)}
+    if spec_base is None:
+        pass
+    elif report["saved_with"] and report["saved_with"] != report["spec_set"]:
         report["unresolved"].append(
             f"the design was saved with spec set {report['saved_with']}, "
             f"not {report['spec_set']}: parts are looked up by position")
 
     def miss(what: str):
-        if len(report["unresolved"]) < 200:
+        if len(report["unresolved"]) < 200 and spec_base is not None:
             report["unresolved"].append(what)
 
     design = Design(name=name or net.name or "imported", parameters=params,

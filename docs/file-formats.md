@@ -614,20 +614,50 @@ Rebuilt from nothing, these are the bytes Lode Data wrote:
 | 1817 | u32 feet aerial, underground (35 612, 1 354) |
 | 1825 | u32 feet per cable: [100 cable file index][10 series] |
 | 5825 | u32 homes aerial, underground; tap ports aerial, underground; homes again (162, 19, 300, 22, 162, 19) |
-| 5869 | four blocks of 2064 u16, each a histogram over the 28 actives (index 774 is the Ripple node) — **not decoded** |
+| 5869 + 4128·k + 4·(bank·129 + value) | (u16 aerial, u16 UG) actives by pad or EQ: k = 0 forward pad, 1 return pad, 2 forward EQ, 3 return EQ, each as the node holds it — (bank − 1, value, 0) at +112 + 3·k, value signed. AL004's Ripple, banks 4, holds (3, 0) four times; an LE, bank 1, (0, v) |
 | 22377 + 4·i | (u16 aerial, u16 underground) actives of index i |
 | 23381 + 4·n | the same for in-line device Qn |
-| 23477, 23481 | 2, then 70 and 81 — **not decoded** |
+| 23477 | u32 power stops (AL004: 2) |
+| 23481, 23483 | u16 70 and 81 on AL004, 0 on an empty network — **not decoded** |
 | 23513 + 16·row + 4·code | taps by tap-file row and port code |
 | 31705 + 4·code | taps by port code |
 | 31721 + 4·r | couplers by record + 1; a 3-way splitter feeding two branches counts once |
-| 35723, 36121 | more counts — **not decoded** |
-| 41401 | u16 41, u8 1, u8 1 (possibly where the cursor was), u32 branch count, the id counter |
+| 35723 + 4·i | u16 connectors on cable file index i: one at each end of a span (a line with footage) that meets a device — the location it runs from or to holds a tap, coupler, active, in-line device or supply, or it is a branch's start at its coupler (a branch whose first line is 0 ft still starts there) |
+| 36121, 36125, 36129 | (u16 aerial, u16 UG) three counts — **not decoded** (AL004: 58/1, 0/1, 28/4; 0 on an empty network) |
+| 36141 + 4·n | (u16 aerial, u16 UG) Underground Housing n, one per underground location: its equipment points (Parameters: amplifier or line extender, tap or 8-port tap, coupler — a splitter feeding two branches is one — equalizer for an in-line device, power supply) reach the housing's Minimum Size |
+| 36201 + 4·k | (u16 aerial, u16 UG): 0 taps, 1 couplers, 2 splitters (both branches of a line off one coupler record), 3 in-line devices, 4 line extenders, 5 other actives, 12 always 1 (the empty network too), 56 + t supplies of type t |
+| 41401 | u16 41, u8 1, u8 1, u32 branch count, the id counter |
+| 41425 | u32 branch, u32 line, u8 1: where the program's cursor was (AL005: 12, 25; else 1, 1) |
 | 42366 + 261·k | the 8 files it was saved with: Parameters, Actives, Taps, Couplers, Cables, Prices, Performance, Map Grid (the program's "Spec File Mismatch" box lists them in this order) |
 | 44542 | the file name it was saved as, without `.ntw`. Opening a file under another name, the program warns "Filename AL004 has changed to AL004_T2_insert. Setting all PCDs to open." |
 
 The writer rewrites the decoded totals, the branch count and the id counter.
-Everything not decoded is left as the file had it.
+Everything not decoded is left as the file had it. Every total above is
+rebuilt exactly from the network on AL002, AL005 and both AL004s; AL003's
+pad/EQ tally holds 34 entries more than its actives, all at bank 4 value 0,
+which no line of it accounts for.
+
+**The empty network.** The program's File > New saved untouched (the user's
+BLANK test) is 48 791 bytes: the header, a preamble all zero but the spec
+names (Untitled, 5 + 8 times), the file name, 41401 – 41415 and 41425 as above,
+and 36249 = 1; then branch 1 with one line (id 127 999, end 127 998, next free
+127 997). That line's pads are (255, 255, 0) ×4 and its house list empty; lines
+keyed later hold (0, 0, 0). `writer.blank()` rebuilds it byte for byte, and a
+network keyed from scratch is written over it. The header is the same in
+every file bar the licence and user fields.
+
+**Actives on the short record.** AL002 holds 22 of its 39 actives on 1970-byte
+records with no name and no object id; the program's own saves put a placed
+active on the long record. Both are kept as they are.
+
+**Branches off a tap.** The old AL004's branches 43 and 44 have coupler 0
+and are listed on no line; their head's first field is the id of the tap line
+they hang from (11.16, 11.18).
+
+**No spec set.** Opened with none, the program shows levels 0.00, the level
+columns as high low Rh Rl, every coupler's ID as 0 (0<2> 0[3] …) and AL004's
+Ripple, index 22, as 70 — its default Configuration Table gives index + 48,
+which WV750 keeps for every active it did not rename (13 → 61 … 40 → 88).
 
 ---
 
