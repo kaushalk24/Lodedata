@@ -663,15 +663,19 @@ def test_the_program_picks_every_stored_pad_and_eq(screen):
     assert checked == 27
 
 
-def test_an_amplifier_without_stored_pads_shows_the_programs_pick():
+def test_an_amplifier_with_nothing_stored_shows_its_banks_first_row():
+    """The program does not pick pads and EQs when an active is placed: it
+    holds 0 in all four (the user's 88 on AL004 4.2 showed NPB-0,
+    SEQ-750-SCS6, NPB-0, MEQ-42-0).  A bridger on bank 1 then shows 0 0
+    SCS6 0."""
     design = design_from_ntw(NTW, SPEC)[0]
     for b in design.branches.values():
         for nd in b.nodes:
             nd.pads = []
     rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
-    for key, want in PADS_EQS.items():
+    for key in PADS_EQS:
         a = rows[key].amp_info
-        assert (a["fwd_pad"], a["ret_pad"], a["fwd_eq"], a["ret_eq"]) == want, key
+        assert (a["fwd_pad"], a["ret_pad"], a["fwd_eq"], a["ret_eq"]) == ("0", "0", "SCS6", "0"), key
 
 
 def test_the_return_pad_bank_is_the_fifth_byte():

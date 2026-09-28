@@ -349,8 +349,9 @@ function infoSupply(r) {
 function infoAmp(r) {
   const a = r.amp_info || {};
   const line = (label, v) => `${label.padEnd(36)}${v === undefined || v === null ? '' : v}\n`;
+  // an active not yet named has no Amp Name line (88 on AL004 4.2)
   return `${r.branch}.${r.node}\n` +
-    line('Amp Name:', a.name) + line('Amp Type:', a.type || r.amp_name) +
+    (a.name ? line('Amp Name:', a.name) : '') + line('Amp Type:', a.type || r.amp_name) +
     line('Forward Pad:', a.fwd_pad) + line('Forward Eq:', a.fwd_eq) +
     line('Return Pad:', a.ret_pad) + line('Return Eq:', a.ret_eq) +
     line('Aerial Dist to Previous Active:', a.aerial_prev) +

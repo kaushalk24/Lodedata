@@ -625,7 +625,7 @@ Rebuilt from nothing, these are the bytes Lode Data wrote:
 | 35723 + 4·i | u16 connectors on cable file index i: one at each end of a span (a line with footage) that meets a device — the location it runs from or to holds a tap, coupler, active, in-line device or supply, or it is a branch's start at its coupler (a branch whose first line is 0 ft still starts there) |
 | 36121, 36125, 36129 | (u16 aerial, u16 UG) three counts — **not decoded** (AL004: 58/1, 0/1, 28/4; 0 on an empty network) |
 | 36141 + 4·n | (u16 aerial, u16 UG) Underground Housing n, one per underground location: its equipment points (Parameters: amplifier or line extender, tap or 8-port tap, coupler — a splitter feeding two branches is one — equalizer for an in-line device, power supply) reach the housing's Minimum Size |
-| 36201 + 4·k | (u16 aerial, u16 UG): 0 taps, 1 couplers, 2 splitters (both branches of a line off one coupler record), 3 in-line devices, 4 line extenders, 5 other actives, 12 always 1 (the empty network too), 56 + t supplies of type t |
+| 36201 + 4·k | (u16 aerial, u16 UG): 0 taps, 1 couplers, 2 splitters (both branches of a line off one coupler record), 3 in-line devices, 4 line extenders — actives table items 1 – 12, 5 all other actives, 12 always 1 (the empty network too), 56 + t supplies of type t |
 | 41401 | u16 41, u8 1, u8 1, u32 branch count, the id counter |
 | 41425 | u32 branch, u32 line, u8 1: where the program's cursor was (AL005: 12, 25; else 1, 1) |
 | 42366 + 261·k | the 8 files it was saved with: Parameters, Actives, Taps, Couplers, Cables, Prices, Performance, Map Grid (the program's "Spec File Mismatch" box lists them in this order) |

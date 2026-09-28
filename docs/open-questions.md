@@ -272,12 +272,19 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       it back. Done.
     * S1 – S3 settled the layout of a network keyed from scratch
       (file-formats 3.8).
+    * Line extender or amplifier goes by the active's place in the Actives
+      table: items 1 – 12 are line extenders, the rest amplifiers (a
+      fibre-fed node is neither in the expanded display). The user placed
+      WV750's item 40, "FML1G7J ALC LE", on AL004 4.2 and the block counted
+      it an amplifier, 1-0-0 9-7-0. The Bridgers and Feedermakers tabs say
+      nothing about it. The same test showed an active placed holds 0 in its
+      pads and EQs (the program does not pick them) and, unnamed, has no
+      Amp Name line in its box. Done.
 
     Still to confirm:
     * typing a new coupler over one keeps its branch (the replica does);
     * the Delete Branch(es)? text when two branches begin at the line;
     * the old AL004's 11.16 and 11.18 drawn `- [43]`, `- [44]`;
-    * line extender or amplifier: the Actives file's Bridgers tab;
     * 23481/23483 and the three pairs at 36121;
     * what Lode Data writes when it saves one of these files itself;
     * which new lines get their house list filled in;

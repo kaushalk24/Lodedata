@@ -21,7 +21,7 @@ from lodedata.network import TAP_CODES                         # noqa: E402
 from lodedata.obfuscation import PAYLOAD_START, deobfuscate    # noqa: E402
 
 from .plant import Design, THROUGH_FIRST, THROUGH_SECOND       # noqa: E402
-from .screen import _active_kind, build, choose_pads_eqs       # noqa: E402
+from .screen import _active_kind                               # noqa: E402
 
 
 class ExportError(ValueError):
@@ -57,7 +57,6 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
     # branch numbers run 1..n in the file, in the design's order
     numbers = sorted(design.branches)
     number = {b: k + 1 for k, b in enumerate(numbers)}
-    rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
 
     outs = []
     for b in numbers:
@@ -83,9 +82,6 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
                         pad_banks = [b - 1 for b in part.banks]
                     if n.pads:
                         pads = list(n.pads)
-                    elif len(part.pad_eq) == 4 and not part.fibre_fed and (b, i) in rows:
-                        # placed here: the pads and EQs the program would pick
-                        pads = choose_pads_eqs(part, rows[(b, i)].levels, design.parameters)
                 elif n.rec:
                     active = -1
                 else:

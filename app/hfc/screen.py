@@ -440,15 +440,25 @@ def build(design: Design) -> Screen:
 
 
 def _active_kind(part) -> str:
-    """Bridger or line extender, as the expanded display counts them.
+    """Amplifier or line extender, as the program counts them.
 
-    Nothing in the Actives file says which a part is -- AL004's BRIDGER and
-    LE records differ only in name, levels and power table -- so this goes
-    by the name until the program's own rule is known.
+    Nothing in an active's record says which it is: the program goes by its
+    place in the Actives table.  Items 1-12 are the line extenders (its own
+    table gives them the LE IDs 11 ... 33H); everything after is an
+    amplifier.  The user placed WV750's item 40, "FML1G7J ALC LE", on AL004
+    4.2: the expanded display counted it an amplifier, 1-0-0.  A fibre-fed
+    node counts as neither there.  (A library not read from a spec set has
+    no items; its parts go by name.)
     """
-    name = part.name.upper() if part else ""
+    if part is None:
+        return ""
+    if part.index > 0:
+        if part.index <= 12:
+            return "line_extender"
+        return "" if part.fibre_fed else "amplifier"
+    name = part.name.upper()
     if "BRIDGER" in name:
-        return "bridger"
+        return "amplifier"
     if name.startswith("LE") or " LE" in name:
         return "line_extender"
     return ""
@@ -531,7 +541,7 @@ def _amp_info(design: Design, scr: Screen) -> None:
     def kinds(nodes) -> list:
         found = [_active_kind(lib.actives.get(nd.amp_part)) for nd in nodes if nd.amp]
         # the third count is 0 on every node seen so far; what it counts is not known
-        return [found.count("bridger"), found.count("line_extender"), 0]
+        return [found.count("amplifier"), found.count("line_extender"), 0]
 
     def downstream(b: int, n: int) -> list:
         out, stack = [], [(b, n)]
@@ -597,10 +607,9 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # the stored values index the active's Pads/EQs Banks: the info box
         # shows the label, the expanded display the prefix and label
         # (AL00416: forward EQ 16 -> "12", SEQ-750-12)
-        stored = nd.pads[:4]
-        if not stored and part and len(part.pad_eq) == 4 and not fibre:
-            # none stored -- an amplifier placed here: the program picks them
-            stored = choose_pads_eqs(part, r.levels, design.parameters)
+        # an active just placed holds 0 in all four: the program does not pick
+        # them then (88 on AL004 4.2: NPB-0, SEQ-750-SCS6, NPB-0, MEQ-42-0)
+        stored = list(nd.pads[:4])
         shown_as = []
         for c, v in enumerate((stored + [0, 0, 0, 0])[:4]):
             prefix, labels = part.pad_eq[c][:2] if part and len(part.pad_eq) == 4 else ("", [])

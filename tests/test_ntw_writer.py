@@ -433,3 +433,37 @@ def test_a_new_network_is_laid_out_as_the_program_lays_one_out():
         at = W.P_SPECS[1] + 261 * k
         assert plain[at:at + 11] == b"Untitled\x006\x00"
     assert len(plain) == 56715
+
+
+def test_an_active_placed_is_counted_by_its_place_in_the_actives_table():
+    """The user placed 88 -- WV750's item 40, FML1G7J ALC LE -- on AL004 4.2:
+    Lode Data counted it an amplifier (the block reads 1-0-0 9-7-0, 127 homes,
+    631 ft), held 0 in its pads and EQs (NPB-0 SEQ-750-SCS6 NPB-0 MEQ-42-0)
+    and showed its levels 39.66 35.67 18.96 17.69 in, 49 38 21 21 out."""
+    from hfc.entry import resolve_active
+    d, src = fresh()
+    part = resolve_active(d.library, "88")
+    assert part.index == 40
+    n = d.branch(4).nodes[1]
+    n.amp, n.amp_part, n.pads = part.active_id, part.id, [0, 0, 0, 0]
+    rows = {(r.branch, r.node): r for r in build(d).rows if not r.end}
+    r = rows[(4, 2)]
+    assert [round(v, 2) for v in r.levels.values()] == [39.66, 35.67, 18.96, 17.69]
+    assert [round(v, 2) for v in r.out_levels.values()] == [49.0, 38.0, 21.0, 21.0]
+    assert (r.block["above"], r.block["below"]) == ([1, 0, 0], [9, 7, 0])
+    assert (r.block["homes"], r.block["same_cable"]) == (127, 631)
+    assert r.block["distances"] == [631] * 5 and r.block["losses"] == [9.34] * 3
+    assert rows[(4, 4)].block["above"] == [1, 0, 0] and rows[(4, 4)].block["below"] == [8, 7, 0]
+    a = r.amp_info
+    assert a["parts"] == ["NPB-0", "NPB-0", "SEQ-750-SCS6", "MEQ-42-0"]
+    assert (a["fwd_pad"], a["fwd_eq"], a["ret_pad"], a["ret_eq"]) == ("0", "SCS6", "0", "0")
+    assert (a["cascade"], a["supply"], a["homes_down"]) == (1, "A", 127)
+    # saved, it is an amplifier in the file's totals and holds (bank - 1, 0)
+    data, _ = export_ntw(d, src)
+    p = plain(data)
+    net = N.read_network(p)
+    nd = net.branches[4].nodes[1]
+    assert nd.active_index == 40 and p[nd.offset + N.N_HAS_ACTIVE] == 0     # not named
+    assert p[nd.offset + N.N_PADS:nd.offset + N.N_PADS + 12] == bytes([1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0])
+    assert struct.unpack_from("<HH", p, W.P_PARTS + 4 * W.PARTS_AMPLIFIERS) == (13, 0)
+    assert struct.unpack_from("<HH", p, W.P_PARTS + 4 * W.PARTS_LINE_EXTENDERS) == (15, 1)

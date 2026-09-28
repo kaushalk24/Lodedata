@@ -197,8 +197,9 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
         n.pads, n.kept_active = [], 0
     if body.amp_code is not None:
         n.kept_active = 0
-        # a newly placed amplifier's pads and EQs are the program's pick
-        n.pads = []
+        # a newly placed active holds 0 in its pads and EQs: the program does
+        # not pick them (the user's 88 on AL004 4.2)
+        n.pads = [0, 0, 0, 0]
         try:
             part = resolve_active(d.library, body.amp_code)
         except EntryError as e:
