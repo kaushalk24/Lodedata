@@ -270,6 +270,8 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       it (`- [55]`); 0 on a branch with nothing on it deletes it. A power
       stop shows `=` in Design; in Powering, + by it takes it off and puts
       it back. Done.
+    * Typing a new coupler over one keeps its branch and everything on it:
+      12 over AL004 4.26's 8[22] reads 12[22] (the user). Done.
     * S1 – S3 settled the layout of a network keyed from scratch
       (file-formats 3.8).
     * Line extender or amplifier goes by the active's place in the Actives
@@ -282,7 +284,6 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       Amp Name line in its box. Done.
 
     Still to confirm:
-    * typing a new coupler over one keeps its branch (the replica does);
     * the Delete Branch(es)? text when two branches begin at the line;
     * the old AL004's 11.16 and 11.18 drawn `- [43]`, `- [44]`;
     * 23481/23483 and the three pairs at 36121;
