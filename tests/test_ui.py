@@ -871,4 +871,11 @@ def test_two_branches_at_a_line_delete_and_zero(page):
     _key(page, "0", "0", "Enter", wait=1200)
     assert _row(page, 4, 14)["couplers"] == ["- <11>", "- <12>"]
     assert page.evaluate("S.scr.branches.length") == 45
+    # Delete on - <11> asks the same and takes the line with both (the user)
+    _key(page, "Delete")
+    assert page.inner_text(".msgbox .mbtext").startswith("Branches 11, 12, begin at this node.")
+    page.click("#mbOk")
+    page.wait_for_timeout(1500)
+    assert page.evaluate("S.scr.branches.length") == 43
+    assert _row(page, 4, 14)["couplers"] == ["2[15]"]            # the old 4.15
     assert not page.errors

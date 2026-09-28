@@ -273,7 +273,8 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     * Two branches at a line (AL004 4.14, 3-<11><12>): Delete asks
       "Branches 11, 12, begin at this node. Deleting this node will delete
       these branches and all downstream nodes." and takes both; 0 on the
-      splitter takes it off both, - <11>  - <12>, keeping them (the user).
+      splitter takes it off both, - <11>  - <12>, keeping them; Delete on
+      - <11> then asks the same and takes the line with both (the user).
       Done, levels matching the user's screen from 4.13 to 4.20.
     * Typing a new coupler over one keeps its branch and everything on it:
       12 over AL004 4.26's 8[22] reads 12[22] (the user). Done.
