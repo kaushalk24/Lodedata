@@ -548,8 +548,9 @@ def test_keying_a_cable_id_uses_that_cable(page):
 
 
 def test_clearing_and_retyping_a_coupler(page):
-    """0 on a coupler clears it and its branch; typing over one replaces it.
-    Either used to fail: the coupler was taken off the line twice."""
+    """0 on a coupler whose branch has nothing on it clears both; typing over
+    a coupler changes the coupler and keeps its branch.  Either used to
+    fail: the coupler was taken off the line twice."""
     _open_al004(page)
     _goto(page, 20, 17, "cplr0")
     _type(page, "0")
@@ -567,9 +568,9 @@ def test_clearing_and_retyping_a_coupler(page):
     page.keyboard.press("Enter")
     page.wait_for_timeout(1000)
     cell = _row(page, 4, 26)["couplers"]
-    assert len(cell) == 1 and cell[0].startswith("12"), cell
+    assert cell == ["12[22]"], cell
     numbers = page.evaluate("S.scr.branches.map(b => b.number)")
-    assert numbers == list(range(1, 44))          # 44 - 22 - 23 + the new one
+    assert numbers == list(range(1, 45))          # 22 and 23 stay
     assert not page.errors
 
 
@@ -781,3 +782,74 @@ def test_a_ntw_opens_without_a_spec_and_takes_one_later(server):
     b1 = [x for x in scr["rows"] if x["branch"] == 1 and not x["end"]]
     assert b1[1]["levels"] == [49.0, 38.0, 17.0, 17.0] and b1[1]["couplers"] == ["570<2>"]
     assert requests.post(f"{base}/ntw").content == src
+
+
+def _key(page, *keys, wait=700):
+    for k in keys:
+        page.keyboard.press(k)
+        page.wait_for_timeout(120)
+    page.wait_for_timeout(wait)
+
+
+def test_delete_refuses_a_power_stop_and_asks_before_a_branch(page):
+    """The user's recording: Delete on a line with a power stop says "Cannot
+    delete a line with a power stop."; on a line a branch begins at it asks
+    "Delete Branch(es)?", and OK takes the line and the branch."""
+    _open_al004(page)
+    _goto(page, 5, 1, "ftg")
+    assert page.inner_text("table.grid tbody tr:first-child td.stop").strip() == "="   # shown in Design
+    _key(page, "Delete")
+    assert page.inner_text(".msgbox .mbtitle") == "Error"
+    assert page.inner_text(".msgbox .mbtext") == "Cannot delete a line with a power stop."
+    page.click("#mbOk")
+    assert _row(page, 5, 1)["power_stop"]
+    lines = page.evaluate("S.scr.branches.length")
+    _goto(page, 4, 4, "cplr0")
+    _key(page, "Delete")
+    assert page.inner_text(".msgbox .mbtitle") == "Delete Branch(es)?"
+    assert page.inner_text(".msgbox .mbtext").replace("\n", " ") == (
+        "Branch 6, begins at this node. Deleting this node will delete this branch "
+        "and all downstream nodes. Delete this node?")
+    page.click("#mbCancel")
+    page.wait_for_timeout(500)
+    assert page.evaluate("S.scr.branches.length") == lines
+    _key(page, "Delete")
+    page.click("#mbOk")
+    page.wait_for_timeout(1500)
+    # 6 and the two it feeds (7 and 8) are gone, and 4.4 with them
+    assert page.evaluate("S.scr.branches.length") == lines - 3
+    assert _row(page, 4, 4)["ftg"] == 156                     # the old 4.5
+    assert not page.errors
+
+
+def test_zero_on_a_coupler_keeps_a_branch_with_lines_on_it(page):
+    """0 Alter, 0: the coupler comes off and its branch stays, "- <6>", fed
+    by nothing; 0 again leaves it.  A branch with nothing on it goes."""
+    _open_al004(page)
+    _goto(page, 4, 4, "cplr0")
+    _key(page, "0", "0", "Enter", wait=1200)
+    assert _row(page, 4, 4)["couplers"] == ["- <6>"]
+    assert _row(page, 6, 1)["levels"] == [0, 0, 0, 0]
+    _key(page, "0", "0", "Enter", wait=1200)
+    assert _row(page, 4, 4)["couplers"] == ["- <6>"]
+    branches = page.evaluate("S.scr.branches.length")
+    _goto(page, 4, 9, "cplr0")                               # a new coupler: an empty branch
+    _key(page, "0", "1", "0", "0", "Enter", wait=1200)
+    assert page.evaluate("S.scr.branches.length") == branches + 1
+    _key(page, "0", "0", "Enter", wait=1200)
+    assert page.evaluate("S.scr.branches.length") == branches
+    assert _row(page, 4, 9)["couplers"] == []
+    assert not page.errors
+
+
+def test_plus_on_the_power_stop_column_toggles_it(page):
+    """Powering: + by the "=" takes the stop off, + again puts it back."""
+    _open_al004(page)
+    page.evaluate("setMode('power')")
+    page.wait_for_timeout(500)
+    _goto(page, 5, 1, "stop")
+    _key(page, "+", wait=1000)
+    assert not _row(page, 5, 1)["power_stop"]
+    _key(page, "+", wait=1000)
+    assert _row(page, 5, 1)["power_stop"]
+    assert not page.errors

@@ -58,6 +58,10 @@ class CouplerPlacement:
     coupler_id: int = 0
     branch: int = 0
     style: str = BRANCH_NORMAL
+    # the coupler taken off with "0" while its branch still has lines on it:
+    # the branch stays, hanging from this line with nothing feeding it (the
+    # program shows "- [55]"; the old AL004's 43 and 44 are two)
+    removed: bool = False
 
 
 # Which leg of a coupler carries the through (low-loss) path.  From the manual:
@@ -99,9 +103,6 @@ class Node:
     supply_part: str | None = None
     power_stop: bool = False    # stops power in the span leading to this node
     rec: int = 0                # its id in the .ntw it came from; 0 = not saved yet
-    # branches hanging from this line that no coupler starts (the old AL004's
-    # 43 and 44, off the taps at 11.16 and 11.18): kept, not drawn yet
-    drops: list = field(default_factory=list)
     # the file's actives index here, when the spec set in use has no such
     # active: written back as it was (AL005's index 14 against WV750)
     kept_active: int = 0
@@ -217,7 +218,6 @@ class Design:
         for b in self.branches.values():
             for node in b.nodes:
                 node.couplers = [c for c in node.couplers if c.branch not in gone]
-                node.drops = [x for x in node.drops if x not in gone]
         self.close_up()
         return gone
 
@@ -235,9 +235,19 @@ class Design:
             for node in b.nodes:
                 for c in node.couplers:
                     c.branch = new.get(c.branch, c.branch)
-                node.drops = [new.get(x, x) for x in node.drops]
             branches[b.number] = b
         self.branches = branches
+
+    def branch_is_empty(self, number: int) -> bool:
+        """Nothing keyed on it: every line blank (the program deletes such a
+        branch when its coupler is cleared, and keeps any other)."""
+        b = self.branches.get(number)
+        if b is None:
+            return True
+        return all(not (n.ftg or n.hc or n.amp or n.kept_active or n.inline or n.supply_label
+                        or n.supply_volts or n.power_stop or n.couplers
+                        or any(t.part_id or t.file_ports for t in n.taps))
+                   for n in b.nodes)
 
     def branch_of(self, node: Node) -> Branch | None:
         """The branch a line is on, by the line itself."""
@@ -250,10 +260,6 @@ class Design:
             # an inserted or deleted line has moved that node to
             for c in node.couplers:
                 child = self.branches.get(c.branch)
-                if child is not None:
-                    child.parent_node = i
-            for x in node.drops:
-                child = self.branches.get(x)
                 if child is not None:
                     child.parent_node = i
 

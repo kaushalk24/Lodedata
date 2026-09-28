@@ -81,6 +81,9 @@ function columns() {
     ...lvl,
     { key: 'fx', head: '', cls: 'fx' },          // "→" marks a fixed node
     ...common,
+    // a power stop shows as "=" between lv and amp (AL002 55.2, the user's
+    // recording)
+    { key: 'stop', head: '', cls: 'stop' },
     { key: 'amp', head: 'amp', edit: true },
     { key: 'tsg', head: 'TSG', edit: true },
     { key: 'tap0', head: 'tap1', edit: true }, { key: 'tap1', head: 'tap2', edit: true },
@@ -125,7 +128,7 @@ function cellText(r, c) {
     case 'supplypct': return '';
     case 'niu': return r.volts === null ? '' : 'Y';
     case 'fx': return r.fixed ? '\u2192' : '';
-    case 'stop': return S.mode === 'power' ? (r.power_stop ? '=' : '|') : '';
+    case 'stop': return S.mode === 'power' ? (r.power_stop ? '=' : '|') : (r.power_stop ? '=' : '');
     case 'volt': return r.volts === null ? '' : r.volts.toFixed(2);
     case 'current': return r.current ? r.current.toFixed(2) : '0.00';
     case 'tap0': case 'tap1': case 'tap2': case 'tap3': {
@@ -247,6 +250,7 @@ function renderGrid() {
       let extra = '';
       if (c.key === 'cab') extra = ' cab';
       if (c.key === 'hc' && r.hc_severity) extra = ' ' + r.hc_severity;
+      if (c.key === 'stop' && r.power_stop) extra = ' on';
       if (c.key === 'ampname') extra = ' amp';
       if (c.key === 'tap0' && S.mode === 'design' && r.amp_label && !r.taps.length) extra = ' amp spill';
       if (c.key === 'supply' && r.supply) extra = ' spill';
@@ -615,6 +619,10 @@ document.addEventListener('keydown', async ev => {
   }
   else if (k === 'Home') { S.row = 0; }
   else if (k === 'End') { S.row = n - 1; }
+  else if (k === '+' && S.mode === 'power' && !S.dot && S.buffer === null
+           && cols[S.col].key === 'stop') {
+    ev.preventDefault(); await togglePowerStop(); return;
+  }
   else if (S.mode !== 'entry' && S.buffer === null && /^[0-9+\/]$/.test(k)) {
     // Design and Power: "0 Alter", "5 Test", ".2 BkFeed", "..5 Dsmry" ...
     ev.preventDefault();
@@ -956,11 +964,51 @@ function ampDefinition() {
     }
   };
 }
+// The Delete key, as the program does it (the user's recording): a line
+// with a power stop is refused; a line a branch begins at asks first, and OK
+// deletes the line with the branch and everything down it.
 async function deleteNode() {
-  const r = curRow(); if (!r) return;
-  await api(`/api/networks/${S.nid}/branches/${r.branch}/nodes/${r.node}`,
-    { method: 'DELETE' });
+  const r = curRow(); if (!r || r.end) return;
+  const url = `/api/networks/${S.nid}/branches/${r.branch}/nodes/${r.node}`;
+  try {
+    await api(url, { method: 'DELETE' });
+  } catch (e) {
+    let d = null;
+    try { d = JSON.parse(e.message).detail; } catch (_) { throw e; }
+    if (d && d.error) { errorBox(d.error); return; }
+    if (d && d.branches) {
+      const which = d.branches.join(', ');
+      modal(`<div class="msgbox"><div class="mbtitle">Delete Branch(es)?</div>
+        <div class="mbtext">Branch ${esc(which)}, begins at this node.<br>Deleting this node will delete this branch<br>` +
+        `and all downstream nodes.<br>Delete this node?</div>
+        <div class="row"><button id="mbOk">OK</button><button id="mbCancel">Cancel</button></div></div>`);
+      $('#mbCancel').onclick = closeModal;
+      $('#mbOk').onclick = async () => {
+        closeModal();
+        await api(url + '?confirm=true', { method: 'DELETE' });
+        await refresh(); msg('node deleted');
+      };
+      $('#mbOk').focus();
+      return;
+    }
+    throw e;
+  }
   await refresh(); msg('node deleted');
+}
+function errorBox(text) {
+  modal(`<div class="msgbox"><div class="mbtitle">Error</div>
+    <div class="mbtext">${esc(text)}</div>
+    <div class="row"><button id="mbOk">OK</button></div></div>`);
+  $('#mbOk').onclick = closeModal; $('#mbOk').focus();
+}
+// Powering: "+" on the power-stop column puts a stop there, "+" again takes
+// it off (the user's recording, AL002 55.2)
+async function togglePowerStop() {
+  const r = curRow(); if (!r || r.end) return;
+  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ power_stop: !r.power_stop }) });
+  await refresh();
 }
 async function delBranch() {
   const r = curRow(); if (!r || r.branch === 1) { msg('the feeder cannot be deleted'); return; }

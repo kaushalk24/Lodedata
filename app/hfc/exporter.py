@@ -106,7 +106,9 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
                     note(f"{where}: {field} is not written (where the file keeps it is not known yet)")
             nodes.append(W.NodeOut(
                 rec=n.rec, ftg=int(round(n.ftg)), hc=n.hc, cable=n.cab, lv=n.lv,
-                taps=taps, branches=[number[c.branch] for c in n.couplers if c.branch in number],
+                # a branch whose coupler was taken off is listed on no line
+                taps=taps, branches=[number[c.branch] for c in n.couplers
+                                     if c.branch in number and not c.removed],
                 active_index=active, inline=n.inline, pads=pads, fixed=n.fixed,
                 power_stop=n.power_stop, label=n.amp_label if (n.amp or n.rec) else None,
                 supply=supply, supply_type=supply_type, pad_banks=pad_banks))
@@ -118,6 +120,9 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
                 pnode = parent.nodes[br.parent_node - 1]
                 for k, cp in enumerate(pnode.couplers, start=1):
                     if cp.branch != b:
+                        continue
+                    if cp.removed:
+                        coupler = 0
                         continue
                     part = lib.passives.get(cp.part_id) if cp.part_id else None
                     coupler = part.record if part is not None and part.record > 0 else -1

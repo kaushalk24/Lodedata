@@ -252,12 +252,30 @@ def insert_node(nid: str, branch: int, body: InsertNode):
 
 
 @app.delete("/api/networks/{nid}/branches/{branch}/nodes/{node}")
-def delete_node(nid: str, branch: int, branch_node: int = 0, node: int = 0):
+def delete_node(nid: str, branch: int, branch_node: int = 0, node: int = 0,
+                confirm: bool = False):
+    """The Delete key.  As the program does it (the user's recording): a
+    line with a power stop is not deleted; one a branch begins at is
+    deleted with that branch and everything down it, once the "Delete
+    Branch(es)?" box has been answered OK (``confirm``)."""
     d = load(nid)
     b = d.branch(branch)
     if not b:
         raise HTTPException(404, "branch not found")
-    b.nodes = [n for n in b.nodes if n.seq != node]
+    n = next((x for x in b.nodes if x.seq == node), None)
+    if n is not None and n.power_stop:
+        raise HTTPException(409, detail={"error": "Cannot delete a line with a power stop."})
+    starts = [c.branch for c in (n.couplers if n else []) if d.branch(c.branch)]
+    if starts and not confirm:
+        raise HTTPException(409, detail={"branches": starts})
+    # removing a branch takes its coupler off the line and closes the
+    # numbers up, so go by what is left on the line
+    while n is not None and n.couplers:
+        before = len(n.couplers)
+        d.remove_branch(n.couplers[0].branch)
+        if len(n.couplers) == before:
+            n.couplers.pop(0)
+    b.nodes = [x for x in b.nodes if x is not n]
     if not b.nodes:
         b.nodes = [Node(seq=1)]
     d.renumber(b)
@@ -338,17 +356,30 @@ def set_coupler(nid: str, branch: int, node: int, body: CouplerEdit):
 
     if part is None:
         if body.slot < len(n.couplers):
-            # removing the branch takes its coupler off this line too
-            d.remove_branch(n.couplers[body.slot].branch)
-            if not n.couplers:
+            cp = n.couplers[body.slot]
+            if d.branch_is_empty(cp.branch):
+                # nothing on the branch: it goes, and its coupler with it
+                d.remove_branch(cp.branch)
+            else:
+                # lines on it: the program takes the coupler off and keeps
+                # the branch, "- [55]"; a second 0 leaves it so (the user's
+                # recording, AL002 53.5)
+                cp.part_id, cp.coupler_id, cp.removed = None, 0, True
+            if all(c.removed for c in n.couplers):
                 n.through_leg = 0
         save(d)
         return {"node": n.to_dict(), "placed": None}
 
-    # re-typing over an existing coupler replaces it rather than stacking
-    # (removing its branch takes the old coupler off this line)
+    # re-typing over a coupler changes the coupler; its branch stays
     if body.slot < len(n.couplers):
-        d.remove_branch(n.couplers[body.slot].branch)
+        cp = n.couplers[body.slot]
+        cp.part_id, cp.coupler_id, cp.removed = part.id, int(part.coupler_id or 0), False
+        n.through_leg = through
+        save(d)
+        return {"node": n.to_dict(),
+                "placed": {"name": part.name, "coupler_id": part.coupler_id,
+                           "legs": part.port_losses, "through_leg": through,
+                           "branch": cp.branch}}
     if len(n.couplers) >= 2:
         raise HTTPException(400, "a node can carry at most two couplers")
 

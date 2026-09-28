@@ -146,6 +146,18 @@ class Screen:
                 "tests": [{"severity": v, "message": m} for v, m in self.tests]}
 
 
+# The program's own actives table, the one it uses with no spec set (Spec
+# Edit > Actives, Unnamed): the Active ID of each index.  The user's
+# screenshots: 1-12 the line extenders 11 ... 33H, 13-41 61-89, 42-50 41-49,
+# then ###.
+_DEFAULT_IDS = (["11", "21", "22", "31", "32", "33", "11H", "21H", "22H", "31H", "32H", "33H"]
+                + [str(i) for i in range(61, 90)] + [str(i) for i in range(41, 50)])
+
+
+def default_active_id(index: int) -> str:
+    return _DEFAULT_IDS[index - 1] if 0 < index <= len(_DEFAULT_IDS) else "###"
+
+
 def _freqs(p) -> list:
     """Column order as the real screen shows it: forward high to return low."""
     return [p.forward_high_mhz, p.forward_low_mhz,
@@ -217,11 +229,10 @@ def build(design: Design) -> Screen:
             last_tap = None
             amp = node.amp
             if not amp and node.kept_active and not design.has_specs:
-                # no spec set: the program's own Configuration Table, where
-                # an active's ID is its index + 48 (AL004's Ripple, index
-                # 22, shows 70; WV750 keeps that for all but the ones it
-                # renamed: 13 is 61, 15 63 ... 40 88)
-                amp = str(node.kept_active + 48)
+                # no spec set: the Active ID of the program's own (Unnamed)
+                # actives table -- AL004's Ripple, index 22, reads 70 and
+                # AL00416, index 13, 61 (the user's screenshots)
+                amp = default_active_id(node.kept_active)
             row = Row(freq_order=freqs, branch=branch.number, node=node.seq or idx + 1,
                       depth=depth, ftg=node.ftg, hc=node.hc, cab=node.cab,
                       lv=node.lv, tsg=node.tsg, amp=amp, fixed=node.fixed,
@@ -275,6 +286,16 @@ def build(design: Design) -> Screen:
                         loss = q.loss_db(f)
                         levels[f] = levels[f] - loss if _is_forward(p, f) else levels[f] + loss
 
+            if not design.has_specs:
+                # no spec set: each tap is drawn with ID 0 in its port
+                # count's brackets, "[ 0]" "/ 0/" (AL004 4.27 - 4.29), and
+                # the line under the branch reads 0.00 below them
+                for slot in node.taps:
+                    if slot.file_ports:
+                        row.taps.append(bracket(f"{0:>2}", TAP_BRACKETS.get(slot.file_ports, "[]")))
+                        row.tap_ports.append(slot.file_ports)
+                        last_tap = ("file", {f: 0.0 for f in freqs}, [""] * len(freqs))
+
             # taps: the through loss applies to everything downstream
             for slot in node.taps:
                 tap = lib.taps.get(slot.part_id)
@@ -323,6 +344,10 @@ def build(design: Design) -> Screen:
                           and len(passive.port_losses) > 2)
                 for i, cp in enumerate(node.couplers):
                     style = branch_style(cp)
+                    if cp.removed:
+                        # its coupler taken off with "0", the branch kept: "- [55]"
+                        row.couplers.append(f"- {bracket(str(cp.branch), style)}")
+                        continue
                     own = lib.passives.get(cp.part_id) or passive
                     cid = cp.coupler_id or (own.coupler_id if own else 0)
                     text = bracket(str(cp.branch), style)
@@ -353,6 +378,11 @@ def build(design: Design) -> Screen:
                         continue
                     down = {f: (levels[f] - leg(i, f) if _is_forward(p, f)
                                 else levels[f] + leg(i, f)) for f in freqs}
+                    if cp.removed:
+                        # nothing feeds it: it starts at 0.00 (AL002 55.1,
+                        # the user's recording: 112 ft of cable 0 below it
+                        # reads -2.42 -0.60 0.52 0.18)
+                        down = {f: 0.0 for f in freqs}
                     own = lib.passives.get(cp.part_id) or passive
                     feeders[child.number] = own.name if own else ""
                     walk(child, down, depth + 1, cum_ft, True)
@@ -494,6 +524,10 @@ def _amp_info(design: Design, scr: Screen) -> None:
         cable = lib.cables.get(nd.cab_part)
         return cable.loss_db(mhz, nd.ftg) if cable and nd.ftg else 0.0
 
+    def has_amp(nd) -> bool:
+        # with no spec set an active is still there, by its index
+        return bool(nd.amp or nd.kept_active)
+
     def kinds(nodes) -> list:
         found = [_active_kind(lib.actives.get(nd.amp_part)) for nd in nodes if nd.amp]
         # the third count is 0 on every node seen so far; what it counts is not known
@@ -513,8 +547,8 @@ def _amp_info(design: Design, scr: Screen) -> None:
         last = n == len(design.branch(b).nodes)
         # a branch's first node shows it at 22.1 (0 ft); whether that is for
         # being first or for the 0 ft is not yet known, so only both
-        block = bool(nd.amp or nd.couplers or last or (n == 1 and not nd.ftg))
-        if not (nd.amp or block):
+        block = bool(has_amp(nd) or nd.couplers or last or (n == 1 and not nd.ftg))
+        if not (has_amp(nd) or block):
             continue
         d = dict.fromkeys(("aerial_prev", "aerial_start", "total_split",
                            "total_prev", "total_start"), 0)
@@ -526,10 +560,10 @@ def _amp_info(design: Design, scr: Screen) -> None:
         for bb, k in upstream(b, n):
             here = node(bb, k)
             if not first:
-                if here.amp:
+                if has_amp(here):
                     found_active = True
                     cascade += 1
-                if here.amp or here.couplers:
+                if has_amp(here) or here.couplers:
                     found_split = True
             ft, db = here.ftg, loss(here)
             d["total_start"] += ft
@@ -556,7 +590,7 @@ def _amp_info(design: Design, scr: Screen) -> None:
                 "below": kinds(below),
                 "homes": homes, "same_cable": same_cable,
             }
-        if not nd.amp:
+        if not has_amp(nd):
             continue
         part = lib.actives.get(nd.amp_part)
         fibre = part is not None and part.fibre_fed
@@ -573,6 +607,11 @@ def _amp_info(design: Design, scr: Screen) -> None:
             label = labels[v].strip() if 0 <= v < len(labels) else str(v)
             shown_as.append((label, prefix + label))
         (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as
+        if not design.has_specs:
+            # no spec set: no type, no pads or EQs, cascade position 0
+            # (AL004's AL00416, the user's screenshot)
+            fp = rp = fe = re_ = ""
+            cascade, fibre = 0, True
         r.amp_info = {
             "name": nd.amp_label, "type": part.name if part else "",
             "fwd_pad": fp, "ret_pad": rp, "fwd_eq": fe, "ret_eq": re_,
@@ -782,7 +821,9 @@ def _powering(design: Design, scr: Screen) -> None:
 
     seen = set()
     for key, n in nodes.items():
-        if not n.supply_volts or key in seen:
+        # a supply the spec set cannot name still has its area (AL004 with
+        # no spec set: AL00416's box says Power Supply A)
+        if not (n.supply_volts or n.supply_label) or key in seen:
             continue
         # the area this supply reaches, as a tree rooted at the supply
         parent, span_ohms, order = {key: None}, {key: 0.0}, [key]
@@ -796,7 +837,7 @@ def _powering(design: Design, scr: Screen) -> None:
                     span_ohms[there] = ohms
                     order.append(there)
         seen.update(order)
-        others = [k for k in order if k != key and nodes[k].supply_volts]
+        others = [k for k in order if k != key and (nodes[k].supply_volts or nodes[k].supply_label)]
         if others:
             rows[key].flags.append(("red", "bucking power: another supply in this "
                                            "area without a power stop between"))

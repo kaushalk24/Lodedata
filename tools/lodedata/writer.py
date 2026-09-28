@@ -320,19 +320,24 @@ def build(source: RawNetwork, branches: list, name: str | None = None,
         return got
 
     for k, br in enumerate(branches):
-        # AL004: branch 1's first line is 127999 and its end line 127998;
-        # a branch placed later takes its end line's id first (2.1 127996,
-        # its end 127997)
+        # A new network starts with branch 1's line and end line (127999,
+        # 127998); lines keyed after take the next ids, and a branch placed
+        # later takes its end line's id first (the user's S3: 1.2 127997,
+        # 1.3 127996, branch 2's end 127995, 2.1 127994)
         if k == 0:
-            ids.append([own(nd.rec, records) for nd in br.nodes])
+            first = own(br.nodes[0].rec, records)
             ends.append(own(br.end_rec, heads))
+            ids.append([first] + [own(nd.rec, records) for nd in br.nodes[1:]])
         else:
             ends.append(own(br.end_rec, heads))
             ids.append([own(nd.rec, records) for nd in br.nodes])
     number = {k + 1: k for k in range(len(branches))}
 
     out = bytearray(pre)
-    template_head = next((b.head for b in source.branches[1:]), None) or source.branches[0].head
+    # a branch placed later: its head as the program starts one (S3's
+    # branch 2), the head of a keyed line -- pads (0, 0, 0), no house list
+    template_head = bytes(_new_node()[4:4 + N.BRANCH_RECORD])
+    template_head = template_head[:TAIL_HOMES - 4] + bytes(N.BRANCH_RECORD - (TAIL_HOMES - 4))
     for k, br in enumerate(branches):
         if not br.nodes:
             raise WriteError(f"branch {k + 1} has no lines")
@@ -373,6 +378,14 @@ def build(source: RawNetwork, branches: list, name: str | None = None,
                 at = base + 261 * k
                 if _stored_name(out, at) != spec:
                     _text_into(out, at, spec, width=261)
+        # Set All Files names all eight; Prices, Performance and Map Grid
+        # then keep Untitled over it, which leaves the name's tail behind
+        # ("Untitled\0" then "6" of WV750-2026, on AL004 and S1 - S3)
+        for k in range(5, 8):
+            at = P_SPECS[1] + 261 * k
+            kept = _stored_name(out, at)
+            _text_into(out, at, spec, width=261)
+            _text_into(out, at, kept or "Untitled", width=261)
     # counted from what was written: a tap or active the spec set in use
     # cannot name is kept in its line, and still counts
     _totals(out, _counts(outs_from_plain(join(source))), _counts(outs_from_plain(bytes(out))))
@@ -394,11 +407,11 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
     extended = bool(rec[N.N_HAS_ACTIVE])
     keep_active = nd.active_index == -1 and src is not None
     has_active = bool(rec[N.N_AMP_INDEX]) and not rec[N_INLINE_FLAG] if keep_active else nd.active_index > 0
-    had_active = bool(rec[N.N_AMP_INDEX]) and not rec[N_INLINE_FLAG]
+    named = nd.label if nd.label is not None else bytes(rec[N.N_LABEL:N.N_LABEL + 1]) != b"\0"
     want = bool(has_active or nd.supply)
-    if want and not extended and had_active and not nd.supply:
-        # AL002 holds 22 actives on the short record (no name, no object id):
-        # they stay as they are
+    if want and not extended and not nd.supply and not named:
+        # an active the program has not been given a name for stays on the
+        # short record: the user's S1 Ripple, and 22 of AL002's actives
         want = False
     if want and not extended:
         # an active or a supply takes the longer record: the program's block

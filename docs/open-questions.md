@@ -258,10 +258,26 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       opens in Lode Data: it names the spec set it needs and nothing else.
       So a network keyed from scratch saves with no .ntw opened first.
 
+    * Without a spec set an active shows the Active ID of the program's own
+      (Unnamed) actives table: 1 – 12 11 … 33H, 13 – 41 61 – 89, 42 – 50
+      41 – 49, then ###; taps show ID 0 in their brackets, `[ 0]` `/ 0/`,
+      couplers `0[9]`, and an active's box its name, distances, supply and
+      homes with type, pads and cascade blank or 0. Done.
+    * Delete (the user's recording): a line with a power stop is refused
+      ("Cannot delete a line with a power stop."); a line a branch begins
+      at asks "Delete Branch(es)?" and OK takes the line and the branch.
+      0 on a coupler takes the coupler off and keeps a branch with lines on
+      it (`- [55]`); 0 on a branch with nothing on it deletes it. A power
+      stop shows `=` in Design; in Powering, + by it takes it off and puts
+      it back. Done.
+    * S1 – S3 settled the layout of a network keyed from scratch
+      (file-formats 3.8).
+
     Still to confirm:
-    * without a spec set, an active shows its index + 48 (AL004's 70 at 1.1);
-      AL00416 at 4.13 would then read 61, and taps are not drawn;
-    * deleting a line that carries a coupler;
+    * typing a new coupler over one keeps its branch (the replica does);
+    * the Delete Branch(es)? text when two branches begin at the line;
+    * the old AL004's 11.16 and 11.18 drawn `- [43]`, `- [44]`;
+    * line extender or amplifier: the Actives file's Bridgers tab;
     * 23481/23483 and the three pairs at 36121;
     * what Lode Data writes when it saves one of these files itself;
     * which new lines get their house list filled in;

@@ -646,13 +646,36 @@ keyed later hold (0, 0, 0). `writer.blank()` rebuilds it byte for byte, and a
 network keyed from scratch is written over it. The header is the same in
 every file bar the licence and user fields.
 
-**Actives on the short record.** AL002 holds 22 of its 39 actives on 1970-byte
-records with no name and no object id; the program's own saves put a placed
-active on the long record. Both are kept as they are.
+**A network keyed from scratch** (the user's S1 – S3, keyed in Lode Data from
+the empty network with WV750-2026). Written from `writer.blank()`, the app's
+file is Lode Data's byte for byte but for 23483, 36129 and where the cursor
+was (41425). What they showed:
 
-**Branches off a tap.** The old AL004's branches 43 and 44 have coupler 0
-and are listed on no line; their head's first field is the id of the tap line
-they hang from (11.16, 11.18).
+* An active stays on the short record until it is named: S1's Ripple on 1.1
+  has no name and no long record. Naming it (or placing a supply) takes the
+  long record and an object id. AL002's 22 unnamed actives are the same.
+* Ids: the network starts with 1.1 = 127 999 and its end line 127 998; lines
+  keyed after take the next ids, and a branch placed later takes its end
+  line's first (S3: 1.2 127 997, 1.3 127 996, branch 2's end 127 995, 2.1
+  127 994).
+* A branch placed later has a keyed line's head: pads (0, 0, 0).
+* Set All Files writes the set's name into all eight saved-with slots;
+  Prices, Performance and Map Grid then keep Untitled over it, leaving the
+  name's tail: `Untitled\0` then `6` of WV750-2026.
+* 23483 counts 1, 2, 3 over S1 – S3 (one per tap keyed) and 23481 stays 0;
+  36129 is the taps ending a branch there (1, 1, 2), as on AL004 (28/4) —
+  but on AL002, AL003 and AL005 neither rule holds, so both stay as the
+  file has them.
+
+**Actives on the short record.** AL002 holds 22 of its 39 actives on 1970-byte
+records with no name and no object id. Both kinds are kept as they are.
+
+**A coupler taken off, its branch kept.** Typing 0 on a coupler whose branch
+has lines on it takes the coupler off and leaves the branch, drawn `- [55]`
+and fed by nothing: it starts at 0.00 (the user's recording, AL002 55.1:
+112 ft of cable 0 reads −2.42 −0.60 0.52 0.18). The old AL004's branches 43
+and 44 are two: coupler 0, listed on no line, their head's first field the
+id of the line they hang from (11.16, 11.18).
 
 **No spec set.** Opened with none, the program shows levels 0.00, the level
 columns as high low Rh Rl, every coupler's ID as 0 (0<2> 0[3] …) and AL004's

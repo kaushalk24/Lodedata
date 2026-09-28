@@ -401,3 +401,35 @@ def test_the_spec_file_mismatch_lines():
     assert lines[:5] == [[w, "Project spec file loaded does not match spec file 'WV750-2026' saved with"]
                          for w in ("Parameters", "Actives", "Taps", "Couplers", "Cables")]
     assert lines[5:] == [["Prices", "Loaded."], ["Performance", "Loaded."], ["Map Grid", "Loaded."]]
+
+
+def test_a_new_network_is_laid_out_as_the_program_lays_one_out():
+    """The user's S3, keyed in Lode Data from an empty network: a Ripple on
+    1.1 (not named), 1.2 100 ft on 406 with 2 homes and a 2.20, 1.3 with 4
+    and a 4.20, a coupler 100 on 1.2 and 2.1 like 1.2.  Written from the
+    empty file, the app's bytes are Lode Data's but for the two counts not
+    decoded (23483, 36129) and where the cursor was; these are the facts."""
+    tap = lambda code: [(3, code), None, None, None]                  # noqa: E731
+    b1 = W.BranchOut(nodes=[
+        W.NodeOut(active_index=22, pad_banks=[3, 3, 3, 3], taps=[None] * 4),
+        W.NodeOut(ftg=100, hc=2, cable=406, taps=tap(0), branches=[2]),
+        W.NodeOut(ftg=100, hc=4, cable=406, taps=tap(1))])
+    b2 = W.BranchOut(nodes=[W.NodeOut(ftg=100, hc=2, cable=406, taps=tap(0))],
+                     coupler_record=11, parent=(1, 2))
+    plain, ids = W.build(W.blank(), [b1, b2], name="S3", spec="WV750-2026", fresh=True)
+    # ids: the line and end line the network started with, then as keyed
+    assert ids == {"nodes": [[127999, 127997, 127996], [127994]], "ends": [127998, 127995]}
+    assert struct.unpack_from("<I", plain, W.P_NEXT_ID)[0] == 127993
+    net = N.read_network(plain)
+    first = net.branches[1].nodes[0]
+    # a Ripple not yet named stays on the short record, pads (3, 0, 0)
+    assert plain[first.offset + N.N_HAS_ACTIVE] == 0
+    assert plain[first.offset + N.N_PADS:first.offset + N.N_PADS + 12] == b"\x03\x00\x00" * 4
+    raw = W.split(plain)
+    # branch 2's head: a keyed line's, pads (0, 0, 0)
+    assert raw.branches[1].head[108:120] == bytes(12)
+    # Prices, Performance, Map Grid: Untitled over the set's name
+    for k in (5, 6, 7):
+        at = W.P_SPECS[1] + 261 * k
+        assert plain[at:at + 11] == b"Untitled\x006\x00"
+    assert len(plain) == 56715

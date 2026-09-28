@@ -366,7 +366,8 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path | None,
     for number, nb in net.branches.items():
         pb, pn = nb.parent
         if nb.tap_port and pb in design.branches and 0 < pn <= len(design.branches[pb].nodes):
-            design.branches[pb].nodes[pn - 1].drops.append(number)
+            design.branches[pb].nodes[pn - 1].couplers.append(
+                CouplerPlacement(branch=number, removed=True))
     return design, report
 
 
