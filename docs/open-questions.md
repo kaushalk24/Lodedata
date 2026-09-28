@@ -254,8 +254,11 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     * Project Settings on startup ("Show on startup") and the "Errors
       Loading Project" box after its OK: both copied from recording 1.
 
+    * A new network written with blank licence and user fields (NEW_T1)
+      opens in Lode Data: it names the spec set it needs and nothing else.
+      So a network keyed from scratch saves with no .ntw opened first.
+
     Still to confirm:
-    * a new network's header with blank licence and user fields;
     * without a spec set, an active shows its index + 48 (AL004's 70 at 1.1);
       AL00416 at 4.13 would then read 61, and taps are not drawn;
     * deleting a line that carries a coupler;
