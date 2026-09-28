@@ -37,9 +37,21 @@ export function renderScreen(inst) {
   inst.el.innerHTML = String(inst.def.render(inst.p, inst));
   const sc = inst.el.querySelector('.scroll');
   if (sc && top) sc.scrollTop = top;
+  watchScroll(inst.el, sc);
   hydrateCharts(inst.el);
   inst.def.mount?.(inst.el, inst.p, inst);
   inst.dirty = false;
+}
+
+/** Hairline under the header once content scrolls; a collapsed large title fades into the header. */
+function watchScroll(host, sc) {
+  if (!sc) return;
+  const update = () => {
+    host.classList.toggle('scrolled', sc.scrollTop > 4);
+    host.classList.toggle('title-in', sc.scrollTop > 40);
+  };
+  sc.addEventListener('scroll', update, { passive: true });
+  update();
 }
 
 export function initNav() {
@@ -148,6 +160,7 @@ export function openSheet(def, p = {}) {
   inst.rerender = () => renderSheet(inst);
   document.getElementById('sheets').appendChild(wrap);
   sheets.push(inst);
+  syncStacked();
   renderSheet(inst);
   requestAnimationFrame(() => requestAnimationFrame(() => wrap.classList.add('open')));
   wireSheetDrag(inst);
@@ -158,6 +171,7 @@ export function renderSheet(inst) {
   const top = sc ? sc.scrollTop : 0;
   inst.panel.innerHTML = String(inst.def.render(inst.p, inst));
   const sc2 = inst.panel.querySelector('.scroll'); if (sc2 && top) sc2.scrollTop = top;
+  watchScroll(inst.panel, sc2);
   hydrateCharts(inst.panel);
   inst.def.mount?.(inst.panel, inst.p, inst);
 }
@@ -165,6 +179,7 @@ export function closeSheet(inst, value) {
   const i = sheets.indexOf(inst);
   if (i < 0) return;
   sheets.splice(i, 1);
+  syncStacked();
   inst.el.classList.remove('open');
   inst.el.classList.add('closing');
   if (document.activeElement && inst.el.contains(document.activeElement)) document.activeElement.blur();
@@ -172,6 +187,11 @@ export function closeSheet(inst, value) {
   inst.def.onClose?.(inst.p, value, inst);
 }
 export const topSheet = () => sheets[sheets.length - 1];
+
+/** Full-height sheets push the app back like an iOS card stack. */
+function syncStacked() {
+  document.getElementById('app')?.classList.toggle('stacked', sheets.some(s => / tall /.test(` ${s.def.cls || ''} `)));
+}
 
 function wireSheetDrag(inst) {
   let y0 = null, dy = 0;
@@ -302,12 +322,12 @@ export function wireEvents() {
 }
 
 /* ---------- shared bits of markup ---------- */
-export const header = ({ title = '', left = '', right = '', large = false } = {}) => html`
-  <header class="bar ${large ? 'large' : ''}">
-    <div class="bar-side">${left}</div><h1 class="bar-title">${title}</h1><div class="bar-side right">${right}</div>
+export const header = ({ title = '', left = '', right = '', collapse = false } = {}) => html`
+  <header class="bar">
+    <div class="bar-side">${left}</div><h1 class="bar-title ${collapse ? 'collapse' : ''}">${title}</h1><div class="bar-side right">${right}</div>
   </header>`;
 export const backBtn = () => html`<button type="button" class="circle" data-a="back" aria-label="Back">${icon('chevronLeft')}</button>`;
 export const circle = (a, name, label, extra = '') => html`<button type="button" class="circle ${extra}" data-a="${a}" aria-label="${label}">${icon(name)}</button>`;
 export const toggle = (a, on, extra = '') => html`<button type="button" class="switch ${on ? 'on' : ''}" role="switch" aria-checked="${on ? 'true' : 'false'}" data-a="${a}" ${raw(extra)}><i></i></button>`;
-export const emptyState = (title, body, actions = '') => html`<div class="empty"><h3>${title}</h3><p>${body}</p>${actions}</div>`;
+export const emptyState = (title, body, actions = '', ic = null) => html`<div class="empty">${ic ? html`<span class="empty-icon">${icon(ic)}</span>` : ''}<h3>${title}</h3><p>${body}</p>${actions}</div>`;
 export { esc };

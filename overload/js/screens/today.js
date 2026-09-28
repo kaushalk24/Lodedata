@@ -46,7 +46,7 @@ registerScreen('today', {
           ${stat('Exercises', d.sum.exercises, 'var(--ex)', 'sets')}${stat('Volume', d.sum.volume ? `${fmtW(d.sum.volume, u)} ${u}` : '0', 'var(--vol)', 'volume')}
           ${stat('Duration', dur ? html`${fmtDuration(dur)}${d.strength ? '' : html`<small class="auto">auto</small>`}` : '--', 'var(--text)', 'sets')}
           ${stat('Avg Rest', d.sum.avgRest ? fmtDuration(d.sum.avgRest) : '--', 'var(--orange)', 'sets')}
-          ${stat('Session Time', fmtClock(d.sessionSec), 'var(--text-2)', 'sessions')}
+          ${stat('Session Time', d.sessionSec ? fmtClock(d.sessionSec) : '--', 'var(--text-2)', 'sessions')}
           ${stat('PRs', html`${icon('trophy')} ${d.sum.prs}`, 'var(--gold)', 'prs')}
         </div>
         ${d.sets.length ? html`<h3 class="section-title">Set Details</h3>
@@ -55,7 +55,7 @@ registerScreen('today', {
             ${collapseSets(sets).map(g => html`<span>${g.count > 1 ? `${g.count} sets: ` : ''}${fmtReps(g.reps)} rep ${g.bw ? `BW${g.weight ? ` +${fmtW(g.weight, u)}` : ''}` : `${fmtW(g.weight, u)} ${u}`}</span>`)}
             ${sets.some(s => d.prIds.has(s.id)) ? html`<span class="gold">${icon('trophy')} Record</span>` : ''}</button>`; })}</div>`
         : emptyState(isToday ? 'Nothing logged yet today' : 'Rest day', isToday ? 'Open a workout and log your first set. Stats fill in as you go.' : 'No sets were logged on this day.',
-          isToday ? html`<button class="btn accent" data-a="go-sets">Open My Workouts</button>` : '')}
+          isToday ? html`<button class="btn accent" data-a="go-sets">Open My Workouts</button>` : '', isToday ? 'tabToday' : 'moon')}
       </div></div>`;
   },
   actions: {

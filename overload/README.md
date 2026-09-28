@@ -11,8 +11,9 @@ rebuilt to run on your phone. No account, no subscription, no server.
 - **Body**: recovery map, weekly sets per muscle, bodyweight log.
 - **Today**: week strip, day stats, set details, calendar and a share card.
 
-See [docs/01-setgraph-teardown.md](docs/01-setgraph-teardown.md) for the screen-by-screen analysis and
-[docs/02-improvements.md](docs/02-improvements.md) for what was improved and why.
+See [docs/01-setgraph-teardown.md](docs/01-setgraph-teardown.md) for the screen-by-screen analysis,
+[docs/02-improvements.md](docs/02-improvements.md) for what was improved and why, and
+[docs/03-roadmap.md](docs/03-roadmap.md) for planned features and optional AI.
 
 ## Run it
 

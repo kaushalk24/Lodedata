@@ -37,8 +37,8 @@ registerScreen('sessions', {
       ${actIcon(s.activity)}<span class="row-main"><span class="row-title">${s.activity}</span><span class="row-sub">${fmtTime(s.start)} – ${fmtTime(s.end)}</span></span>
       <b class="sess-time" style="color:${(ACTIVITIES[s.activity] || ACTIVITIES.Other)[1]}">${fmtClock((s.end - s.start) / 1000)}</b></button>`;
     return html`${header({
-      left: html`<button class="pill-btn" data-a="range">Duration</button>`, title: 'Sessions',
-      right: html`<button class="pill-btn" data-a="style">Style</button>`,
+      left: html`<button class="pill-btn range-btn" data-a="range" aria-label="Change period">${RANGES[range]}${icon('updown')}</button>`, title: 'Sessions',
+      right: html`<button type="button" class="circle" data-a="style" aria-label="${style === 'cards' ? 'Show as list' : 'Show as cards'}">${icon(style === 'cards' ? 'list' : 'grid')}</button>`,
     })}
       <div class="scroll"><div class="content">
         <div class="chips scroll-x">${['All', ...acts].map(a => html`<button class="chip ${p.filter === a ? 'on accent' : ''}" data-a="filter" data-v="${a}">${a}</button>`)}</div>
@@ -47,7 +47,7 @@ registerScreen('sessions', {
         ${done.length ? html`<div class="total-line"><span class="muted">${RANGES[range]}</span><b>${fmtDuration(total)}</b><span class="muted">${inRange.length} session${inRange.length === 1 ? '' : 's'}</span></div>
           ${days.map(d => html`<div class="day-head static">${dayHeader(d.ts)}</div><div class="${style === 'cards' ? 'sess-grid' : 'card list'}">${d.items.map(card)}</div>`)}`
         : running ? '' : html`<div class="ghost-cards">${['Strength Training', 'Tennis', 'Stair Climbing'].map((a, i) => html`<div class="sess-card ghost">${actIcon(a)}<span class="row-main"><span class="row-title">${a}</span></span><b class="sess-time" style="color:${ACTIVITIES[a][1]}">${['00:29', '01:31', '00:10'][i]}</b></div>`)}</div>
-          ${emptyState('No Sessions', 'Add sessions to track the duration of your activities. Starting one while you lift also fills in Duration on the Today tab.')}`}
+          ${emptyState('No Sessions', 'Add sessions to track the duration of your activities. Starting one while you lift also fills in Duration on the Today tab.', '', 'timer')}`}
       </div></div>
       <div class="dock sessions-dock">
         <button class="act-pick" data-a="pick-activity">${icon((ACTIVITIES[p.activity] || ACTIVITIES.Other)[0])}<span>${running ? running.activity : p.activity}</span>${icon('updown')}</button>

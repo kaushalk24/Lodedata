@@ -17,7 +17,7 @@ going wrong. Everything here is free, with no account, subscription or AI servic
 | ✅ | **Recent-note chips** under *Add note*. | The same notes ("Drop set", "Standing") are typed again and again. |
 | ✅ | **Drop Set label** added next to Warm-Up, AMRAP, Failure. | "Drop set" and "Standing drop set" are typed as notes. |
 | ✅ | **Visual plate calculator**: tap plates to load the bar, see both sleeves, and get per-side plates from any weight. Uses the gym's actual plate counts. | Setgraph has a plates keyboard but no picture of the bar. |
-| ✅ | **Repeat last set** in one tap (the stack button next to +), with Undo. | The most common log is "same as last set". |
+| ✅ | **Repeat last set** in one tap (the pill next to + shows exactly what it will log), with Undo. | The most common log is "same as last set". |
 | ✅ | **Rest timer upgrades**: +30 s, per-exercise rest (squats 3:00, curls 1:30), a sound and vibration when rest ends, then a green *Go!* with overtime. Tapping the bar jumps back to the exercise. | Real average rest was 5m 22s against a 2:45 default, so one default doesn't fit every lift. |
 | ✅ | **Backdate a set** from the *Now* chip. | "Did machine press warm yo don't know weight and rep" shows sets get logged after the fact. |
 | ✅ | **Done-today ticks** and *Last: 8 × 25 kg · 3 sets* under each exercise in a workout folder. | At the gym the question is "what's left, and what did I lift last time?" |
@@ -53,6 +53,8 @@ going wrong. Everything here is free, with no account, subscription or AI servic
 | ✅ | **PWA**: add to Home Screen, full screen, works offline, keeps the screen awake (Notepad Mode). | No App Store, and no $99/year Apple developer fee just to run your own app. |
 
 ## Next steps, in order of value
+
+The full plan, including optional AI features, is in [03-roadmap.md](03-roadmap.md).
 
 1. ◻️ **Supersets**: link 2–3 exercises so saving one opens the next, and rest starts after the last.
 2. ◻️ **RPE / reps in reserve** as an optional chip, feeding smarter targets.

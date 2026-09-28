@@ -1,5 +1,5 @@
 /* Sets tab root: My Workouts, templates, plan designer, streak. */
-import { html, dayKey, fmtLongDate, weekdayLetter } from '../util.js';
+import { html, dayKey, fmtLongDate, weekdayLetter, relTime } from '../util.js';
 import { icon } from '../icons.js';
 import * as store from '../store.js';
 import { registerScreen, renderScreen, push, openSheet, toast, confirmDialog, header, circle, toggle } from '../ui.js';
@@ -25,14 +25,14 @@ registerScreen('home', {
       ${p.edit ? html`<button class="row-del" data-a="delete-workout" data-id="${w.id}" aria-label="Delete ${w.name}">${icon('minus')}</button>` : ''}
       <button class="row" data-a="${p.edit ? 'edit-workout' : 'open-workout'}" data-id="${w.id}">
         <span class="row-icon c-${w.color}">${icon('book')}</span>
-        <span class="row-main"><span class="row-title">${w.name}</span></span>
+        <span class="row-main"><span class="row-title">${w.name}</span>${p.edit ? '' : html`<span class="row-sub">${lastTrained(w)}</span>`}</span>
         ${p.edit ? html`<span class="reorder"><span data-a="move-workout" data-dir="-1" data-id="${w.id}" ${i === 0 ? 'hidden' : ''}>${icon('up')}</span><span data-a="move-workout" data-dir="1" data-id="${w.id}">${icon('down')}</span></span>`
         : html`<span class="row-meta">${w.exIds.length}</span><span class="chev">${icon('chevronRight')}</span>`}
       </button></div>`;
     const tip = TIPS[st.ui.tipIndex % TIPS.length];
     return html`
       ${header({
-        left: circle('settings', 'gear', 'Settings'),
+        left: circle('settings', 'gear', 'Settings'), title: 'My Workouts', collapse: true,
         right: html`<button class="circle ${streak.streak ? 'lit' : ''}" data-a="streak" aria-label="Streak">${icon('flame')}${streak.streak ? html`<small>${streak.streak}</small>` : ''}</button>
                     <button class="pill-btn" data-a="edit-toggle">${p.edit ? 'Done' : 'Edit'}</button>`,
       })}
@@ -58,7 +58,7 @@ registerScreen('home', {
         </div>` : ''}
         <button class="section-head" data-a="toggle-templates"><h3>Workout Templates</h3><span class="${st.ui.templatesCollapsed ? '' : 'flip'}">${icon('chevronDown')}</span></button>
         ${st.ui.templatesCollapsed ? '' : html`<div class="tpl-grid">${TEMPLATES.map(t => html`
-          <button class="tpl" data-a="template" data-id="${t.id}"><b>${t.name}</b><span>${t.exercises.join(', ')}</span></button>`)}</div>`}
+          <button class="tpl c-${t.color}" data-a="template" data-id="${t.id}"><span class="tpl-top"><i></i><small>${t.exercises.length} exercises</small></span><b>${t.name}</b><span>${t.exercises.join(', ')}</span></button>`)}</div>`}
         <button class="card tip" data-a="tips">
           <span class="eyebrow">Building your workouts</span>
           <span class="tip-row">${icon('note')}<span><b>${tip.title}</b><span>Explore common workout structures to build your personalized tracking setup.</span></span></span>
@@ -86,6 +86,14 @@ registerScreen('home', {
     'dismiss-reminder': () => store.setUi('reminderDismissed', dayKey(Date.now())),
   },
 });
+
+function lastTrained(w) {
+  const ts = Math.max(0, ...w.exIds.map(store.lastTs));
+  if (!w.exIds.length) return 'No exercises yet';
+  if (!ts) return 'Not trained yet';
+  const r = relTime(ts);
+  return r.includes('/') ? `Trained on ${r}` : `Trained ${r === 'Yesterday' ? 'yesterday' : r}`;
+}
 
 /* ---------- workout editor ---------- */
 export function workoutEditor(id = null) {

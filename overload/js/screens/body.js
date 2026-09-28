@@ -92,7 +92,7 @@ registerScreen('bodyweight', {
           <div class="card list">${[...list].reverse().map((b, i, a) => { const prev = a[i + 1]; const d = prev ? b.kg - prev.kg : 0; return html`
             <button class="row" data-a="entry" data-id="${b.id}"><span class="row-main">${fmtShortDate(b.ts)}</span>
             ${prev ? html`<span class="row-sub ${d > 0 ? 'up' : d < 0 ? 'down' : ''}">${d > 0 ? '+' : ''}${fmtW(d, u)}</span>` : ''}<span class="row-meta strong">${fmtW(b.kg, u)} ${u}</span></button>`; })}</div>`
-          : emptyState('No weigh-ins yet', 'Tap + to log your bodyweight. It also counts toward pull-ups, dips and other bodyweight sets.')}
+          : emptyState('No weigh-ins yet', 'Tap + to log your bodyweight. It also counts toward pull-ups, dips and other bodyweight sets.', '', 'scale')}
       </div></div>`;
   },
   actions: {

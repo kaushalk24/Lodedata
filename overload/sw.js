@@ -1,5 +1,5 @@
 /* Offline cache: serve the app shell from cache, refresh it in the background. */
-const CACHE = 'overload-v1';
+const CACHE = 'overload-v2';
 const ASSETS = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css', 'icons/icon.svg', 'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png',
   'js/app.js', 'js/util.js', 'js/stats.js', 'js/library.js', 'js/planner.js', 'js/store.js', 'js/dataio.js', 'js/icons.js',

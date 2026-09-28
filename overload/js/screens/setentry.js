@@ -1,11 +1,11 @@
 /* The set entry sheet: reps/weight with a custom keypad, steppers, label, plates, bodyweight,
  * unit, time and note. Prefilled from the last set so repeating a set is one tap. */
-import { html, fmtNum, fmtTime, fmtShortDate, daysBetween, toDisplay, fromDisplay, round, dayKey } from '../util.js';
+import { html, fmtNum, fmtTime, fmtShortDate, daysBetween, toDisplay, fromDisplay, round, dayKey, uid } from '../util.js';
 import { icon } from '../icons.js';
 import * as store from '../store.js';
 import { openSheet, toast, celebrate, confirmDialog } from '../ui.js';
 import { wouldBePR, suggestTarget, platesPerSide, groupByDay, weeklyStreak } from '../stats.js';
-import { LABELS, setText } from './common.js';
+import { LABELS, setText, freshSets } from './common.js';
 import { startRest } from '../timer.js';
 
 const trim = v => String(round(v, 2));
@@ -54,7 +54,8 @@ function fieldView(p, key) {
   const on = p.field === key;
   const val = p[key];
   const unitLabel = key === 'reps' ? 'rep' : p.bw ? (num(p.weight) ? `+${p.unit}` : `BW`) : p.unit;
-  return html`<button class="num-field ${key} ${on ? 'on' : ''} ${on && p.fresh && val !== '' ? 'fresh' : ''}" data-a="field" data-f="${key}">
+  const len = Math.min(6, String(val).length);
+  return html`<button class="num-field ${key} len-${len} ${on ? 'on' : ''} ${on && p.fresh && val !== '' ? 'fresh' : ''}" data-a="field" data-f="${key}">
     <span class="nv">${val === '' ? html`<span class="ph">0</span>` : val}</span><span class="nu">${unitLabel}</span></button>`;
 }
 
@@ -251,7 +252,9 @@ function save(p, inst) {
     return;
   }
   const before = store.allSets().filter(s => dayKey(s.ts) === dayKey(Date.now())).length;
-  const s = store.addSet({ exId: p.exId, ...data, ts: p.ts ?? Date.now() });
+  const id = uid(); freshSets.add(id);
+  const s = store.addSet({ id, exId: p.exId, ...data, ts: p.ts ?? Date.now() });
+  navigator.vibrate?.(15);
   inst.close();
   if (p.ts == null) startRest(p.exId);
   const st = store.settings();

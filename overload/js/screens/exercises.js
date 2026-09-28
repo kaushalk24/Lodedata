@@ -90,7 +90,7 @@ registerScreen('exercises', {
       <div class="scroll"><div class="content">
         ${p.searching ? html`<div class="results">${results(p)}</div>` : list.length
           ? html`<div class="card list">${list.map(e => exRow(e))}</div>`
-          : emptyState('No exercises yet', 'Search below to add from the library, or type any name to create your own.')}
+          : emptyState('No exercises yet', 'Search below to add from the library, or type any name to create your own.', '', 'books')}
       </div></div>
       ${searchDock(p, 'Search or add')}`;
   },
@@ -162,7 +162,7 @@ registerScreen('workout', {
         ${p.searching ? html`<div class="results">${results(p, { wid: w.id })}</div>` : html`
           ${w.desc ? html`<button class="card plan-note ${p.expand ? 'open' : ''}" data-a="expand">${icon('note')}<span>${w.desc}</span></button>` : ''}
           ${list.length ? html`<div class="card list">${list.map(e => exRow(e, { detail: true, now }))}</div>`
-            : emptyState('Empty workout', 'Tap “Add or remove” below to put exercises in this folder.')}`}
+            : emptyState('Empty workout', 'Tap “Add or remove” below to put exercises in this folder.', '', 'book')}`}
       </div></div>
       ${searchDock(p, 'Add or remove', { left: circle('edit-desc', 'note', 'Plan and notes'), right: circle('duplicate', 'copy', 'Duplicate workout') })}`;
   },

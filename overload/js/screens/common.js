@@ -11,6 +11,9 @@ export const LABELS = {
   pr: { name: 'PR Attempt', color: 'var(--gold)', badge: 'PR' },
 };
 
+/** Set ids just logged; the exercise screen highlights them once. */
+export const freshSets = new Set();
+
 export const COLORS = ['red', 'orange', 'yellow', 'green', 'pink', 'blue', 'purple', 'gray', 'multi'];
 
 export const unit = () => store.settings().unit;

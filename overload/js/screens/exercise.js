@@ -1,5 +1,5 @@
 /* Exercise detail: Sets history, Chart, 1RM and Records. */
-import { html, fmtW, fmtReps, fmtNum, fmtShortDate, fmtTime, dayHeader, dayKeyToTs, round, toDisplay } from '../util.js';
+import { html, fmtW, fmtReps, fmtNum, fmtShortDate, fmtTime, dayHeader, dayKeyToTs, round, toDisplay, uid } from '../util.js';
 import { icon } from '../icons.js';
 import * as store from '../store.js';
 import {
@@ -7,7 +7,7 @@ import {
 } from '../stats.js';
 import { lineChart } from '../chart.js';
 import { registerScreen, renderScreen, push, pop, openSheet, toast, choose, confirmDialog, promptDialog, header, backBtn, circle, toggle, emptyState } from '../ui.js';
-import { setRow, labelBadge, unit, setText } from './common.js';
+import { setRow, labelBadge, unit, setText, freshSets } from './common.js';
 import { openSetEntry } from './setentry.js';
 import { startRest } from '../timer.js';
 import { muscleEditor } from './body.js';
@@ -32,7 +32,9 @@ function deltaCell(label, value, d, color, fmt = v => fmtNum(v)) {
 function setsView(p, ex) {
   const sets = visibleSets(p);
   if (!sets.length) {
-    return html`${ex.note ? pinned(ex) : ''}${emptyState(p.gym || p.hideWarmups ? 'No sets match the filter' : 'No sets yet', 'Tap the green + to log your first set. The last set is remembered, so the next one is usually one tap.')}`;
+    return html`${ex.note ? pinned(ex) : ''}${p.gym || p.hideWarmups
+      ? emptyState('No sets match the filter', 'Change the filter to see the rest of your history.', '', 'filter')
+      : emptyState('No sets yet', 'Tap the green + to log your first set. Your last set is remembered, so the next one is usually a single tap.', '', 'tabSets')}`;
   }
   const bodyKg = store.bodyKg(), u = unit();
   const prs = prSetIds(store.setsFor(p.id), bodyKg);
@@ -40,12 +42,18 @@ function setsView(p, ex) {
   const cmp = compareToPrevious(sets, bodyKg);
   const gyms = store.getState().gyms;
   const multiGym = new Set(sets.map(s => s.gymId)).size > 1;
-  const gymName = id => multiGym ? gyms.find(g => g.id === id)?.name || '' : '';
+  const gymName = id => gyms.find(g => g.id === id)?.name || '';
+  // With several gyms, the day header names the gym once; a set only repeats it if it differs.
+  const dayGym = d => {
+    const n = {}; for (const s of d.sets) n[s.gymId] = (n[s.gymId] || 0) + 1;
+    return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0];
+  };
   const limit = p.limit || 40;
   return html`
     ${ex.note ? pinned(ex) : ''}
-    ${days.slice(0, limit).map((d, di) => html`
-      <button class="day-head" data-a="open-day" data-day="${d.key}">${dayHeader(d.ts)} ${icon('chevronRight')}</button>
+    ${days.slice(0, limit).map((d, di) => { const g = multiGym ? dayGym(d) : null; const sum = summarize(d.sets, bodyKg); return html`
+      <button class="day-head" data-a="open-day" data-day="${d.key}"><span class="dh-title">${dayHeader(d.ts)}${icon('chevronRight')}</span>
+        <span class="dh-meta">${sum.sets} set${sum.sets === 1 ? '' : 's'} · ${fmtW(sum.volume, u)} ${u}${g ? html` · <em>${gymName(g)}</em>` : ''}</span></button>
       <div class="card list sets">
         ${di === 0 && cmp ? html`<div class="compare">
           <div class="eyebrow">${icon('updown')} Compared to previous</div>
@@ -55,8 +63,8 @@ function setsView(p, ex) {
             ${deltaCell(`Volume (${u})`, fmtW(cmp.cur.volume, u), cmp.volume, 'var(--vol)', v => fmtW(v, u))}
             ${deltaCell(`${u}/rep`, fmtW(cmp.cur.perRep, u), cmp.perRep, 'var(--weight)', v => fmtW(v, u))}
           </div></div>` : ''}
-        ${d.sets.map((s, i) => setRow(s, i + 1, { pr: prs.has(s.id), gymName: gymName(s.gymId) }))}
-      </div>`)}
+        ${d.sets.map((s, i) => setRow(s, i + 1, { pr: prs.has(s.id), gymName: g && s.gymId !== g ? gymName(s.gymId) : '' }))}
+      </div>`; })}
     ${days.length > limit ? html`<button class="btn block" data-a="more">Show older sessions (${days.length - limit} more)</button>` : ''}`;
 }
 
@@ -66,7 +74,7 @@ function chartView(p) {
   const sets = visibleSets(p);
   const u = unit();
   const last = store.lastSet(p.id);
-  if (!last) return emptyState('Nothing to chart yet', 'Charts appear after your first sets.');
+  if (!last) return emptyState('Nothing to chart yet', 'Charts appear after your first sets.', '', 'chart');
   p.chartMode ??= 'sets'; p.chartRange ??= 'recent';
   let chart, extra = '';
   if (p.chartMode === 'sets') {
@@ -115,12 +123,12 @@ function oneRmView(p) {
       <div class="card pad onerm"><span class="muted">Estimated 1RM</span><b>${fmtW(best.value, u)} <small>${u}</small></b>
         <span class="muted small">From ${setText(best.set)} on ${fmtShortDate(best.set.ts)}</span></div>
       <div class="card list">${percentTable(best.value).map(r => html`<div class="row static pct"><span class="pct-p">${r.pct}%</span><span class="row-main">${fmtNum(round(toDisplay(r.weight, u), 1))} ${u}</span><span class="row-meta">~${r.reps} rep${r.reps === 1 ? '' : 's'}</span></div>`)}</div>`
-      : emptyState('No estimate yet', 'Log a working set of 15 reps or fewer.') : ''}`;
+      : emptyState('No estimate yet', 'Log a working set of 15 reps or fewer.', '', 'sun') : ''}`;
 }
 
 function recordsView(p) {
   const sets = store.setsFor(p.id), u = unit(), bodyKg = store.bodyKg();
-  if (!sets.length) return emptyState('No records yet', 'Records fill in as you log sets.');
+  if (!sets.length) return emptyState('No records yet', 'Records fill in as you log sets.', '', 'trophy');
   const b = bestEfforts(sets, bodyKg);
   const best1 = bestE1rm(sets, store.settings().formula, bodyKg);
   const row = (label, value, setId) => html`<button class="row" data-a="jump" data-id="${setId}"><span class="row-main muted">${label}</span><span class="row-meta strong">${value}</span><span class="chev">${icon('chevronRight')}</span></button>`;
@@ -150,9 +158,11 @@ registerScreen('exercise', {
       <nav class="viewbar">${VIEWS.map(([k, label, ic]) => html`<button class="vb ${k} ${p.view === k ? 'on' : ''}" data-a="view" data-v="${k}" aria-label="${label}">${icon(ic)}<span>${label}</span></button>`)}</nav>
       <div class="scroll with-viewbar"><div class="content">${body}</div></div>
       ${p.view === 'sets' ? html`<div class="fab-row"><button class="fab" data-a="log" aria-label="Log set">${icon('plus')}</button>
-        ${store.lastSet(p.id) ? html`<button class="fab-mini" data-a="repeat" aria-label="Repeat last set">${icon('layers')}</button>` : ''}</div>` : ''}`;
+        ${store.lastSet(p.id) ? html`<button class="repeat-pill" data-a="repeat" aria-label="Log the same set again">${icon('repeat')}<span>${setText(store.lastSet(p.id))}</span></button>` : ''}</div>` : ''}`;
   },
   mount(el, p) {
+    for (const id of freshSets) el.querySelector(`#set-${CSS.escape(id)}`)?.classList.add('new');
+    freshSets.clear();
     if (p.flash) {
       const row = el.querySelector(`#set-${CSS.escape(p.flash)}`);
       p.flash = null;
@@ -165,7 +175,9 @@ registerScreen('exercise', {
     'edit-set': el => openSetEntry({ setId: el.dataset.id }),
     repeat: (el, ev, p) => {
       const last = store.lastSet(p.id);
-      const s = store.addSet({ exId: p.id, reps: last.reps, weight: last.weight, bw: last.bw, label: last.label === 'warmup' ? null : last.label });
+      const id = uid(); freshSets.add(id);
+      const s = store.addSet({ id, exId: p.id, reps: last.reps, weight: last.weight, bw: last.bw, label: last.label === 'warmup' ? null : last.label });
+      navigator.vibrate?.(12);
       startRest(p.id);
       toast(`Logged ${setText(s)}`, { action: 'Undo', onAction: () => store.deleteSet(s.id), iconName: 'check' });
     },
