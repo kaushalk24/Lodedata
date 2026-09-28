@@ -853,3 +853,22 @@ def test_plus_on_the_power_stop_column_toggles_it(page):
     _key(page, "+", wait=1000)
     assert _row(page, 5, 1)["power_stop"]
     assert not page.errors
+
+
+def test_two_branches_at_a_line_delete_and_zero(page):
+    """AL004 4.14, 3-<11><12> (the user): Delete asks "Branches 11, 12, begin
+    at this node ... these branches"; 0 on the splitter takes it off both
+    branches, - <11> and - <12>, and keeps them."""
+    _open_al004(page)
+    _goto(page, 4, 14, "cplr0")
+    assert _row(page, 4, 14)["couplers"] == ["3-<11><12>"]
+    _key(page, "Delete")
+    assert page.inner_text(".msgbox .mbtext").replace("\n", " ") == (
+        "Branches 11, 12, begin at this node. Deleting this node will delete these branches "
+        "and all downstream nodes. Delete this node?")
+    page.click("#mbCancel")
+    page.wait_for_timeout(400)
+    _key(page, "0", "0", "Enter", wait=1200)
+    assert _row(page, 4, 14)["couplers"] == ["- <11>", "- <12>"]
+    assert page.evaluate("S.scr.branches.length") == 45
+    assert not page.errors

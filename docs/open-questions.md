@@ -270,6 +270,11 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       it (`- [55]`); 0 on a branch with nothing on it deletes it. A power
       stop shows `=` in Design; in Powering, + by it takes it off and puts
       it back. Done.
+    * Two branches at a line (AL004 4.14, 3-<11><12>): Delete asks
+      "Branches 11, 12, begin at this node. Deleting this node will delete
+      these branches and all downstream nodes." and takes both; 0 on the
+      splitter takes it off both, - <11>  - <12>, keeping them (the user).
+      Done, levels matching the user's screen from 4.13 to 4.20.
     * Typing a new coupler over one keeps its branch and everything on it:
       12 over AL004 4.26's 8[22] reads 12[22] (the user). Done.
     * S1 – S3 settled the layout of a network keyed from scratch
@@ -284,7 +289,6 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       Amp Name line in its box. Done.
 
     Still to confirm:
-    * the Delete Branch(es)? text when two branches begin at the line;
     * the old AL004's 11.16 and 11.18 drawn `- [43]`, `- [44]`;
     * 23481/23483 and the three pairs at 36121;
     * what Lode Data writes when it saves one of these files itself;

@@ -978,9 +978,13 @@ async function deleteNode() {
     try { d = JSON.parse(e.message).detail; } catch (_) { throw e; }
     if (d && d.error) { errorBox(d.error); return; }
     if (d && d.branches) {
+      // one branch: "Branch 54, begins ... this branch"; two: "Branches
+      // 11, 12, begin ... these branches" (AL004 4.14, the user)
+      const many = d.branches.length > 1;
       const which = d.branches.join(', ');
       modal(`<div class="msgbox"><div class="mbtitle">Delete Branch(es)?</div>
-        <div class="mbtext">Branch ${esc(which)}, begins at this node.<br>Deleting this node will delete this branch<br>` +
+        <div class="mbtext">${many ? 'Branches' : 'Branch'} ${esc(which)}, ${many ? 'begin' : 'begins'} at this node.<br>` +
+        `Deleting this node will delete ${many ? 'these branches' : 'this branch'}<br>` +
         `and all downstream nodes.<br>Delete this node?</div>
         <div class="row"><button id="mbOk">OK</button><button id="mbCancel">Cancel</button></div></div>`);
       $('#mbCancel').onclick = closeModal;

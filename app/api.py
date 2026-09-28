@@ -358,14 +358,21 @@ def set_coupler(nid: str, branch: int, node: int, body: CouplerEdit):
     if part is None:
         if body.slot < len(n.couplers):
             cp = n.couplers[body.slot]
-            if d.branch_is_empty(cp.branch):
-                # nothing on the branch: it goes, and its coupler with it
-                d.remove_branch(cp.branch)
-            else:
-                # lines on it: the program takes the coupler off and keeps
-                # the branch, "- [55]"; a second 0 leaves it so (the user's
-                # recording, AL002 53.5)
-                cp.part_id, cp.coupler_id, cp.removed = None, 0, True
+            # one splitter feeding both branches comes off both: AL004 4.14's
+            # 3-<11><12> becomes - <11>  - <12> (the user)
+            one = d.library.passives.get(cp.part_id) if cp.part_id else None
+            shared = (len(n.couplers) == 2 and one is not None
+                      and n.couplers[0].part_id == n.couplers[1].part_id
+                      and len(one.port_losses) > 2)
+            for c in (list(n.couplers) if shared else [cp]):
+                if d.branch_is_empty(c.branch):
+                    # nothing on the branch: it goes, and its coupler with it
+                    d.remove_branch(c.branch)
+                else:
+                    # lines on it: the program takes the coupler off and
+                    # keeps the branch, "- [55]"; a second 0 leaves it so
+                    # (the user's recording, AL002 53.5)
+                    c.part_id, c.coupler_id, c.removed = None, 0, True
             if all(c.removed for c in n.couplers):
                 n.through_leg = 0
         save(d)
