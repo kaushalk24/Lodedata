@@ -560,6 +560,74 @@ house counts, taps, couplers, both amplifiers and their names on branch 4;
 AL00416 (its info box); pads 4 and 14 on AL00416 (its info box says Fwd Pad 4,
 Ret Pad 14). The power stop field is confirmed on one design only.
 
+### 3.8 `.ntw` — everything a writer needs
+
+`tools/lodedata/writer.py` writes a design back over the file it came from.
+AL004 goes through it and comes back byte for byte, both from its own records
+and from the app's design model (`tests/test_ntw_writer.py`). Offsets below are
+from the start of the file, header included.
+
+**The whole file** is the header, a 44 295-byte preamble, then the branches
+to the end of the file. There is no trailer, checksum or length field.
+
+**Ids.** Every node, every branch's end line and every active or supply has
+a u32 id from one counter that counts down from 127 999. AL004 uses 127 649
+– 127 999. The next free id is at 41409 (127 648), and 41413 holds 127 999.
+Ids of deleted nodes are not reused. A node links to its neighbours by id:
++4 the previous node, or the branch number on a branch's first node; +8 the
+next node, or the end line's id on the last.
+
+**Branch head** (1966 bytes): laid out like a node record less its own id.
++0 is the id of the node carrying its coupler (0 on branch 1), +4 the first
+node's id, +8 the u16 node count and +10 four empty tap slots. +126 is the
+coupler record + 1 and +131 is 4 on the branch taking the through leg. Branch
+numbers are the file order, 1…n; no number is stored.
+
+**End** (48 bytes): 4 zero bytes, the end line's id, the last node's id, zeros.
+
+**Node record**, beyond 3.7:
+
+| offset | field |
+|---|---|
+| 14 + 21·k | tap slot: i32 row (−1 empty), u8 port code, then `ff ff 00` ×4 and 4 zeros on every slot |
+| 108 | u8 1 on a node carrying an in-line device Qn |
+| 112 + 3·k | (flag, value, 0): the pads/EQs. A node whose amplifier was taken away keeps them (9.20 holds 9.21's) |
+| 137 | u32 id of the active or supply placed here; 0 once it is taken away |
+| 718 | u32 the node's own id, in an extended record |
+| 726 | char[16] power supply label, NUL-terminated; the rest is left (18.1: `A\0004A`, once `AL004A`) |
+| 981 | char[16] amplifier name, the same way |
+| 1706 | u8 the house count again |
+| 1714 | 32 × u32: all 4 on every record that holds or has held an active |
+| 1842 | 32 × u32: 1 for each home, then 4 — on the lines where it is filled in (125 of 275), all 0 on the rest |
+
+An extended record (2504 bytes) is the same record with 534 zero bytes put in
+at +1706: the three tail fields move to 2240, 2248 and 2376. Taking the
+active away takes the block out again.
+
+**Preamble.** Parts are counted by where the part is. A part on an
+underground node counts as underground: the node's cable file index is odd.
+Rebuilt from nothing, these are the bytes Lode Data wrote:
+
+| offset | holds |
+|---|---|
+| 512 + 261·k | the five spec file names (MAX_PATH slots) |
+| 1817 | u32 feet aerial, underground (35 612, 1 354) |
+| 1825 | u32 feet per cable: [100 cable file index][10 series] |
+| 5825 | u32 homes aerial, underground; tap ports aerial, underground; homes again (162, 19, 300, 22, 162, 19) |
+| 5869 | four blocks of 2064 u16, each a histogram over the 28 actives (index 774 is the Ripple node) — **not decoded** |
+| 22377 + 4·i | (u16 aerial, u16 underground) actives of index i |
+| 23381 + 4·n | the same for in-line device Qn |
+| 23477, 23481 | 2, then 70 and 81 — **not decoded** |
+| 23513 + 16·row + 4·code | taps by tap-file row and port code |
+| 31705 + 4·code | taps by port code |
+| 31721 + 4·r | couplers by record + 1; a 3-way splitter feeding two branches counts once |
+| 35723, 36121 | more counts — **not decoded** |
+| 41401 | u16 41, u8 1, u8 1 (possibly where the cursor was), u32 branch count, the id counter |
+| 42366 + 261·k | the spec file names again, then three `Untitled` slots; 44542 the network name |
+
+The writer rewrites the decoded totals, the branch count and the id counter.
+Everything not decoded is left as the file had it.
+
 ---
 
 ## 4. Tooling in this repo

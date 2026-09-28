@@ -742,7 +742,8 @@ function hasSpecs() {
        + Object.keys(l.actives || {}).length + Object.keys(l.passives || {}).length > 0;
 }
 const libTable = t => Object.values((S.net && S.net.library[t]) || {});
-const pickCableById = n => libTable('cables')[n] || null;
+// a cable ID is series * 100 + the cable file index; the index names the cable
+const pickCableById = n => libTable('cables').find(c => c.cable_index === n % 100) || null;
 
 function modal(html) {
   $('#modalbox').innerHTML = html;
@@ -1104,8 +1105,8 @@ const MENU_ACTIONS = {
     ['Open', [['Network...', openNetwork], ['Lode Data network (.ntw)...', importNtw]]],
     ['Unload', [['Specs', NYI('Unload specs')]]],
     ['Save Specs', [['All', NYI('Save Specs')]]],
-    ['Save Network', () => msg('saved — every change is saved as it is made')],
-    ['Save Network As...', NYI('Save Network As')],
+    ['Save Network', () => saveNetwork(false)],
+    ['Save Network As...', () => saveNetwork(true)],
     '-',
     ['Project Settings...', projectSettings],
     '-',
@@ -1391,6 +1392,50 @@ function importNtw() {
     msg(`${r.network}: ${r.branches} branches, ${r.nodes} nodes read against ${r.spec_set}` +
         (r.unresolved.length ? ` — ${r.unresolved.length} unresolved: ${r.unresolved[0]}` : ''));
   };
+}
+
+// ---------------------------------------------------------------- saving
+// File > Save Network writes the network as a Lode Data .ntw, built over the
+// .ntw it was opened from.  The first save asks where to put it -- pick the
+// file it was opened from to overwrite it -- and later saves go to that same
+// file; Save Network As... always asks.  A browser with no file picker
+// downloads the file instead.
+const saveTo = {};                       // network id -> the file it saves to
+async function saveNetwork(as) {
+  if (!S.nid || !S.net) return;
+  const name = `${S.net.name || 'network'}.ntw`;
+  let handle = as ? null : saveTo[S.nid];
+  try {
+    if (!handle && window.showSaveFilePicker) {
+      // asked for first, while the menu click still counts as the user's
+      handle = await window.showSaveFilePicker({ suggestedName: name,
+        types: [{ description: 'Lode Data network', accept: { 'application/octet-stream': ['.ntw'] } }] });
+    }
+    await saveChain;                     // every edit keyed so far goes in
+    const r = await fetch(`/api/networks/${S.nid}/ntw`, { method: 'POST' });
+    if (!r.ok) {
+      let t = await r.text();
+      try { t = JSON.parse(t).detail || t; } catch (_) {}
+      msg(t); return;
+    }
+    const blob = await r.blob();
+    let skipped = [];
+    try { skipped = JSON.parse(r.headers.get('X-Not-Written') || '[]'); } catch (_) {}
+    let where = name;
+    if (handle) {
+      const w = await handle.createWritable();
+      await w.write(blob); await w.close();
+      saveTo[S.nid] = handle; where = handle.name;
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+    msg(`saved ${where}` + (skipped.length ? ` — ${skipped.length} not written: ${skipped[0]}` : ''));
+  } catch (e) {
+    if (e.name !== 'AbortError') msg(e.message);
+  }
 }
 
 // ---------------------------------------------------------------- lifecycle

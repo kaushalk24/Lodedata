@@ -63,12 +63,14 @@ B_COUPLER = 126              # coupler file record + 1, 0 = none yet
 B_THROUGH = 131              # non-zero: this branch takes the through leg
 
 PORTS_BY_CODE = {0: 2, 1: 4, 2: 6, 3: 8}
+TAP_CODES = {v: k for k, v in PORTS_BY_CODE.items()}
 
 
 @dataclass
 class NtwTap:
     row: int
     ports: int
+    slot: int = 0             # which of the four tap columns
 
 
 @dataclass
@@ -99,6 +101,7 @@ class NtwBranch:
     nodes: list = field(default_factory=list)
     parent: tuple = (0, 0)    # (branch, node) carrying its coupler
     offset: int = 0
+    end_id: int = 0           # the id of its end line (the last node's next)
 
 
 @dataclass
@@ -157,7 +160,7 @@ def _node(r: _Reader, p: int) -> NtwNode:
         s = p + N_TAPS + k * TAP_SLOT
         row = r.i32(s)
         if row >= 0:
-            n.taps.append(NtwTap(row=row, ports=PORTS_BY_CODE.get(r.u8(s + 4), 4)))
+            n.taps.append(NtwTap(row=row, ports=PORTS_BY_CODE.get(r.u8(s + 4), 4), slot=k))
     n.branches = [b for b in (r.u32(p + N_BRANCH_A), r.u32(p + N_BRANCH_B)) if b]
     n.power_stop = bool(r.u8(p + N_POWER_STOP))
     n.fixed = bool(r.u8(p + N_FIXED))
@@ -194,6 +197,7 @@ def read_network(plain: bytes) -> NtwNetwork:
             node = _node(r, p)
             branch.nodes.append(node)
             p += ACTIVE_NODE_RECORD if r.u8(p + N_HAS_ACTIVE) else NODE_RECORD
+        branch.end_id = r.u32(p + END_GAP)
         net.branches[branch.number] = branch
         number += 1
         b = p + END_GAP + END_RECORD

@@ -579,7 +579,7 @@ def _housings(design: Design, scr: Screen) -> None:
         if nd.amp:
             kind = _active_kind(lib.actives.get(nd.amp_part))
             n += pts["line_extender"] if kind == "line_extender" else pts["amplifier"]
-        n += sum(pts["tap_8_port"] if t.ports == 8 else pts["tap"] for t in nd.taps if t)
+        n += sum(pts["tap_8_port"] if t.ports == 8 else pts["tap"] for t in nd.taps if t.part_id)
         n += pts["coupler"] * len(nd.couplers)
         n += pts["power_supply"] if nd.supply_volts else 0
         return n

@@ -476,3 +476,95 @@ def test_double_clicking_a_coupler_enters_its_branch_and_show_tips_hides_the_box
     assert show_tips() == ""
     assert not page.evaluate("document.getElementById('info').hidden")
     assert not page.errors
+
+
+def _ntw_lines(data: bytes):
+    sys.path.insert(0, str(ROOT / "tools"))
+    from lodedata.obfuscation import deobfuscate
+    from lodedata.network import read_network
+    return read_network(data[:512] + deobfuscate(data[512:]))
+
+
+def test_save_network_writes_the_edited_ntw_to_the_chosen_file(page):
+    """File > Save Network asks where the first time, then writes there;
+    the file carries the edit and reads back as a Lode Data network."""
+    _open_al004(page)
+    page.evaluate("""() => {
+      window.__saved = [];
+      window.showSaveFilePicker = async (opts) => ({
+        name: opts.suggestedName,
+        createWritable: async () => { const parts = [];
+          return { write: async b => parts.push(new Uint8Array(await b.arrayBuffer())),
+                   close: async () => { let t = '';
+                     for (const b of parts[0]) t += String.fromCharCode(b);
+                     window.__saved.push(btoa(t)); } }; } });
+    }""")
+    _goto(page, 4, 1, "ftg")
+    _type(page, "0")
+    _type(page, "500")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(800)
+    page.click('.mi[data-menu="file"]')
+    page.wait_for_timeout(200)
+    page.click('.dropdown .di:has-text("Save Network"):not(:has-text("As"))')
+    page.wait_for_timeout(2000)
+    assert "saved AL004.ntw" in page.inner_text("#stMsg")
+    saved = page.evaluate("window.__saved")
+    assert len(saved) == 1
+    import base64
+    net = _ntw_lines(base64.b64decode(saved[0]))
+    assert net.branches[4].nodes[0].ftg == 500 and len(net.branches) == 45
+    assert not page.errors
+
+
+def test_save_network_as_downloads_without_a_file_picker(page):
+    """A browser with no file picker (Firefox) gets the .ntw as a download."""
+    _open_al004(page)
+    page.evaluate("delete window.showSaveFilePicker; window.showSaveFilePicker = undefined")
+    page.click('.mi[data-menu="file"]')
+    page.wait_for_timeout(200)
+    with page.expect_download() as info:
+        page.click('.dropdown .di:has-text("Save Network As")')
+    download = info.value
+    assert download.suggested_filename == "AL004.ntw"
+    data = Path(download.path()).read_bytes()
+    assert data == (SAMPLES / "AL004-WV750" / "AL004.ntw").read_bytes()
+    assert not page.errors
+
+
+def test_keying_a_cable_id_uses_that_cable(page):
+    """406 is series 4, cable file index 6 (EX TX10 700 A): its loss applies."""
+    _open_al004(page)
+    before = _row(page, 4, 2)
+    _goto(page, 4, 2, "cab")
+    _type(page, "0")
+    _type(page, "406")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1000)
+    after = _row(page, 4, 2)
+    assert after["cab"] == 406 and after["cab_name"] == "EX TX10 700 A"
+    assert after["levels"] != before["levels"]
+    assert "not in the spec set" not in page.inner_text("#stMsg")
+    assert not page.errors
+
+
+def test_clearing_and_retyping_a_coupler(page):
+    """0 on a coupler clears it and its branch; typing over one replaces it.
+    Either used to fail: the coupler was taken off the line twice."""
+    _open_al004(page)
+    _goto(page, 20, 17, "cplr0")
+    _type(page, "0")
+    _type(page, "0")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1000)
+    assert _row(page, 20, 17)["couplers"] == []
+    assert 44 not in page.evaluate("S.scr.branches.map(b => b.number)")
+    _goto(page, 4, 26, "cplr0")                   # 8[22]: type a DC-12 over it
+    _type(page, "0")
+    _type(page, "12")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1000)
+    cell = _row(page, 4, 26)["couplers"]
+    assert len(cell) == 1 and cell[0].startswith("12"), cell
+    assert 22 not in page.evaluate("S.scr.branches.map(b => b.number)")
+    assert not page.errors

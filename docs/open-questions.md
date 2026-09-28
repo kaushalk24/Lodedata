@@ -200,3 +200,31 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     byte with the 900 Series flag. Still to
     confirm: does Strand/Trench Types decide `<n>` for 5xx cable as it does
     for 1xx? (No AL004 branch runs on 5xx alone.)
+11. **Saving as .ntw — built, waiting on Lode Data.** File → Save Network
+    writes the network as a `.ntw`, built over the file it was opened from
+    (file-formats 3.8). The first save asks where to write; pick the opened
+    file to overwrite it. Later saves write there. Save Network As… always
+    asks. Without a file picker (Firefox) the file downloads. Unchanged, AL004
+    comes back byte for byte.
+
+    Seven files made through the app's API from AL004 are with the user, to
+    open in Lode Data:
+    * T1: 4.1 footage 500.
+    * T2: a 0-ft line inserted above 4.2.
+    * T3: a new 60-ft line after 4.4 with 2 homes and a `/17/`.
+    * T4: an LE 11 on 4.8, named AL00499.
+    * T5: a DC-8 on 4.9 feeding a new branch 46 of two lines.
+    * T6: 20.3 deleted.
+    * T7: 20.17's coupler cleared, so branch 44 goes and 45 becomes 44.
+
+    Still to learn from Lode Data itself:
+    * whether it opens them;
+    * what it writes when it saves them again;
+    * which new lines get their house list filled in (the writer fills it in);
+    * the four undecoded preamble blocks;
+    * whether it renumbers branches after one is deleted, as the file order
+      forces (the replica keeps its numbers until reopened);
+    * where TSG, Map, Loc, address and notes go (listed as not written);
+    * a new power supply's record;
+    * a network started in the app has no file to build on yet: a new empty
+      network saved from Lode Data would serve as one.

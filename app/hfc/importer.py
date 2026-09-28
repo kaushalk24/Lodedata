@@ -291,11 +291,11 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
                     library=lib, imported_from=f"{net.name}.ntw")
     for number, nb in sorted(net.branches.items()):
         pb, pn = nb.parent
-        br = Branch(number=number, parent_branch=pb, parent_node=pn)
+        br = Branch(number=number, parent_branch=pb, parent_node=pn, end_rec=nb.end_id)
         for i, nn in enumerate(nb.nodes, start=1):
             node = Node(seq=i, ftg=float(nn.ftg), hc=nn.hc, cab=nn.cable, lv=nn.lv,
                         power_stop=nn.power_stop, amp_label=nn.label, pads=list(nn.pads),
-                        fixed=nn.fixed)
+                        fixed=nn.fixed, rec=nn.id)
             if nn.inline:
                 q = inline.get(nn.inline)
                 node.inline = nn.inline
@@ -312,10 +312,15 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
                 miss(f"{number}.{i}: cable {nn.cable}")
             for t in nn.taps:
                 tap = taps.get((t.row, t.ports))
+                # a tap stays in its own column: an empty slot ahead of it
+                # is kept as an empty placement
+                while len(node.taps) < t.slot:
+                    node.taps.append(TapPlacement())
                 if tap:
                     node.taps.append(TapPlacement(part_id=tap.id, ports=tap.ports,
                                                   value_db=tap.tap_value_db))
                 else:
+                    node.taps.append(TapPlacement())
                     miss(f"{number}.{i}: tap row {t.row} ({t.ports}-port)")
             if nn.active_index:
                 act = actives.get(nn.active_index)

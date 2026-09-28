@@ -112,6 +112,16 @@ Power currents and volts match on all 29 lines of branch 4.
   "Enter desired tap {# of ports}.{ID #}: [home] for list", Home = Select
   Tap), `5` Test, `/` expanded display, Esc closes. Entry types directly.
 
+## Saving .ntw
+
+`tools/lodedata/writer.py` writes a design back over the `.ntw` it was opened
+from. `app/hfc/exporter.py` turns the app's design into the writer's input.
+`POST /api/networks/{id}/ntw` backs File → Save Network / Save Network As….
+The app keeps the opened file in the `ntw_files` table and the file ids on
+nodes (`Node.rec`) and branches (`Branch.end_rec`). AL004 comes back byte for
+byte, and the layout is in file-formats 3.8. Open question 11 lists what is
+still to be confirmed in Lode Data.
+
 ## Next step
 
 Questions 1–5, 8 and the Parameters file are closed; item 7's leftovers are

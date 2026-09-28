@@ -96,6 +96,7 @@ class Node:
     supply_label: str = ""      # its name, e.g. "A"
     supply_part: str | None = None
     power_stop: bool = False    # stops power in the span leading to this node
+    rec: int = 0                # its id in the .ntw it came from; 0 = not saved yet
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -122,17 +123,20 @@ class Branch:
     style: str = BRANCH_NORMAL
     label: str = ""
     nodes: list = field(default_factory=list)
+    end_rec: int = 0            # the id of its end line in the .ntw; 0 = not saved yet
 
     def to_dict(self) -> dict:
         return {"number": self.number, "parent_branch": self.parent_branch,
                 "parent_node": self.parent_node, "style": self.style,
-                "label": self.label, "nodes": [n.to_dict() for n in self.nodes]}
+                "label": self.label, "end_rec": self.end_rec,
+                "nodes": [n.to_dict() for n in self.nodes]}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Branch":
         b = cls(number=d.get("number", 1), parent_branch=d.get("parent_branch", 0),
                 parent_node=d.get("parent_node", 0),
-                style=d.get("style", BRANCH_NORMAL), label=d.get("label", ""))
+                style=d.get("style", BRANCH_NORMAL), label=d.get("label", ""),
+                end_rec=d.get("end_rec", 0))
         b.nodes = [Node.from_dict(n) for n in d.get("nodes") or []]
         return b
 

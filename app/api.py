@@ -24,6 +24,7 @@ from hfc.starter import starter_library
 from hfc.reports import level_report, bill_of_materials, powering_report, to_csv
 from hfc.importer import (library_from_spec_set, inspect_ntw, relink_library,
                           design_from_ntw)
+from hfc.exporter import export_ntw, ExportError
 
 WEB = Path(__file__).parent / "web"
 DB_PATH = Path(os.environ.get("LODEDATA_DB",
@@ -38,7 +39,26 @@ def db() -> sqlite3.Connection:
     con = sqlite3.connect(DB_PATH)
     con.execute("CREATE TABLE IF NOT EXISTS designs ("
                 "id TEXT PRIMARY KEY, name TEXT, updated TEXT, doc TEXT)")
+    # the .ntw a network was opened from, or last saved as: a save is built
+    # over it, so everything the program wrote that this app does not model
+    # is kept
+    con.execute("CREATE TABLE IF NOT EXISTS ntw_files (id TEXT PRIMARY KEY, data BLOB)")
     return con
+
+
+def ntw_file(design_id: str) -> bytes | None:
+    con = db()
+    row = con.execute("SELECT data FROM ntw_files WHERE id=?", (design_id,)).fetchone()
+    con.close()
+    return bytes(row[0]) if row else None
+
+
+def keep_ntw_file(design_id: str, data: bytes) -> None:
+    con = db()
+    con.execute("INSERT INTO ntw_files(id,data) VALUES(?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data", (design_id, data))
+    con.commit()
+    con.close()
 
 
 def load(design_id: str) -> Design:
@@ -97,6 +117,7 @@ def get_network(nid: str):
 def delete_network(nid: str):
     con = db()
     con.execute("DELETE FROM designs WHERE id=?", (nid,))
+    con.execute("DELETE FROM ntw_files WHERE id=?", (nid,))
     con.commit()
     con.close()
     return {"deleted": nid}
@@ -186,6 +207,11 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
         if f in ("clear_amp", "amp_code"):
             continue
         setattr(n, f, v)
+    if body.cab is not None and body.cab_part is None:
+        # the cable ID is series * 100 + the cable file index; the index
+        # names the cable, as when a .ntw is read
+        n.cab_part = next((c.id for c in d.library.cables.values()
+                           if c.cable_index == body.cab % 100), None)
     save(d)
     return n.to_dict()
 
@@ -308,17 +334,17 @@ def set_coupler(nid: str, branch: int, node: int, body: CouplerEdit):
 
     if part is None:
         if body.slot < len(n.couplers):
+            # removing the branch takes its coupler off this line too
             d.remove_branch(n.couplers[body.slot].branch)
-            n.couplers.pop(body.slot)
             if not n.couplers:
                 n.through_leg = 0
         save(d)
         return {"node": n.to_dict(), "placed": None}
 
     # re-typing over an existing coupler replaces it rather than stacking
+    # (removing its branch takes the old coupler off this line)
     if body.slot < len(n.couplers):
         d.remove_branch(n.couplers[body.slot].branch)
-        n.couplers.pop(body.slot)
     if len(n.couplers) >= 2:
         raise HTTPException(400, "a node can carry at most two couplers")
 
@@ -392,7 +418,8 @@ async def import_ntw(file: UploadFile = File(...),
     """
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / Path(file.filename).name
-        p.write_bytes(await file.read())
+        data = await file.read()
+        p.write_bytes(data)
         info = inspect_ntw(p)
         base = None
         for f in specs:
@@ -409,7 +436,33 @@ async def import_ntw(file: UploadFile = File(...),
             raise HTTPException(400, str(e))
     d.id = new_id("ntw")
     save(d)
+    keep_ntw_file(d.id, data)
     return {"imported": True, "id": d.id, "name": d.name, "report": report, **info}
+
+
+@app.post("/api/networks/{nid}/ntw")
+def save_ntw(nid: str):
+    """File > Save Network: the network as a Lode Data .ntw.
+
+    Built over the .ntw it was opened from (or last saved as), which then
+    becomes the file the next save builds on.  Anything the file cannot hold
+    yet is listed in the X-Not-Written header rather than dropped silently.
+    """
+    d = load(nid)
+    source = ntw_file(nid)
+    if source is None:
+        raise HTTPException(409, "this network was not opened from a .ntw file, and a "
+                                 "new network cannot be written as one yet")
+    try:
+        data, report = export_ntw(d, source)
+    except ExportError as e:
+        raise HTTPException(400, str(e))
+    save(d)
+    keep_ntw_file(nid, data)
+    name = (d.name or "network").replace('"', "")
+    return Response(content=data, media_type="application/octet-stream", headers={
+        "Content-Disposition": f'attachment; filename="{name}.ntw"',
+        "X-Not-Written": json.dumps(report["not_written"])})
 
 
 _REPORTS = {"levels": level_report, "bom": bill_of_materials,
