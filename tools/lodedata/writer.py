@@ -25,6 +25,7 @@ Every node, end line and active has an id, handed out counting down from
 from __future__ import annotations
 
 import struct
+from collections import Counter
 from dataclasses import dataclass, field
 
 from . import network as N
@@ -67,6 +68,29 @@ P_SPECS = (512, 42366)                  # twice, 5 x char[261]: the spec set it 
 P_BRANCHES = 41405                      # u32 number of branches
 P_NEXT_ID = 41409                       # u32 next free id, counting down
 P_FIRST_ID = 41413                      # u32 the id the count starts from (127999)
+P_CURSOR = 41425                        # u32 branch, u32 line (AL005: 12, 25; else 1, 1)
+FIRST_ID = 127999
+# More totals, checked against all five sample designs (AL002-AL005 and
+# AL004 as re-saved with WV750-2026): every value below is rebuilt exactly.
+P_PAD_TALLY = 5869          # 4 x 1032 (u16 aerial, u16 UG): the actives' forward
+PAD_TALLY_SIZE = 4128       # pad, return pad, forward EQ, return EQ, each at
+                            # +4 x (bank x 129 + value) -- the (bank, value)
+                            # the node record holds
+P_POWER_STOPS = 23477       # u32 power stops
+P_CONNECTORS = 35723        # u16 at +4 x cable index: a connector at each end of
+                            # a span (a line with footage) that meets a device
+P_HOUSINGS = 36141          # (u16 aerial, u16 UG) at +4 x housing number: the
+                            # Underground Housing each underground location takes
+HOUSING_SLOTS = range(1, 15)
+P_PARTS = 36201             # (u16 aerial, u16 UG) at +4 x k:
+PARTS_TAPS, PARTS_COUPLERS, PARTS_SPLITTERS, PARTS_INLINE = 0, 1, 2, 3
+PARTS_LINE_EXTENDERS, PARTS_AMPLIFIERS = 4, 5
+PARTS_ONE = 12              # 1 in every file, the empty one included
+PARTS_SUPPLIES = 56         # + power supply type
+SUPPLY_TYPES = range(0, 26)
+# Not decoded yet, left as the file has them (0 in an empty network):
+# 23481 and 23483 (AL004: 70, 81) and the three pairs at 36121 (AL004:
+# 58/1, 0/1, 28/4).
 
 
 def _u32(b, o):
@@ -158,6 +182,8 @@ class NodeOut:
     label: str | None = None     # Amplifier Definition name; None = leave it
     supply: str = ""             # power supply label, "" = none
     supply_type: int = 0         # -1 = as in the file
+    pad_banks: list | None = None  # the active's Pads/EQs banks less one (fwd pad,
+                                   # ret pad, fwd EQ, ret EQ); None = leave them
 
 
 @dataclass
@@ -167,6 +193,14 @@ class BranchOut:
     coupler_record: int = 0      # the coupler that starts it (file record + 1); -1 = as in the file
     through: bool = False        # takes the coupler's through leg
     parent: tuple = (0, 0)       # (branch number, node number) carrying its coupler
+
+
+@dataclass
+class SpecInfo:
+    """What the totals need from the spec set the network uses."""
+    line_extenders: set = field(default_factory=set)   # actives indices
+    points: dict = field(default_factory=dict)         # Parameters: equipment points
+    housings: list = field(default_factory=list)       # [(housing number, least points)]
 
 
 class WriteError(ValueError):
@@ -182,12 +216,57 @@ def _text_into(rec: bytearray, at: int, text: str, width: int = 16) -> None:
 def _new_node() -> bytearray:
     """A line as the program starts one: empty tap slots, and the house list
     filled in (1 per home, 4 for the rest) as on AL004's newest lines."""
+    rec = _untouched_line()
+    rec[N.N_PADS:N.N_PADS + 12] = bytes(12)
+    struct.pack_into("<32I", rec, TAIL_HOMES, *([4] * 32))
+    return rec
+
+
+def _untouched_line() -> bytearray:
+    """The one line of a new network, as the program saves it untouched:
+    empty tap slots, pads (255, 255, 0) x 4, no house list."""
     rec = bytearray(N.NODE_RECORD)
     for k in range(N.TAP_SLOTS):
         s = N.N_TAPS + k * N.TAP_SLOT
         rec[s:s + 17] = EMPTY_TAP + b"\xff\xff\x00" * 4
-    struct.pack_into("<32I", rec, TAIL_HOMES, *([4] * 32))
+    rec[N.N_PADS:N.N_PADS + 12] = b"\xff\xff\x00" * 4
     return rec
+
+
+HEADER_MAGIC = b"Lode Data Network File"
+HEADER_VERSION = b"Design 12.11"
+
+
+def blank(header: bytes | None = None) -> RawNetwork:
+    """An empty network as the program starts one and saves it (File > New,
+    nothing keyed: Untitled spec files, branch 1 with one line), rebuilt from
+    the program's own empty file byte for byte.  ``header`` is a .ntw header
+    to take the licence and user fields from; without one they are blank."""
+    if header is not None and len(header) == PAYLOAD_START:
+        head = bytearray(header)
+    else:
+        head = bytearray(PAYLOAD_START)
+        head[0:len(HEADER_MAGIC)] = HEADER_MAGIC
+        head[26], head[27] = 12, 1
+        head[28:28 + len(HEADER_VERSION)] = HEADER_VERSION
+        head[402] = 0xE2
+    pre = bytearray(PREAMBLE_END)
+    for base in P_SPECS:
+        for k in range(8 if base == P_SPECS[1] else 5):
+            _text_into(pre, base + 261 * k, "Untitled", width=261)
+    struct.pack_into("<HBB", pre, P_BRANCHES - 4, 41, 1, 1)
+    struct.pack_into("<III", pre, P_BRANCHES, 1, FIRST_ID - 2, FIRST_ID)
+    struct.pack_into("<IIB", pre, P_CURSOR, 1, 1, 1)
+    struct.pack_into("<H", pre, P_PARTS + 4 * PARTS_ONE, 1)
+    line = _untouched_line()
+    struct.pack_into("<III", line, 0, FIRST_ID, 1, FIRST_ID - 1)
+    branch_head = bytearray(N.BRANCH_RECORD)
+    branch_head[:N.BRANCH_RECORD] = line[4:4 + N.BRANCH_RECORD]
+    struct.pack_into("<IIH", branch_head, B_PARENT, 0, FIRST_ID, 1)
+    end = bytes(N.END_GAP) + struct.pack("<II", FIRST_ID - 1, FIRST_ID) + bytes(N.END_RECORD - 8)
+    return RawNetwork(header=bytes(head), preamble=bytes(pre[PAYLOAD_START:]),
+                      branches=[RawBranch(head=bytes(branch_head), nodes=[(FIRST_ID, bytes(line))],
+                                          end=end)])
 
 
 def _tail(extended: bool) -> int:
@@ -195,7 +274,8 @@ def _tail(extended: bool) -> int:
 
 
 def build(source: RawNetwork, branches: list, name: str | None = None,
-          spec: str | None = None, fresh: bool = False) -> tuple[bytes, dict]:
+          spec: str | None = None, fresh: bool = False,
+          info: SpecInfo | None = None) -> tuple[bytes, dict]:
     """Write ``branches`` (BranchOut, branch 1 first) over ``source``.
 
     ``name`` is the file name it is saved as, without .ntw.  The program
@@ -204,8 +284,10 @@ def build(source: RawNetwork, branches: list, name: str | None = None,
     ``spec`` is the spec set the network now uses (its base name): the file
     keeps it, and the program warns when a file is opened with another set.
     ``fresh`` writes a network that did not come from ``source`` (one keyed
-    in from scratch): only the file's layout is taken from it, every line is
-    new and the ids start again from the first.
+    in from scratch; ``source`` is then normally ``blank()``): only the
+    file's layout is taken from it, every line is new and the ids start
+    again from the first.  ``info`` is what the totals need from the spec
+    set; without it the totals that depend on it are left as they are.
 
     Returns the decoded file and the ids handed out: ``{"nodes": [[id per
     node] per branch], "ends": [end id per branch]}`` so the caller can keep
@@ -271,7 +353,11 @@ def build(source: RawNetwork, branches: list, name: str | None = None,
         out += head
 
         for i, nd in enumerate(br.nodes):
-            out += _node_record(nd, records.get(nd.rec) if ids[k][i] == nd.rec else None, ids[k][i],
+            src = records.get(nd.rec) if ids[k][i] == nd.rec else None
+            if fresh and k == 0 and i == 0:
+                # the network's first line is the one it started with
+                src = bytes(_untouched_line())
+            out += _node_record(nd, src, ids[k][i],
                                 prev=ids[k][i - 1] if i else k + 1,
                                 nxt=ids[k][i + 1] if i + 1 < len(br.nodes) else ends[k],
                                 take=take)
@@ -287,7 +373,14 @@ def build(source: RawNetwork, branches: list, name: str | None = None,
                 at = base + 261 * k
                 if _stored_name(out, at) != spec:
                     _text_into(out, at, spec, width=261)
-    _totals(out, _counts(outs_from_plain(join(source))), _counts(branches))
+    # counted from what was written: a tap or active the spec set in use
+    # cannot name is kept in its line, and still counts
+    _totals(out, _counts(outs_from_plain(join(source))), _counts(outs_from_plain(bytes(out))))
+    _more_totals(out, info)
+    cur_branch, cur_line = struct.unpack_from("<II", out, P_CURSOR)
+    if not (0 < cur_branch <= len(branches) and 0 < cur_line <= len(branches[cur_branch - 1].nodes)):
+        # where the program's cursor was, and it is no longer there
+        struct.pack_into("<II", out, P_CURSOR, 1, 1)
     return bytes(out), {"nodes": ids, "ends": ends}
 
 
@@ -301,7 +394,12 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
     extended = bool(rec[N.N_HAS_ACTIVE])
     keep_active = nd.active_index == -1 and src is not None
     has_active = bool(rec[N.N_AMP_INDEX]) and not rec[N_INLINE_FLAG] if keep_active else nd.active_index > 0
+    had_active = bool(rec[N.N_AMP_INDEX]) and not rec[N_INLINE_FLAG]
     want = bool(has_active or nd.supply)
+    if want and not extended and had_active and not nd.supply:
+        # AL002 holds 22 actives on the short record (no name, no object id):
+        # they stay as they are
+        want = False
     if want and not extended:
         # an active or a supply takes the longer record: the program's block
         # goes in ahead of the house list, and the active gets an id
@@ -341,8 +439,17 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
     if keep_active:
         pass
     elif nd.active_index > 0:
+        placed = rec[N.N_AMP_INDEX] != nd.active_index or rec[N_INLINE_FLAG]
         rec[N.N_AMP_INDEX] = rec[N.N_AMP_INDEX2] = nd.active_index & 0xFF
         rec[N_INLINE_FLAG] = 0
+        if nd.pad_banks is not None and placed:
+            # each pad and EQ is (the bank it comes from, its value, 0): AL004's
+            # Ripple node, banks 4, holds (3, 0, 0) four times
+            for k, bank in enumerate(nd.pad_banks[:4]):
+                rec[N.N_PADS + 3 * k] = bank & 0xFF
+                if placed and nd.pads is None:
+                    rec[N.N_PADS + 3 * k + 1] = 0
+                rec[N.N_PADS + 3 * k + 2] = 0
     elif nd.inline:
         rec[N.N_AMP_INDEX] = N.INLINE_BASE - nd.inline
         rec[N.N_AMP_INDEX2] = N.INLINE_BASE2 - nd.inline
@@ -364,7 +471,10 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
         if not rec[N.N_PS_NAME]:
             raise WriteError(f"line id {own}: a power supply placed here is not "
                              "written yet -- its record layout is still being checked")
-        _text_into(rec, N.N_PS_NAME, nd.supply)
+        if nd.supply != chr(rec[N.N_PS_NAME]):
+            # the program shows one letter; the old AL004 still holds
+            # "AL004A" behind its "A", so an unchanged label is left alone
+            _text_into(rec, N.N_PS_NAME, nd.supply)
         if nd.supply_type >= 0:
             rec[N.N_PS_TYPE] = nd.supply_type & 0xFF
     elif rec[N.N_PS_NAME]:
@@ -451,6 +561,117 @@ def _totals(out: bytearray, old: dict, new: dict) -> None:
                 continue
             a, u = new[name].get(key, (0, 0))
             struct.pack_into("<HH", out, at(key), a, u)
+
+
+def _groups(nodes: list) -> list:
+    """A branch's lines by location: a line with footage starts one, the
+    lines 0 ft after it are at the same place."""
+    out = []
+    for i, nd in enumerate(nodes):
+        if nd.ftg or not out:
+            out.append([])
+        out[-1].append(nd)
+    return out
+
+
+def _has_device(nd) -> bool:
+    return bool(nd.taps or nd.branches or nd.active_index or nd.inline or nd.supply)
+
+
+def tallies(plain, info: SpecInfo | None = None) -> dict:
+    """The totals below ``_totals``'s, rebuilt from a decoded file:
+    {offset: value}, u16 each but the power stops (u32).  The line
+    extender / amplifier split and the housings need ``info``."""
+    net = N.read_network(bytes(plain))
+    t = Counter()
+    ug = lambda nd: (nd.cable % 100) % 2          # noqa: E731
+    for br in net.branches.values():
+        for nd in br.nodes:
+            u = ug(nd)
+            if nd.power_stop:
+                t[P_POWER_STOPS] += 1
+            t[P_PARTS + 4 * PARTS_TAPS + 2 * u] += len(nd.taps)
+            if nd.branches:
+                recs = [net.branches[b].coupler_record for b in nd.branches if b in net.branches]
+                if len(recs) == 2 and recs[0] == recs[1]:
+                    t[P_PARTS + 4 * PARTS_SPLITTERS + 2 * u] += 1
+                else:
+                    t[P_PARTS + 4 * PARTS_COUPLERS + 2 * u] += len(recs)
+            if nd.inline:
+                t[P_PARTS + 4 * PARTS_INLINE + 2 * u] += 1
+            if nd.supply and nd.supply_type in SUPPLY_TYPES:
+                t[P_PARTS + 4 * (PARTS_SUPPLIES + nd.supply_type) + 2 * u] += 1
+            if nd.active_index:
+                if info is not None:
+                    kind = PARTS_LINE_EXTENDERS if nd.active_index in info.line_extenders else PARTS_AMPLIFIERS
+                    t[P_PARTS + 4 * kind + 2 * u] += 1
+                for k in range(4):
+                    bank = plain[nd.offset + N.N_PADS + 3 * k]
+                    value = struct.unpack_from("<b", plain, nd.offset + N.N_PADS + 3 * k + 1)[0]
+                    slot = bank * 129 + value
+                    if 0 <= slot < PAD_TALLY_SIZE // 4:
+                        t[P_PAD_TALLY + PAD_TALLY_SIZE * k + 4 * slot + 2 * u] += 1
+
+        # connectors: one at each end of a span that meets a device; a branch
+        # starts at its coupler, and one starting 0 ft on is still there
+        groups = _groups(br.nodes)
+
+        def device_at(g: int) -> bool:
+            if any(_has_device(nd) for nd in groups[g]):
+                return True
+            return g == 0 and br.number != 1 and not groups[0][0].ftg
+
+        for g, lines in enumerate(groups):
+            if not lines[0].ftg:
+                continue
+            ends = device_at(g) + (device_at(g - 1) if g else br.number != 1)
+            t[P_CONNECTORS + 4 * (lines[0].cable % 100)] += ends
+
+        if info is not None and info.points and info.housings:
+            pts = info.points
+            for lines in groups:
+                if not ug(lines[0]):
+                    continue
+                total = 0
+                for nd in lines:
+                    if nd.active_index:
+                        total += pts.get("line_extender" if nd.active_index in info.line_extenders
+                                         else "amplifier", 0)
+                    total += sum(pts.get("tap_8_port" if tp.ports == 8 else "tap", 0) for tp in nd.taps)
+                    if nd.branches:
+                        recs = [net.branches[b].coupler_record for b in nd.branches if b in net.branches]
+                        devices = 1 if len(recs) == 2 and recs[0] == recs[1] else len(recs)
+                        total += pts.get("coupler", 0) * devices
+                    if nd.inline:
+                        total += pts.get("equalizer", 0)
+                    if nd.supply:
+                        total += pts.get("power_supply", 0)
+                fits = [number for number, least in info.housings if total and least <= total]
+                if fits and fits[-1] in HOUSING_SLOTS:
+                    t[P_HOUSINGS + 4 * fits[-1] + 2] += 1
+    t[P_PARTS + 4 * PARTS_ONE] = 1
+    return t
+
+
+def _more_totals(out: bytearray, info: SpecInfo | None) -> None:
+    """Rewrite the totals ``tallies`` rebuilds; the rest is left."""
+    pairs = [PARTS_TAPS, PARTS_COUPLERS, PARTS_SPLITTERS, PARTS_INLINE, PARTS_ONE]
+    pairs += [PARTS_SUPPLIES + k for k in SUPPLY_TYPES]
+    if info is not None:
+        pairs += [PARTS_LINE_EXTENDERS, PARTS_AMPLIFIERS]
+    clear = [P_PARTS + 4 * k + h for k in pairs for h in (0, 2)]
+    clear += [P_CONNECTORS + 4 * k for k in range(100)]
+    clear += [P_PAD_TALLY + 2 * k for k in range(4 * PAD_TALLY_SIZE // 2)]
+    if info is not None and info.points and info.housings:
+        clear += [P_HOUSINGS + 4 * n + h for n in HOUSING_SLOTS for h in (0, 2)]
+    for at in clear:
+        struct.pack_into("<H", out, at, 0)
+    struct.pack_into("<I", out, P_POWER_STOPS, 0)
+    for at, value in tallies(out, info).items():
+        if at == P_POWER_STOPS:
+            struct.pack_into("<I", out, at, value)
+        else:
+            struct.pack_into("<H", out, at, min(value, 0xFFFF))
 
 
 def outs_from_plain(plain: bytes) -> list:

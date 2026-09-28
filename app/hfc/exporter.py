@@ -21,25 +21,32 @@ from lodedata.network import TAP_CODES                         # noqa: E402
 from lodedata.obfuscation import PAYLOAD_START, deobfuscate    # noqa: E402
 
 from .plant import Design, THROUGH_FIRST, THROUGH_SECOND       # noqa: E402
-from .screen import build, choose_pads_eqs                     # noqa: E402
+from .screen import _active_kind, build, choose_pads_eqs       # noqa: E402
 
 
 class ExportError(ValueError):
     pass
 
 
-def export_ntw(design: Design, source: bytes, name: str | None = None,
-               fresh: bool = False) -> tuple[bytes, dict]:
+def export_ntw(design: Design, source: bytes | None, name: str | None = None,
+               fresh: bool = False, header: bytes | None = None) -> tuple[bytes, dict]:
     """The design as a .ntw file, built over ``source`` (the .ntw it came
     from, as read from disk), to be saved as ``name``.ntw.  Returns the file
     and a report; the design's
     lines and branches are given the ids they now have in the file, so the
-    next save carries on from this one."""
-    plain = source[:PAYLOAD_START] + deobfuscate(source[PAYLOAD_START:])
-    try:
-        raw = W.split(plain)
-    except ValueError as e:
-        raise ExportError(f"the file this network was opened from cannot be read back: {e}")
+    next save carries on from this one.
+
+    ``fresh`` (a network keyed in from scratch, ``source`` None) writes it
+    as the program writes a new network: over its empty file, with the
+    licence and user fields of ``header`` when one is given."""
+    if source is None:
+        raw, fresh = W.blank(header), True
+    else:
+        plain = source[:PAYLOAD_START] + deobfuscate(source[PAYLOAD_START:])
+        try:
+            raw = W.split(plain)
+        except ValueError as e:
+            raise ExportError(f"the file this network was opened from cannot be read back: {e}")
     lib = design.library
     report = {"not_written": []}
 
@@ -67,11 +74,13 @@ def export_ntw(design: Design, source: bytes, name: str | None = None,
                     # an empty column ahead of a tap, or a tap the spec set
                     # could not name: the file keeps what it had there
                     taps.append(W.KEEP if n.rec else None)
-            active, pads = 0, None
+            active, pads, pad_banks = 0, None, None
             if n.amp:
                 part = lib.actives.get(n.amp_part) if n.amp_part else None
                 if part is not None and part.index > 0:
                     active = part.index
+                    if len(part.banks) == 4:
+                        pad_banks = [b - 1 for b in part.banks]
                     if n.pads:
                         pads = list(n.pads)
                     elif len(part.pad_eq) == 4 and not part.fibre_fed and (b, i) in rows:
@@ -81,6 +90,8 @@ def export_ntw(design: Design, source: bytes, name: str | None = None,
                     active = -1
                 else:
                     note(f"{where}: active {n.amp} is not in the spec set")
+            elif n.kept_active and n.rec:
+                active = -1
             supply, supply_type = "", 0
             if n.supply_label:
                 supply = n.supply_label
@@ -98,7 +109,7 @@ def export_ntw(design: Design, source: bytes, name: str | None = None,
                 taps=taps, branches=[number[c.branch] for c in n.couplers if c.branch in number],
                 active_index=active, inline=n.inline, pads=pads, fixed=n.fixed,
                 power_stop=n.power_stop, label=n.amp_label if (n.amp or n.rec) else None,
-                supply=supply, supply_type=supply_type))
+                supply=supply, supply_type=supply_type, pad_banks=pad_banks))
 
         coupler, through = 0, False
         if br.parent_branch in design.branches:
@@ -117,8 +128,17 @@ def export_ntw(design: Design, source: bytes, name: str | None = None,
             through=through,
             parent=(number.get(br.parent_branch, 0), br.parent_node) if b != numbers[0] else (0, 0)))
 
+    info = None
+    if lib.actives:
+        p = design.parameters
+        info = W.SpecInfo(
+            line_extenders={a.index for a in lib.actives.values()
+                            if a.index > 0 and _active_kind(a) == "line_extender"},
+            points=dict(p.equipment_points or {}),
+            housings=[tuple(h) for h in (p.housings or [])])
     try:
-        plain_out, ids = W.build(raw, outs, name=name, spec=lib.name or None, fresh=fresh)
+        plain_out, ids = W.build(raw, outs, name=name, spec=lib.name or None, fresh=fresh,
+                                 info=info)
     except W.WriteError as e:
         raise ExportError(str(e))
     for b, node_ids, end in zip(numbers, ids["nodes"], ids["ends"]):

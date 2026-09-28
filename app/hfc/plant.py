@@ -47,6 +47,8 @@ class TapPlacement:
     part_id: str | None = None
     ports: int = 4
     value_db: float = 0.0
+    # a tap the spec set in use cannot name: its port count, from the file
+    file_ports: int = 0
 
 
 @dataclass
@@ -97,6 +99,12 @@ class Node:
     supply_part: str | None = None
     power_stop: bool = False    # stops power in the span leading to this node
     rec: int = 0                # its id in the .ntw it came from; 0 = not saved yet
+    # branches hanging from this line that no coupler starts (the old AL004's
+    # 43 and 44, off the taps at 11.16 and 11.18): kept, not drawn yet
+    drops: list = field(default_factory=list)
+    # the file's actives index here, when the spec set in use has no such
+    # active: written back as it was (AL005's index 14 against WV750)
+    kept_active: int = 0
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -209,6 +217,7 @@ class Design:
         for b in self.branches.values():
             for node in b.nodes:
                 node.couplers = [c for c in node.couplers if c.branch not in gone]
+                node.drops = [x for x in node.drops if x not in gone]
         self.close_up()
         return gone
 
@@ -226,6 +235,7 @@ class Design:
             for node in b.nodes:
                 for c in node.couplers:
                     c.branch = new.get(c.branch, c.branch)
+                node.drops = [new.get(x, x) for x in node.drops]
             branches[b.number] = b
         self.branches = branches
 
@@ -240,6 +250,10 @@ class Design:
             # an inserted or deleted line has moved that node to
             for c in node.couplers:
                 child = self.branches.get(c.branch)
+                if child is not None:
+                    child.parent_node = i
+            for x in node.drops:
+                child = self.branches.get(x)
                 if child is not None:
                     child.parent_node = i
 

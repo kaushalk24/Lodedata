@@ -50,6 +50,10 @@ class Row:
     amp_label: str = ""
     taps: list = field(default_factory=list)       # rendered strings, e.g. "[26]"
     tap_severity: list = field(default_factory=list)  # "", "yellow" or "red" per tap
+    # "red" when the homes passed are more than the ports of the line's taps
+    # together (3 homes on a 2-port tap, or on no tap); a 4- or 8-port tap
+    # takes it back to green (the user, recording 2's 2.2)
+    hc_severity: str = ""
     tap_levels: list = field(default_factory=list)    # each tap's port levels, per frequency
     power_stop: bool = False
     end: bool = False           # the line under a branch's last node
@@ -98,7 +102,8 @@ class Row:
             "amp": self.amp, "amp_name": self.amp_name, "fixed": self.fixed,
             "amp_label": self.amp_label,
             "taps": self.taps, "tap_ports": self.tap_ports, "couplers": self.couplers,
-            "tap_severity": self.tap_severity, "end": self.end,
+            "tap_severity": self.tap_severity, "hc_severity": self.hc_severity,
+            "end": self.end,
             "tap_port_severity": self.tap_port_severity,
             "out_levels": [as_shown(self.out_levels[f]) for f in self.freq_order]
                           if self.out_levels else [],
@@ -209,6 +214,10 @@ def build(design: Design) -> Screen:
                       lv=node.lv, tsg=node.tsg, amp=node.amp, fixed=node.fixed,
                       power_stop=node.power_stop,
                       amp_label=node.amp_label, supply=node.supply_volts)
+            ports = sum(lib.taps[s.part_id].ports if s.part_id in lib.taps else s.file_ports
+                        for s in node.taps)
+            if node.hc > ports:
+                row.hc_severity = "red"
             cable = lib.cables.get(node.cab_part)
             row.cab_name = cable.name if cable else ""
             cum_ft += node.ftg

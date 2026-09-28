@@ -46,7 +46,7 @@ def db() -> sqlite3.Connection:
     return con
 
 
-LAYOUT_FILE = "__layout__"      # the last .ntw opened: a new network is written in its layout
+LAYOUT_FILE = "__layout__"      # the last .ntw opened: a new network takes its header
 
 
 def ntw_file(design_id: str) -> bytes | None:
@@ -194,8 +194,9 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
     n = _node(d, branch, node)
     if body.clear_amp:
         n.amp, n.amp_part, n.amp_label = "", None, ""
-        n.pads = []
+        n.pads, n.kept_active = [], 0
     if body.amp_code is not None:
+        n.kept_active = 0
         # a newly placed amplifier's pads and EQs are the program's pick
         n.pads = []
         try:
@@ -441,7 +442,7 @@ async def import_ntw(file: UploadFile = File(...),
     d.id = new_id("ntw")
     save(d)
     keep_ntw_file(d.id, data)
-    # the layout a network keyed in from scratch is written in
+    # the header a network keyed in from scratch is written with
     keep_ntw_file(LAYOUT_FILE, data)
     return {"imported": True, "id": d.id, "name": d.name, "report": report, **info}
 
@@ -458,15 +459,15 @@ def save_ntw(nid: str, filename: str | None = None):
     """
     d = load(nid)
     stem = Path(filename).stem if filename else None
-    source, fresh = ntw_file(nid), False
+    source = ntw_file(nid)
+    header = None
     if source is None:
-        # keyed in from scratch: written in the layout of the last .ntw opened
-        source, fresh = ntw_file(LAYOUT_FILE), True
-        if source is None:
-            raise HTTPException(409, "open any Lode Data .ntw here once first: a new "
-                                     "network is written in the layout of one")
+        # keyed in from scratch: written as the program writes a new network,
+        # with the licence and user fields of the last .ntw opened here
+        layout = ntw_file(LAYOUT_FILE)
+        header = layout[:512] if layout else None
     try:
-        data, report = export_ntw(d, source, name=stem or d.name, fresh=fresh)
+        data, report = export_ntw(d, source, name=stem or d.name, header=header)
     except ExportError as e:
         raise HTTPException(400, str(e))
     if stem:

@@ -75,6 +75,7 @@ def links_ok(data: bytes) -> N.NtwNetwork:
     # the totals are what the network holds
     rebuilt = bytearray(p)
     W._totals(rebuilt, W._counts(W.outs_from_plain(p)), W._counts(W.outs_from_plain(p)))
+    W._more_totals(rebuilt, None)
     assert bytes(rebuilt) == p
     return net
 
@@ -291,7 +292,41 @@ def _keyed_from_scratch():
     return d
 
 
-def test_a_network_keyed_from_scratch_is_written_in_the_layout_of_another():
+def test_an_empty_network_is_the_programs_own_empty_file():
+    """File > New saved untouched (the user's BLANK test, checked byte for
+    byte outside this test): one branch, one line, Untitled spec files."""
+    p = W.join(W.blank())
+    assert len(p) == 48791
+    net = N.read_network(p)
+    assert [len(b.nodes) for b in net.branches.values()] == [1]
+    assert net.branches[1].nodes[0].id == 127999 and net.branches[1].end_id == 127998
+    assert struct.unpack_from("<III", p, W.P_BRANCHES) == (1, 127997, 127999)
+    assert net.saved_with == ["Untitled"] * 8
+    assert p[:22] == b"Lode Data Network File" and p[129:161] == bytes(32)
+    # and writing it back changes nothing
+    out, _ = W.build(W.blank(), W.outs_from_plain(p), fresh=True)
+    assert out == p
+
+
+def test_every_total_the_file_keeps_is_rebuilt():
+    """Pads/EQs by bank and value, power stops, connectors by cable,
+    underground housings, and taps, couplers, splitters, in-line devices,
+    line extenders, amplifiers and supplies: AL004's exactly."""
+    d, src = fresh()
+    p = plain(src)
+    info = W.SpecInfo(
+        line_extenders={a.index for a in d.library.actives.values() if a.name.startswith("LE")},
+        points=d.parameters.equipment_points, housings=[tuple(h) for h in d.parameters.housings])
+    t = W.tallies(p, info)
+    assert t[W.P_POWER_STOPS] == 2
+    assert t[W.P_PARTS + 4 * W.PARTS_LINE_EXTENDERS] == 15 and t[W.P_PARTS + 4 * W.PARTS_AMPLIFIERS] == 12
+    assert t[W.P_HOUSINGS + 4 * 1 + 2] == 5 and t[W.P_HOUSINGS + 4 * 3 + 2] == 1
+    rebuilt = bytearray(p)
+    W._more_totals(rebuilt, info)
+    assert bytes(rebuilt) == p
+
+
+def test_a_network_keyed_from_scratch_is_written_as_a_new_network():
     d = _keyed_from_scratch()
     # Lode Data's own figures for it (recording 2)
     rows = {(r.branch, r.node, r.end): r for r in build(d).rows}
@@ -299,7 +334,7 @@ def test_a_network_keyed_from_scratch_is_written_in_the_layout_of_another():
     assert tuple(round(v, 2) for v in rows[(2, 2, False)].levels.values()) == (42.70, 36.25, 18.55, 17.80)
     assert tuple(round(v, 2) for v in rows[(2, 3, True)].levels.values()) == (41.60, 35.55, 19.25, 18.50)
     assert [round(v, 2) for v in rows[(2, 1, False)].tap_levels[0]] == [23.41, 14.45, 40.45, 38.29]
-    data, report = export_ntw(d, NTW.read_bytes(), name="SCRATCH", fresh=True)
+    data, report = export_ntw(d, None, name="SCRATCH", header=NTW.read_bytes()[:512])
     net = links_ok(data)
     assert len(net.branches) == 3 and [len(b.nodes) for b in net.branches.values()] == [3, 2, 1]
     ids = sorted(n.id for b in net.branches.values() for n in b.nodes)
@@ -307,12 +342,54 @@ def test_a_network_keyed_from_scratch_is_written_in_the_layout_of_another():
     p = plain(data)
     assert W._stored_name(p) == "SCRATCH"
     assert net.saved_with == ["WV750-2026"] * 5 + ["Untitled"] * 3
+    # nothing of AL004's is in it: what is not this network is the empty file's
+    empty = W.join(W.blank(NTW.read_bytes()[:512]))
+    assert p[:512] == empty[:512]
+    for at in (23481, 36121, 36125, 36129):
+        assert struct.unpack_from("<I", p, at)[0] == 0
+    first = net.branches[1].nodes[0]
+    # the Ripple, banks 4, holds each pad and EQ as (3, 0, 0), as on AL004
+    assert p[first.offset + N.N_PADS:first.offset + N.N_PADS + 12] == b"\x03\x00\x00" * 4
     back = reread(data)
     assert screen_of(back) == screen_of(d)
     assert back.branch(1).nodes[0].amp_label == "AL004"
     # and saving it again builds on the file it now is
     again, _ = export_ntw(d, data, name="SCRATCH")
     assert again == data
+
+
+def test_hc_is_red_when_the_homes_are_more_than_the_ports():
+    """Recording 2: 2.2's 3 homes on a 2-port /20/ show red, 2.1's 2 on a
+    2-port /23/ do not; a 4-port tap turns it back (the user)."""
+    from hfc.entry import resolve_tap
+    d = _keyed_from_scratch()
+    red = lambda: {(r.branch, r.node) for r in build(d).rows if r.hc_severity == "red"}  # noqa: E731
+    assert red() == {(2, 2)}
+    node = d.branch(2).nodes[1]
+    tap = resolve_tap(d.library, "4.20", node.hc)
+    node.taps = [TapPlacement(part_id=tap.id, ports=tap.ports, value_db=tap.tap_value_db)]
+    assert red() == set()
+    node.taps, node.hc = [], 1                      # homes and no tap
+    assert red() == {(2, 2)}
+    two = resolve_tap(d.library, "2.20", 1)
+    node.taps = [TapPlacement(part_id=two.id, ports=2), TapPlacement(part_id=two.id, ports=2)]
+    node.hc = 4                                     # two 2-port taps: 4 ports
+    assert red() == set()
+    node.hc = 5
+    assert red() == {(2, 2)}
+
+
+def test_parts_the_spec_set_cannot_name_are_kept():
+    """Opened with another spec set (a node upgrade), an active or tap it
+    has no entry for stays in the file as it was, and still counts."""
+    d, src = fresh()
+    amp = d.branch(4).nodes[12]                      # AL00416's bridger, index 13
+    tap = next(n for b in d.branches.values() for n in b.nodes if n.taps and n.taps[0].part_id)
+    assert amp.amp
+    amp.amp, amp.amp_part, amp.kept_active = "", None, 13
+    tap.taps[0] = TapPlacement()                     # as the importer leaves an unknown tap
+    data, _ = export_ntw(d, src)
+    assert plain(data) == plain(src)
 
 
 def test_the_spec_file_mismatch_lines():

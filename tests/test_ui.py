@@ -683,8 +683,9 @@ def test_other_spec_files_bring_up_the_spec_file_mismatch_box(page, tmp_path):
 
 
 def test_a_network_keyed_from_scratch_saves_as_ntw(server):
-    """File > New, a spec set, a few lines; Save Network writes a .ntw in the
-    layout of the last .ntw opened, and it reads back."""
+    """File > New, a spec set, a few lines; Save Network writes a .ntw as the
+    program writes a new network (the header's licence and user fields from
+    the last .ntw opened), and it reads back."""
     import requests
     pair = SAMPLES / "AL004-WV750"
     if not (pair / "AL004.ntw").exists():
@@ -711,3 +712,4 @@ def test_a_network_keyed_from_scratch_saves_as_ntw(server):
     assert (first.ftg, first.hc, first.cable) == (120, 2, 2)      # the coupler line's cable
     assert net.branches[1].nodes[0].label == "AL004"
     assert requests.get(base).json()["name"] == "SCRATCH"
+    assert r.content[:512] == (pair / "AL004.ntw").read_bytes()[:512]

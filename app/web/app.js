@@ -243,6 +243,7 @@ function renderGrid() {
       if (i === S.row && j === S.col && S.buffer !== null) text = S.buffer + '_';
       let extra = '';
       if (c.key === 'cab') extra = ' cab';
+      if (c.key === 'hc' && r.hc_severity) extra = ' ' + r.hc_severity;
       if (c.key === 'ampname') extra = ' amp';
       if (c.key === 'tap0' && S.mode === 'design' && r.amp_label && !r.taps.length) extra = ' amp spill';
       if (c.key === 'supply' && r.supply) extra = ' spill';

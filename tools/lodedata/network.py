@@ -102,6 +102,7 @@ class NtwBranch:
     parent: tuple = (0, 0)    # (branch, node) carrying its coupler
     offset: int = 0
     end_id: int = 0           # the id of its end line (the last node's next)
+    tap_port: bool = False    # hangs from a line no coupler of which starts it
 
 
 # The files it was saved with, as the program's "Spec File Mismatch" box
@@ -220,6 +221,16 @@ def read_network(plain: bytes) -> NtwNetwork:
             for child in node.branches:
                 if child in net.branches:
                     net.branches[child].parent = (br.number, i)
+    # A branch no coupler starts still names the line it hangs from, in its
+    # head's first field: the old AL004 has two, 43 and 44, from the taps at
+    # 11.16 and 11.18 (coupler 0; their lines list no branch)
+    at = {n.id: (br.number, i) for br in net.branches.values()
+          for i, n in enumerate(br.nodes, start=1)}
+    for br in net.branches.values():
+        if br.number != 1 and br.parent == (0, 0):
+            parent = at.get(r.u32(br.offset))
+            if parent is not None:
+                br.parent, br.tap_port = parent, True
 
     feeder = net.branches.get(1)
     if feeder and feeder.nodes and feeder.nodes[0].label:

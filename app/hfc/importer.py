@@ -235,6 +235,7 @@ def library_from_spec_set(base: str | Path,
             current_draw_a=next((amps for v, amps in a.power_draw
                                  if abs(v - 60.0) < 6), 0.0),
             pad_eq=[_pad_eq(banks.get(n), c) for c, n in enumerate(a.banks)],
+            banks=list(a.banks),
             source=f"lodedata:{base.name}.atv",
         ))
 
@@ -321,13 +322,14 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
                     node.taps.append(TapPlacement(part_id=tap.id, ports=tap.ports,
                                                   value_db=tap.tap_value_db))
                 else:
-                    node.taps.append(TapPlacement())
+                    node.taps.append(TapPlacement(file_ports=t.ports))
                     miss(f"{number}.{i}: tap row {t.row} ({t.ports}-port)")
             if nn.active_index:
                 act = actives.get(nn.active_index)
                 if act:
                     node.amp, node.amp_part = act.active_id, act.id
                 else:
+                    node.kept_active = nn.active_index
                     miss(f"{number}.{i}: active index {nn.active_index}")
             if nn.supply:
                 node.supply_label = nn.supply
@@ -352,6 +354,10 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path,
                     node.through_leg = THROUGH_FIRST if k == 1 else THROUGH_SECOND
             br.nodes.append(node)
         design.branches[number] = br
+    for number, nb in net.branches.items():
+        pb, pn = nb.parent
+        if nb.tap_port and pb in design.branches and 0 < pn <= len(design.branches[pb].nodes):
+            design.branches[pb].nodes[pn - 1].drops.append(number)
     return design, report
 
 

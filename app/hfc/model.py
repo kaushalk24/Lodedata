@@ -181,6 +181,9 @@ class ActiveType:
     # labels, losses], both by the value a design stores, from the Pads/EQs
     # Bank each uses (a pad's dB; an EQ's loss at its high, low frequency)
     pad_eq: list = field(default_factory=list)
+    # the Pads/EQs Bank numbers themselves (fwd pad, ret pad, fwd EQ, ret EQ);
+    # a design stores each pad as (bank - 1, value)
+    banks: list = field(default_factory=list)
     source: str = "manual"
 
     @property
