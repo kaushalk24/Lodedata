@@ -28,9 +28,10 @@ class ExportError(ValueError):
     pass
 
 
-def export_ntw(design: Design, source: bytes) -> tuple[bytes, dict]:
+def export_ntw(design: Design, source: bytes, name: str | None = None) -> tuple[bytes, dict]:
     """The design as a .ntw file, built over ``source`` (the .ntw it came
-    from, as read from disk).  Returns the file and a report; the design's
+    from, as read from disk), to be saved as ``name``.ntw.  Returns the file
+    and a report; the design's
     lines and branches are given the ids they now have in the file, so the
     next save carries on from this one."""
     plain = source[:PAYLOAD_START] + deobfuscate(source[PAYLOAD_START:])
@@ -116,7 +117,7 @@ def export_ntw(design: Design, source: bytes) -> tuple[bytes, dict]:
             parent=(number.get(br.parent_branch, 0), br.parent_node) if b != numbers[0] else (0, 0)))
 
     try:
-        plain_out, ids = W.build(raw, outs)
+        plain_out, ids = W.build(raw, outs, name=name)
     except W.WriteError as e:
         raise ExportError(str(e))
     for b, node_ids, end in zip(numbers, ids["nodes"], ids["ends"]):

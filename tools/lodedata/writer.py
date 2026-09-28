@@ -62,6 +62,7 @@ P_INLINE = 23381                        # the same at +4 x n for Qn
 P_TAPS = 23513                          # (u16, u16) [512 tap rows][4 port codes]
 P_TAP_PORTS = 31705                     # (u16, u16) [4 port codes]
 P_COUPLERS = 31721                      # (u16, u16) at +4 x coupler record
+P_NAME = 44542                          # the network's file name, without .ntw
 P_BRANCHES = 41405                      # u32 number of branches
 P_NEXT_ID = 41409                       # u32 next free id, counting down
 
@@ -191,8 +192,12 @@ def _tail(extended: bool) -> int:
     return EXT_SIZE if extended else 0
 
 
-def build(source: RawNetwork, branches: list) -> tuple[bytes, dict]:
+def build(source: RawNetwork, branches: list, name: str | None = None) -> tuple[bytes, dict]:
     """Write ``branches`` (BranchOut, branch 1 first) over ``source``.
+
+    ``name`` is the file name it is saved as, without .ntw.  The program
+    keeps it in the file and, opening a file whose name differs, says
+    "Filename AL004 has changed to ... Setting all PCDs to open."
 
     Returns the decoded file and the ids handed out: ``{"nodes": [[id per
     node] per branch], "ends": [end id per branch]}`` so the caller can keep
@@ -258,8 +263,14 @@ def build(source: RawNetwork, branches: list) -> tuple[bytes, dict]:
 
     struct.pack_into("<I", out, P_BRANCHES, len(branches))
     struct.pack_into("<I", out, P_NEXT_ID, next_id)
+    if name is not None and name != _stored_name(out):
+        _text_into(out, P_NAME, name, width=261)
     _totals(out, _counts(outs_from_plain(join(source))), _counts(branches))
     return bytes(out), {"nodes": ids, "ends": ends}
+
+
+def _stored_name(plain) -> str:
+    return bytes(plain[P_NAME:P_NAME + 261]).split(b"\0", 1)[0].decode("latin-1")
 
 
 def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,

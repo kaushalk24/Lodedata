@@ -623,7 +623,8 @@ Rebuilt from nothing, these are the bytes Lode Data wrote:
 | 31721 + 4·r | couplers by record + 1; a 3-way splitter feeding two branches counts once |
 | 35723, 36121 | more counts — **not decoded** |
 | 41401 | u16 41, u8 1, u8 1 (possibly where the cursor was), u32 branch count, the id counter |
-| 42366 + 261·k | the spec file names again, then three `Untitled` slots; 44542 the network name |
+| 42366 + 261·k | the spec file names again, then three `Untitled` slots |
+| 44542 | the file name it was saved as, without `.ntw`. Opening a file under another name, the program warns "Filename AL004 has changed to AL004_T2_insert. Setting all PCDs to open." |
 
 The writer rewrites the decoded totals, the branch count and the id counter.
 Everything not decoded is left as the file had it.

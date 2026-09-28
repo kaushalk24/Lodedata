@@ -202,7 +202,29 @@ class Design:
         for b in self.branches.values():
             for node in b.nodes:
                 node.couplers = [c for c in node.couplers if c.branch not in gone]
+        self.close_up()
         return gone
+
+    def close_up(self) -> None:
+        """Branch numbers run 1..n with no gaps: when branches go, the ones
+        after them move up, keeping their order.  As Lode Data does it (the
+        user): with 2(3), 8(4), 12(5), deleting 2(3) leaves 8(3), 12(4)."""
+        order = sorted(self.branches)
+        new = {old: k for k, old in enumerate(order, start=1)}
+        branches = {}
+        for old in order:
+            b = self.branches[old]
+            b.number = new[old]
+            b.parent_branch = new.get(b.parent_branch, b.parent_branch)
+            for node in b.nodes:
+                for c in node.couplers:
+                    c.branch = new.get(c.branch, c.branch)
+            branches[b.number] = b
+        self.branches = branches
+
+    def branch_of(self, node: Node) -> Branch | None:
+        """The branch a line is on, by the line itself."""
+        return next((b for b in self.branches.values() if any(x is node for x in b.nodes)), None)
 
     def renumber(self, branch: Branch) -> None:
         for i, node in enumerate(branch.nodes, start=1):

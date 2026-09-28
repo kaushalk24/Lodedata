@@ -1375,6 +1375,19 @@ function importNtw() {
       accept=".par,.atv,.tap,.cpr,.cbl,.prc,.per"></label>
     <div class="row"><button class="primary" id="ntwGo">Import</button>
       <button id="mClose">Cancel</button></div><pre id="ntwOut"></pre>`);
+  // picked through the browser's file access where it has it, so that
+  // Save Network can write straight back into this file
+  let picked = null;
+  if (window.showOpenFilePicker) $('#ntwFile').onclick = async e => {
+    e.preventDefault();
+    try {
+      const [h] = await window.showOpenFilePicker({ types: NTW_TYPES });
+      const dt = new DataTransfer();
+      dt.items.add(await h.getFile());
+      $('#ntwFile').files = dt.files;
+      picked = h;
+    } catch (_) {}
+  };
   $('#ntwGo').onclick = async () => {
     const f = $('#ntwFile').files[0]; if (!f) return;
     const fd = new FormData(); fd.append('file', f);
@@ -1387,6 +1400,7 @@ function importNtw() {
       return;
     }
     const r = out.report;
+    if (picked && picked.name === f.name) await keepFile(out.id, picked);
     closeModal();
     await open(out.id);
     msg(`${r.network}: ${r.branches} branches, ${r.nodes} nodes read against ${r.spec_set}` +
@@ -1395,24 +1409,59 @@ function importNtw() {
 }
 
 // ---------------------------------------------------------------- saving
-// File > Save Network writes the network as a Lode Data .ntw, built over the
-// .ntw it was opened from.  The first save asks where to put it -- pick the
-// file it was opened from to overwrite it -- and later saves go to that same
-// file; Save Network As... always asks.  A browser with no file picker
-// downloads the file instead.
+// File > Save Network writes the network back into the .ntw it was opened
+// from, as the program's Save does: opening a .ntw keeps hold of that file
+// (the browser asks once for leave to save to it).  Save Network As... asks
+// for a file, and the network then carries that file's name and saves there.
+// A network with no file yet asks too; a browser with no file access
+// (Firefox) downloads the file instead.  The file held for each network is
+// kept in the browser (IndexedDB), so it lasts past a reload.
+const NTW_TYPES = [{ description: 'Lode Data network', accept: { 'application/octet-stream': ['.ntw'] } }];
 const saveTo = {};                       // network id -> the file it saves to
+
+function handleStore(mode, work) {
+  return new Promise(done => {
+    try {
+      const open = indexedDB.open('design-assistant', 1);
+      open.onupgradeneeded = () => open.result.createObjectStore('ntw-files');
+      open.onerror = () => done(null);
+      open.onsuccess = () => {
+        try {
+          const tx = open.result.transaction('ntw-files', mode);
+          const req = work(tx.objectStore('ntw-files'));
+          tx.oncomplete = () => done(req ? req.result : null);
+          tx.onerror = () => done(null);
+        } catch (_) { done(null); }
+      };
+    } catch (_) { done(null); }
+  });
+}
+async function keepFile(nid, handle) {
+  saveTo[nid] = handle;
+  await handleStore('readwrite', st => st.put(handle, nid));
+}
+async function fileFor(nid) {
+  if (!saveTo[nid]) saveTo[nid] = await handleStore('readonly', st => st.get(nid));
+  return saveTo[nid] || null;
+}
+
 async function saveNetwork(as) {
   if (!S.nid || !S.net) return;
-  const name = `${S.net.name || 'network'}.ntw`;
-  let handle = as ? null : saveTo[S.nid];
+  const nid = S.nid;
+  let handle = as ? null : await fileFor(nid);
   try {
     if (!handle && window.showSaveFilePicker) {
       // asked for first, while the menu click still counts as the user's
-      handle = await window.showSaveFilePicker({ suggestedName: name,
-        types: [{ description: 'Lode Data network', accept: { 'application/octet-stream': ['.ntw'] } }] });
+      handle = await window.showSaveFilePicker({ suggestedName: `${S.net.name || 'network'}.ntw`, types: NTW_TYPES });
     }
+    if (handle && handle.queryPermission &&
+        await handle.queryPermission({ mode: 'readwrite' }) !== 'granted' &&
+        await handle.requestPermission({ mode: 'readwrite' }) !== 'granted') {
+      msg('not saved: leave to write the file was not given'); return;
+    }
+    const name = handle ? handle.name : `${S.net.name || 'network'}.ntw`;
     await saveChain;                     // every edit keyed so far goes in
-    const r = await fetch(`/api/networks/${S.nid}/ntw`, { method: 'POST' });
+    const r = await fetch(`/api/networks/${nid}/ntw?filename=${encodeURIComponent(name)}`, { method: 'POST' });
     if (!r.ok) {
       let t = await r.text();
       try { t = JSON.parse(t).detail || t; } catch (_) {}
@@ -1421,18 +1470,23 @@ async function saveNetwork(as) {
     const blob = await r.blob();
     let skipped = [];
     try { skipped = JSON.parse(r.headers.get('X-Not-Written') || '[]'); } catch (_) {}
-    let where = name;
     if (handle) {
       const w = await handle.createWritable();
       await w.write(blob); await w.close();
-      saveTo[S.nid] = handle; where = handle.name;
+      await keepFile(nid, handle);
     } else {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = name;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }
-    msg(`saved ${where}` + (skipped.length ? ` — ${skipped.length} not written: ${skipped[0]}` : ''));
+    const stem = name.replace(/\.ntw$/i, '');
+    if (S.nid === nid && S.net.name !== stem) {     // Save As under a new name
+      S.net.name = stem;
+      renderInfo();                      // the title bar carries the name
+      await loadList(nid);
+    }
+    msg(`saved ${name}` + (skipped.length ? ` — ${skipped.length} not written: ${skipped[0]}` : ''));
   } catch (e) {
     if (e.name !== 'AbortError') msg(e.message);
   }

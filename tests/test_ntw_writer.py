@@ -243,3 +243,18 @@ def test_a_copied_line_gets_its_own_id():
     p = plain(data)
     assert struct.unpack_from("<I", p, a.offset + W.N_OBJECT) != \
         struct.unpack_from("<I", p, b.offset + W.N_OBJECT)
+
+
+def test_deleting_a_branch_closes_up_the_numbers():
+    """As Lode Data does: the branches after a deleted one move up."""
+    d, src = fresh()
+    assert d.remove_branch(44) == [44]
+    assert sorted(d.branches) == list(range(1, 45))
+    moved = d.branch(44)
+    assert (moved.parent_branch, moved.parent_node) == (5, 9)
+    assert [c.branch for c in d.branch(5).nodes[8].couplers] == [44]
+    assert d.branch(20).nodes[16].couplers == []
+    data, _ = export_ntw(d, src)
+    net = links_ok(data)
+    assert len(net.branches) == 44 and net.branches[44].parent == (5, 9)
+    assert screen_of(reread(data)) == screen_of(d)

@@ -87,6 +87,8 @@ Power currents and volts match on all 29 lines of branch 4.
     whole milliohms, truncated (feet × µΩ/ft // 1000)
   * a node's current is the current in the span on its supply side
   * a power stop cuts the span leading into its node
+* Branch numbers are the file order, 1…n. Deleting a branch moves the later
+  ones up (the user: 2(3), 8(4), 12(5) → delete 2(3) → 8(3), 12(4)).
 * Coupler brackets (nothing in the file stores them): `<n>` if the branch has
   no footage on non-1xx cable and its first span matches the nearest span
   behind or ahead of the coupler on the parent branch (what BkFeed/FwdFd

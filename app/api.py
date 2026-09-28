@@ -348,7 +348,8 @@ def set_coupler(nid: str, branch: int, node: int, body: CouplerEdit):
     if len(n.couplers) >= 2:
         raise HTTPException(400, "a node can carry at most two couplers")
 
-    child = d.add_branch(branch, node, body.style)
+    # a branch taken away above may have moved this line's branch up
+    child = d.add_branch(d.branch_of(n).number, node, body.style)
     n.couplers.insert(min(body.slot, len(n.couplers)),
                       CouplerPlacement(part_id=part.id,
                                        coupler_id=int(part.coupler_id or 0),
@@ -441,22 +442,27 @@ async def import_ntw(file: UploadFile = File(...),
 
 
 @app.post("/api/networks/{nid}/ntw")
-def save_ntw(nid: str):
+def save_ntw(nid: str, filename: str | None = None):
     """File > Save Network: the network as a Lode Data .ntw.
 
     Built over the .ntw it was opened from (or last saved as), which then
-    becomes the file the next save builds on.  Anything the file cannot hold
-    yet is listed in the X-Not-Written header rather than dropped silently.
+    becomes the file the next save builds on.  ``filename`` is the name it is
+    saved under: the file keeps it, and the network takes it, as the
+    program's Save Network As does.  Anything the file cannot hold yet is
+    listed in the X-Not-Written header rather than dropped silently.
     """
     d = load(nid)
+    stem = Path(filename).stem if filename else None
     source = ntw_file(nid)
     if source is None:
         raise HTTPException(409, "this network was not opened from a .ntw file, and a "
                                  "new network cannot be written as one yet")
     try:
-        data, report = export_ntw(d, source)
+        data, report = export_ntw(d, source, name=stem)
     except ExportError as e:
         raise HTTPException(400, str(e))
+    if stem:
+        d.name = stem
     save(d)
     keep_ntw_file(nid, data)
     name = (d.name or "network").replace('"', "")

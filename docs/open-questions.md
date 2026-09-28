@@ -200,31 +200,38 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     byte with the 900 Series flag. Still to
     confirm: does Strand/Trench Types decide `<n>` for 5xx cable as it does
     for 1xx? (No AL004 branch runs on 5xx alone.)
-11. **Saving as .ntw — built, waiting on Lode Data.** File → Save Network
-    writes the network as a `.ntw`, built over the file it was opened from
-    (file-formats 3.8). The first save asks where to write; pick the opened
-    file to overwrite it. Later saves write there. Save Network As… always
-    asks. Without a file picker (Firefox) the file downloads. Unchanged, AL004
-    comes back byte for byte.
+11. **Saving as .ntw — opens in Lode Data.** File → Save Network writes the
+    network back into the `.ntw` it was opened from; Chrome/Edge ask once for
+    leave to write it. Save Network As… asks for a file, and the network then
+    takes that name and saves there. The file used for each network is
+    remembered across reloads. Without file access (Firefox) the file
+    downloads. The file is built over the one opened (file-formats 3.8), and
+    AL004 comes back byte for byte.
 
-    Seven files made through the app's API from AL004 are with the user, to
-    open in Lode Data:
-    * T1: 4.1 footage 500.
-    * T2: a 0-ft line inserted above 4.2.
-    * T3: a new 60-ft line after 4.4 with 2 homes and a `/17/`.
-    * T4: an LE 11 on 4.8, named AL00499.
-    * T5: a DC-8 on 4.9 feeding a new branch 46 of two lines.
-    * T6: 20.3 deleted.
-    * T7: 20.17's coupler cleared, so branch 44 goes and 45 becomes 44.
+    The user opened all seven test files in Lode Data and every change was
+    there:
+    * T1: 4.1 footage.
+    * T2: a line inserted.
+    * T3: a new line with a tap.
+    * T4: an LE placed and named.
+    * T5: a new branch.
+    * T6: a line deleted.
+    * T7: a branch deleted.
 
-    Still to learn from Lode Data itself:
-    * whether it opens them;
-    * what it writes when it saves them again;
-    * which new lines get their house list filled in (the writer fills it in);
+    Lode Data warned "Filename AL004 has changed to AL004_T2_insert. Setting
+    all PCDs to open.": the file keeps its own name (44542) and these had been
+    saved under other names. A save now writes the name it is saved under.
+
+    Branch numbers (the user): deleting a branch moves the later ones up — with
+    2(3), 8(4), 12(5), deleting 2(3) gives 8(3), 12(4). The replica does the
+    same. Still to confirm:
+    * the number a newly placed coupler's branch gets: the user's example
+      reads "2(4)" when 2 is put back above 8(3); the replica gives the next
+      number after the highest;
+    * what Lode Data writes when it saves one of these files itself;
+    * which new lines get their house list filled in;
     * the four undecoded preamble blocks;
-    * whether it renumbers branches after one is deleted, as the file order
-      forces (the replica keeps its numbers until reopened);
     * where TSG, Map, Loc, address and notes go (listed as not written);
     * a new power supply's record;
-    * a network started in the app has no file to build on yet: a new empty
-      network saved from Lode Data would serve as one.
+    * a network started in the app needs a file to build on: an empty network
+      saved from Lode Data.

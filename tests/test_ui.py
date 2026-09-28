@@ -558,13 +558,97 @@ def test_clearing_and_retyping_a_coupler(page):
     page.keyboard.press("Enter")
     page.wait_for_timeout(1000)
     assert _row(page, 20, 17)["couplers"] == []
-    assert 44 not in page.evaluate("S.scr.branches.map(b => b.number)")
-    _goto(page, 4, 26, "cplr0")                   # 8[22]: type a DC-12 over it
+    # the branches after 44 move up: 45 (from 5.9) is now 44
+    branches = page.evaluate("S.scr.branches.map(b => [b.number, b.parent_branch, b.parent_node])")
+    assert [b[0] for b in branches] == list(range(1, 45)) and branches[-1] == [44, 5, 9]
+    assert _row(page, 5, 9)["couplers"] == ["1<44>"]
+    _goto(page, 4, 26, "cplr0")                   # 8[22] (and 23 under it): a DC-12 over it
     _type(page, "0")
     _type(page, "12")
     page.keyboard.press("Enter")
     page.wait_for_timeout(1000)
     cell = _row(page, 4, 26)["couplers"]
     assert len(cell) == 1 and cell[0].startswith("12"), cell
-    assert 22 not in page.evaluate("S.scr.branches.map(b => b.number)")
+    numbers = page.evaluate("S.scr.branches.map(b => b.number)")
+    assert numbers == list(range(1, 44))          # 44 - 22 - 23 + the new one
+    assert not page.errors
+
+
+def _open_al004_with_file_access(page):
+    """Open AL004 the way Chrome and Edge do: through the browser's file
+    access, which hands back the file itself to save into."""
+    import base64
+    data = base64.b64encode((SAMPLES / "AL004-WV750" / "AL004.ntw").read_bytes()).decode()
+    page.evaluate("""(data) => {
+      const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
+      window.__written = []; window.__asked = 0;
+      const handle = (name, contents) => ({
+        name, getFile: async () => new File([contents], name),
+        createWritable: async () => { const parts = [];
+          return { write: async b => parts.push(new Uint8Array(await b.arrayBuffer())),
+                   close: async () => { let t = '';
+                     for (const b of parts[0]) t += String.fromCharCode(b);
+                     window.__written.push([name, btoa(t)]); } }; } });
+      window.showOpenFilePicker = async () => [handle('AL004.ntw', bytes)];
+      window.showSaveFilePicker = async (o) => { window.__asked += 1; return handle('AL004_B.ntw', new Uint8Array()); };
+    }""", data)
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.click("#ntwFile")
+    page.wait_for_timeout(300)
+    pair = SAMPLES / "AL004-WV750"
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("WV750-2026.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+
+
+def _file_menu(page, item):
+    page.click('.mi[data-menu="file"]')
+    page.wait_for_timeout(200)
+    page.click(f'.dropdown .di:has(span:text-is("{item}"))')
+    page.wait_for_timeout(2000)
+
+
+def test_save_network_writes_back_into_the_opened_file(page):
+    """Open AL004, change it, File > Save Network: the changes go into
+    AL004.ntw itself, with no file dialog."""
+    if not (SAMPLES / "AL004-WV750" / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    import base64
+    _open_al004_with_file_access(page)
+    _goto(page, 4, 1, "ftg")
+    _type(page, "0")
+    _type(page, "500")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(800)
+    _file_menu(page, "Save Network")
+    assert "saved AL004.ntw" in page.inner_text("#stMsg")
+    assert page.evaluate("window.__asked") == 0
+    written = page.evaluate("window.__written")
+    assert [w[0] for w in written] == ["AL004.ntw"]
+    net = _ntw_lines(base64.b64decode(written[0][1]))
+    assert net.branches[4].nodes[0].ftg == 500 and net.name == "AL004"
+    assert not page.errors
+
+
+def test_save_network_as_takes_the_new_name(page):
+    """Save Network As... asks for a file; the file keeps that name, so the
+    program does not warn "Filename AL004 has changed to ..." on opening it,
+    and the network carries the name from then on."""
+    if not (SAMPLES / "AL004-WV750" / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    import base64
+    sys.path.insert(0, str(ROOT / "tools"))
+    from lodedata.obfuscation import deobfuscate
+    from lodedata.writer import _stored_name
+    _open_al004_with_file_access(page)
+    _file_menu(page, "Save Network As...")
+    assert page.evaluate("window.__asked") == 1
+    name, data = page.evaluate("window.__written")[0]
+    data = base64.b64decode(data)
+    assert name == "AL004_B.ntw" and _stored_name(data[:512] + deobfuscate(data[512:])) == "AL004_B"
+    assert "AL004_B" in page.inner_text("#title")
+    _file_menu(page, "Save Network")                # then saves go to AL004_B.ntw
+    assert page.evaluate("window.__asked") == 1
+    assert [w[0] for w in page.evaluate("window.__written")] == ["AL004_B.ntw", "AL004_B.ntw"]
     assert not page.errors
