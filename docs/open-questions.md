@@ -352,8 +352,10 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     * where the Branch: line sits in the tap box, and which tap feeds the
       branch when a line has more than one;
     * what 0 on a tap feeding a branch does (kept here, fed by nothing);
-    * the older AL004's Test lines not produced yet: Tap(550), Crossover,
-      "870 input … to LE", "40 output … from LE", "LE 11/5 before/0 after";
+    * the older AL004's Test lines not produced yet (27 of its 94): Tap(550),
+      "870 input … to LE", "40 output … from LE", "LE 11/5 before/0 after".
+      Its five crossovers are there: WVEXT862 holds Max. Crossover 0.00, a
+      limit like any other (every positive crossover is listed);
     * the extra 550 column Lode shows with WVEXT862 (19.55 at 44.1, 0.00
       under it): how F3 is carried from the node and through an active;
     * 23481/23483 and the three pairs at 36121;

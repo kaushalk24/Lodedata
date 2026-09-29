@@ -821,9 +821,11 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
         if out > 0.005:
             mark(i, "yellow")
             errors.append(("yellow", f"Tap({f:g}) {out:5.2f} {side}"))
+    # Max. Crossover 0.00 is a limit like any other: WVEXT862 holds 0 and
+    # Lode lists all five crossovers of the older AL004 (2.01 at 5.29 up)
     hi, lo = freqs.index(p.forward_high_mhz), freqs.index(p.forward_low_mhz)
     cross = seen[freqs[lo]] - seen[freqs[hi]]
-    if getattr(p, "max_crossover_db", 0) and cross > p.max_crossover_db + 0.005:
+    if cross > p.max_crossover_db + 0.005:
         mark(hi, "yellow")
         mark(lo, "yellow")
         errors.append(("yellow", f"Crossover of {cross:5.2f}"))

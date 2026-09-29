@@ -492,7 +492,7 @@ whole table that matches row for row.
 | 1063 + k | u8 housing k+1 Minimum Size (Points) | 4 6 11 17 27 | proven |
 | 1082 | ×4: 12, 16, 16, 16 | same in KERMIT | unknown — equals the four design tap windows |
 | 1098 + 4·k | NIU: System Penetration %, Offhook %, Ring %, Additional Line %, Offhook Limit | 0 ×5 (KERMIT 47 53 51 54 0) | proven (test copy: 1 2 3 4 5). Whole numbers: 1.11 typed comes back as 1.0 |
-| 1118 | Max. Crossover | 3.00 | proven (test copy: 3.25) |
+| 1118 | Max. Crossover (0.00 is a limit: WVEXT862 holds it and Lode lists every positive crossover) | 3.00 | proven (test copy: 3.25) |
 | 1122 | Max Return Crossover | 99.00 | proven |
 | 1126 | Max. LE Cascade | 3 (KERMIT 2) | proven (test copy: 4) |
 | 1130 | Lines per Form | 0 (KERMIT 45) | proven (test copy: 44) |

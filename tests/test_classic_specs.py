@@ -115,14 +115,16 @@ def test_the_older_design_saves_back_as_it_came():
 
 
 # Lode's Test Results for the older AL004 (94 errors), the lines of the kinds
-# worked out so far -- the tap checks at 870, 54, 40 and 5 MHz and the EQ
-# slope -- in the window's order.  Still to come: the 550 MHz column, the
-# crossovers, the amplifier input/output and LE cascade lines.
+# worked out so far -- the tap checks at 870, 54, 40 and 5 MHz, the
+# crossovers (WVEXT862's Max. Crossover is 0.00) and the EQ slope -- in the
+# window's order.  Still to come: the 550 MHz column, the amplifier
+# input/output and LE cascade lines.
 LODE_TESTS = [
     "Tap(54)  1.24 below min at 3.1.", "Tap(870)  2.18 below min at 3.3.",
-    "Tap(870) 10.72 below min at 3.5.", "Tap(870) 12.74 below min at 3.6.",
-    "Tap(5)  2.79 below window at 3.6.", "Tap(870)  4.12 below min at 5.29.",
-    "Tap(5)  1.23 below window at 5.29.", "Tap(5)  0.53 below window at 6.7.",
+    "Tap(870) 10.72 below min at 3.5.", "Crossover of  3.85 at 3.5.",
+    "Tap(870) 12.74 below min at 3.6.",
+    "Tap(5)  2.79 below window at 3.6.", "Crossover of 11.22 at 3.6.", "Tap(870)  4.12 below min at 5.29.",
+    "Tap(5)  1.23 below window at 5.29.", "Crossover of  2.01 at 5.29.", "Tap(5)  0.53 below window at 6.7.",
     "Tap(40)  1.73 above max at 6.10.", "Tap(40)  2.04 above max at 7.7.",
     "Tap(5)  0.62 above max at 7.7.", "Tap(870)  8.05 below min at 9.16.",
     "Tap(54)  8.09 below min at 9.16.", "Tap(40)  7.94 above max at 9.16.",
@@ -139,8 +141,10 @@ LODE_TESTS = [
     "Tap(40)  3.12 below window at 14.1.", "Tap(5)  3.61 below window at 14.1.",
     "Tap(870) 17.67 below min at 15.3.", "Tap(54)  6.00 below min at 15.3.",
     "Tap(40)  5.35 above max at 15.3.", "Tap(5)  0.70 above max at 15.3.",
+    "Crossover of  2.67 at 15.3.",
     "Tap(870) 23.18 below min at 15.4.", "Tap(54)  6.12 below min at 15.4.",
     "Tap(40)  5.23 above max at 15.4.", "Tap(5)  0.08 above max at 15.4.",
+    "Crossover of  8.06 at 15.4.",
     "Tap(870)  6.12 below min at 16.1.", "Tap(54)  4.92 below min at 16.1.",
     "Tap(40)  4.68 above max at 16.1.", "Tap(5)  2.18 above max at 16.1.",
     "Tap(40)  2.42 below window at 16.7.", "Tap(5)  2.92 below window at 16.7.",
@@ -157,10 +161,13 @@ def test_the_test_list_is_lodes():
     got = [m for _, m in build(d).tests]
     assert len(got) == len(LODE_TESTS)
     # 15.4's 870 MHz port is 0.006 dB lower here than in Lode (23.19 against
-    # its 23.18): open, to be checked against Lode's levels on branch 15
-    open_ = LODE_TESTS.index("Tap(870) 23.18 below min at 15.4.")
-    assert got[open_] == "Tap(870) 23.19 below min at 15.4."
-    assert got[:open_] + got[open_ + 1:] == LODE_TESTS[:open_] + LODE_TESTS[open_ + 1:]
+    # its 23.18, and so its crossover 8.07 against 8.06): open, to be checked
+    # against Lode's levels on branch 15
+    open_ = {LODE_TESTS.index("Tap(870) 23.18 below min at 15.4."): "Tap(870) 23.19 below min at 15.4.",
+             LODE_TESTS.index("Crossover of  8.06 at 15.4."): "Crossover of  8.07 at 15.4."}
+    assert [got[i] for i in open_] == list(open_.values())
+    assert [m for i, m in enumerate(got) if i not in open_] == \
+        [m for i, m in enumerate(LODE_TESTS) if i not in open_]
 
 
 def test_branches_6_and_7_as_lode_shows_them():
