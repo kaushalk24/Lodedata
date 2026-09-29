@@ -134,7 +134,9 @@ def main() -> int:
     server = start_engine(port)
     if checking:
         try:
-            return check(port)
+            check(port)
+            print("check passed")
+            return 0
         except Exception:
             import traceback
             print("check failed:\n" + traceback.format_exc())
@@ -142,15 +144,27 @@ def main() -> int:
         finally:
             server.should_exit = True
 
-    import webview
-    files = Files()
-    window = webview.create_window("Design Assistant", f"http://127.0.0.1:{port}/",
-                                   js_api=files, maximized=True, min_size=(1000, 650))
-    files._window = window
-    if hasattr(webview, "settings"):
-        webview.settings["ALLOW_DOWNLOADS"] = True       # the reports' CSV files
-    webview.start(private_mode=False, storage_path=str(data / "window"))
-    server.should_exit = True
+    try:
+        import webview
+        files = Files()
+        window = webview.create_window("Design Assistant", f"http://127.0.0.1:{port}/",
+                                       js_api=files, maximized=True, min_size=(1000, 650))
+        files._window = window
+        if hasattr(webview, "settings"):
+            webview.settings["ALLOW_DOWNLOADS"] = True       # the reports' CSV files
+        webview.start(private_mode=False, storage_path=str(data / "window"))
+    except Exception:
+        import traceback
+        print("the window could not open:\n" + traceback.format_exc())
+        sys.stdout.flush()
+        if sys.platform == "win32":
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(
+                None, f"The Design Assistant could not open its window.\n\nSee {data / 'lodedata.log'}",
+                "Design Assistant", 0x10)
+        return 1
+    finally:
+        server.should_exit = True
     return 0
 
 

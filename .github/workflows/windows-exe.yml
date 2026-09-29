@@ -22,6 +22,18 @@ jobs:
       - name: Build and check LodeData.exe
         shell: cmd
         run: desktop\build.bat
+      - name: Start it as a user would
+        shell: pwsh
+        run: |
+          $p = Start-Process dist/LodeData/LodeData.exe -PassThru
+          Start-Sleep 20
+          $log = "$env:LOCALAPPDATA/LodeData/lodedata.log"
+          if ($p.HasExited) { Get-Content $log -ErrorAction SilentlyContinue; throw "LodeData.exe closed by itself" }
+          if ((Test-Path $log) -and (Select-String -Path $log -Pattern "could not open" -Quiet)) { Get-Content $log; throw "the window did not open" }
+          $page = Invoke-WebRequest http://127.0.0.1:17170/ -UseBasicParsing
+          if ($page.Content -notmatch "app.js") { throw "the page did not load" }
+          Stop-Process $p -Force
+          "LodeData.exe started, its window stayed open and the page loaded"
       - name: Zip
         shell: pwsh
         run: Compress-Archive -Path dist/LodeData -DestinationPath LodeData-windows.zip
