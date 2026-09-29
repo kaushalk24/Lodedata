@@ -1,0 +1,41 @@
+# Builds LodeData.exe (the Design Assistant as a Windows program) on a
+# Windows machine at every push, checks it, and publishes it as the
+# "windows-latest" release: LodeData-windows.zip.
+name: Windows program
+
+on:
+  push:
+    branches: [claude/lode-data-reverse-engineer-65vgkc]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build and check LodeData.exe
+        shell: cmd
+        run: desktop\build.bat
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/LodeData -DestinationPath LodeData-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LodeData-windows
+          path: LodeData-windows.zip
+      - name: Publish as the windows-latest release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete windows-latest --yes --cleanup-tag 2>$null
+          $global:LASTEXITCODE = 0
+          gh release create windows-latest LodeData-windows.zip --target $env:GITHUB_SHA --prerelease `
+            --title "LodeData.exe (latest build)" `
+            --notes "The Design Assistant as a Windows program, built from $env:GITHUB_SHA. Unzip, open the LodeData folder, double-click LodeData.exe."

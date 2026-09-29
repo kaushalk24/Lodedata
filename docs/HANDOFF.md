@@ -36,6 +36,20 @@ The user is a Lode Data designer. Current focus: **the application itself**.
 `tests/test_server.py`. They are not the focus; leave them as they are and
 keep their tests passing.)
 
+**The Windows program.** The users run the app as `LodeData.exe` on
+Windows 11 laptops — no server (`desktop/README.md`). Every push to the
+branch is built and checked by GitHub Actions on a Windows machine
+(`.github/workflows/windows-exe.yml` → `desktop/build.bat`) and published as
+the release "windows-latest":
+https://github.com/kaushalk24/Lodedata/releases/download/windows-latest/LodeData-windows.zip
+After each push, check that run went green (Actions → "Windows program")
+and give the user that link along with the source link. Keep it working:
+new Python dependencies go in `requirements.txt` (and, if PyInstaller does
+not find them, in `desktop/build.bat`); new files the page loads go under
+`app/web/`; Open/Save in the page go through `showOpenFilePicker` /
+`showSaveFilePicker`, which the program replaces with Windows' dialogs
+(`desktopFile` in `app/web/app.js`).
+
 ## How the user works — standing instructions
 
 * "Match the real program exactly; don't guess." When evidence is missing,
@@ -133,6 +147,8 @@ asked about before pushing. Add every new sample the user sends to
 | `tests/test_classic_specs.py` | older AL004 + WVEXT862 |
 | `tests/test_sn001.py` | SN001 + SHINSTON |
 | `tests/test_ui.py` | the page in a real browser (Playwright) |
+| `desktop/` | the Windows program: `lodedata_desktop.py` (window + engine), `build.bat`, `README.md` |
+| `.github/workflows/windows-exe.yml` | builds and publishes `LodeData.exe` at every push |
 
 ## Where it stands
 

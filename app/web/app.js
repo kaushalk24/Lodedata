@@ -1645,12 +1645,55 @@ function handleStore(mode, work) {
 }
 async function keepFile(nid, handle) {
   saveTo[nid] = handle;
-  await handleStore('readwrite', st => st.put(handle, nid));
+  await handleStore('readwrite', st => st.put(handle.path || handle, nid));
 }
 async function fileFor(nid) {
-  if (!saveTo[nid]) saveTo[nid] = await handleStore('readonly', st => st.get(nid));
+  if (!saveTo[nid]) {
+    const kept = await handleStore('readonly', st => st.get(nid));
+    saveTo[nid] = typeof kept === 'string' ? desktopFile(kept) : kept;
+  }
   return saveTo[nid] || null;
 }
+
+// The Windows program (LodeData.exe, desktop/lodedata_desktop.py) shows this
+// page in its own window. There Open and Save go through Windows' own
+// dialogs, a file is kept by its path, and Save writes straight back into it.
+function desktopFile(path) {
+  const name = path.split(/[\\/]/).pop();
+  return {
+    name, path,
+    getFile: async () => {
+      const b = atob(await window.pywebview.api.read_file(path));
+      return new File([Uint8Array.from(b, c => c.charCodeAt(0))], name);
+    },
+    createWritable: async () => {
+      const parts = [];
+      return {
+        write: async blob => { parts.push(blob); },
+        close: async () => {
+          const bytes = new Uint8Array(await new Blob(parts).arrayBuffer());
+          let s = '';
+          for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+          await window.pywebview.api.write_file(path, btoa(s));
+        },
+      };
+    },
+  };
+}
+function desktopDialogs() {
+  const none = () => new DOMException('no file chosen', 'AbortError');
+  window.showOpenFilePicker = async () => {
+    const p = await window.pywebview.api.open_ntw();
+    if (!p) throw none();
+    return [desktopFile(p)];
+  };
+  window.showSaveFilePicker = async o => {
+    const p = await window.pywebview.api.save_ntw((o && o.suggestedName) || 'network.ntw');
+    if (!p) throw none();
+    return desktopFile(p);
+  };
+}
+window.addEventListener('pywebviewready', desktopDialogs);
 
 async function saveNetwork(as) {
   if (!S.nid || !S.net) return;

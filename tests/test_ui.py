@@ -717,6 +717,61 @@ def test_save_network_as_takes_the_new_name(page):
     assert not page.errors
 
 
+def test_the_windows_program_opens_and_saves_through_its_own_dialogs(page):
+    """In LodeData.exe the page reaches Windows' Open and Save dialogs
+    through window.pywebview.api (desktop/lodedata_desktop.py). Save writes
+    straight back into the file opened, by its path -- also once the page
+    has let go of it, as after a restart; Save As writes where the dialog
+    says. Here the Windows side is played by a stand-in."""
+    if not (SAMPLES / "AL004-WV750" / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    import base64
+    data = base64.b64encode((SAMPLES / "AL004-WV750" / "AL004.ntw").read_bytes()).decode()
+    page.evaluate(r"""(data) => {
+      window.__disk = {'C:\\nets\\AL004.ntw': data};
+      window.__dialogs = [];
+      window.pywebview = { api: {
+        open_ntw: async () => { __dialogs.push('open'); return 'C:\\nets\\AL004.ntw'; },
+        save_ntw: async name => { __dialogs.push('save ' + name); return 'C:\\nets\\AL004_B.ntw'; },
+        read_file: async p => __disk[p],
+        write_file: async (p, d) => { __disk[p] = d; return true; } } };
+      window.dispatchEvent(new Event('pywebviewready'));
+    }""", data)
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.click("#ntwFile")
+    page.wait_for_timeout(300)
+    pair = SAMPLES / "AL004-WV750"
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("WV750-2026.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+
+    def disk(name):
+        return _ntw_lines(base64.b64decode(page.evaluate(f"__disk['C:\\\\nets\\\\{name}']")))
+
+    for ftg in ("500", "501"):
+        _goto(page, 4, 1, "ftg")
+        _type(page, "0")
+        _type(page, ftg)
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(800)
+        _file_menu(page, "Save Network")
+        assert page.evaluate("__dialogs") == ["open"]
+        assert disk("AL004.ntw").branches[4].nodes[0].ftg == int(ftg)
+        # the page lets go of the file, as on a restart: the path it kept
+        # brings the same file back for the next save
+        page.evaluate("for (const k of Object.keys(saveTo)) delete saveTo[k]")
+    _file_menu(page, "Save Network As...")
+    assert page.evaluate("__dialogs") == ["open", "save AL004.ntw"]
+    sys.path.insert(0, str(ROOT / "tools"))
+    from lodedata.obfuscation import deobfuscate
+    from lodedata.writer import _stored_name
+    data = base64.b64decode(page.evaluate("__disk['C:\\\\nets\\\\AL004_B.ntw']"))
+    assert _stored_name(data[:512] + deobfuscate(data[512:])) == "AL004_B"
+    assert "AL004_B" in page.inner_text("#title")
+    assert not page.errors
+
+
 def test_other_spec_files_bring_up_the_spec_file_mismatch_box(page, tmp_path):
     """Opened with a spec set of another name, the network still opens and
     the box says which set it was saved with (the user: a node upgrade uses

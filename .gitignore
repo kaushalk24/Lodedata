@@ -2,3 +2,9 @@ data/
 samples/
 __pycache__/
 *.pyc
+
+# the Windows program build (desktop/build.bat)
+/build/
+/dist/
+/LodeData.spec
+lodedata-check.log

@@ -1,0 +1,3 @@
+# The Windows program: its window, and the tool that builds LodeData.exe.
+pywebview>=5.0
+pyinstaller>=6.0
