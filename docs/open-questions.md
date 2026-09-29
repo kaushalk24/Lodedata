@@ -357,7 +357,12 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       Its five crossovers are there: WVEXT862 holds Max. Crossover 0.00, a
       limit like any other (every positive crossover is listed);
     * the extra 550 column Lode shows with WVEXT862 (19.55 at 44.1, 0.00
-      under it): how F3 is carried from the node and through an active;
+      under it) — to build, nothing to ask: F3 = 550 is the Parameters'
+      third forward frequency; cables, couplers and taps carry it in slot 2
+      of their loss blocks; the older .atv holds F3–F6 inputs at +135 and
+      outputs at +151 (0 in; 43.0 out on the LEs and FNB99, 41.1 NC4000,
+      43.5 HLN 3842 NODE). Worked by hand this gives Lode's 4.1 = 35.20 and
+      4.2 = 33.28. Then its 14 Tap(550) Test lines;
     * 23481/23483 and the three pairs at 36121;
     * which new lines get their house list filled in;
     * where TSG, Map, Loc and address go (listed as not written);

@@ -5,10 +5,13 @@ one list, with what to send for each. Kept up to date as answers come in;
 the details behind each item are in `open-questions.md` and
 `file-formats.md`.
 
-Status: **paused** at the user's request (after the third SHINSTON set).
-Answered so far: every question of the AL004, WVEXT862 and SHINSTON sets
-up to and including SHINSTON3 (brackets, Notes, preview box, EQ, slope
-lines, half-cent rounding, node box, cascade on AL004, supply labels, ...).
+Status: **set A is next** — sent to the user on 29 Sep, waiting for their
+screenshots (the question work was paused for the server deployment and
+the mouse-wheel navigation, both done). Answered so far: every question
+of the AL004, WVEXT862 and SHINSTON sets up to and including SHINSTON3
+(brackets, Notes, preview box, EQ, slope lines, half-cent rounding, node
+box, cascade on AL004, supply labels, ...). Where each answer came from:
+`EVIDENCE.md`.
 
 "Older AL004" below means AL004.ntw opened with the WVEXT862 spec set;
 "AL004" the newer one with WV750-2026. A screenshot means the whole Lode
@@ -47,6 +50,10 @@ the values are in the spec files. They come with this set.)
    (AL004 4.14, `3-<11><12>`): what do `. ←` and `. →` do, and does a
    double-click on the second bracket enter the second branch?
    *Send:* a note of what happens on 4.14.
+   Also: after the mouse wheel (or `. ←`) brings you back from a branch,
+   is the cursor on the coupler cell or on ftg (the app: ftg)? And does
+   View > Show Tips stay off after Lode is closed and reopened (the app:
+   tips come back on reload)?
 7. **`{n}` and `(n)`.** The manual lists `{n}` (backfeed) and `(n)` (no
    footage), but Lode draws backward-running and no-footage branches
    `<n>`. *Send:* any screenshot where Lode draws `{n}` or `(n)`, if you

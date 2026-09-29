@@ -27,8 +27,10 @@ pytestmark = pytest.mark.skipif(
 
 
 def _spec_files():
-    # The keying tests type KERMIT750 tap codes (4.23, 8.21); prefer that set.
-    cbls = sorted(SAMPLES.rglob("*.cbl"), key=lambda p: ("KERMIT" not in p.name, str(p)))
+    # The page tests are written against WV750-2026 (AL004's set: its tap
+    # codes 4.23, 8.21 and the names in the boxes); prefer it over any other
+    # set in samples/.
+    cbls = sorted(SAMPLES.rglob("*.cbl"), key=lambda p: ("WV750-2026" not in p.name, str(p)))
     cbl = next(iter(cbls), None)
     if not cbl:
         return []

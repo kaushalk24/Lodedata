@@ -1,146 +1,199 @@
 # Handoff — read this first in a new session
 
+Everything a new session needs to carry on without losing anything: the
+goal, how the user works, the rules learned, where the evidence is, what is
+done and what comes next. Then read, in this order:
+
+1. `docs/QUESTIONS.md` — every question still open, grouped in sets, with
+   what the user sends for each. **Set A is next.**
+2. `docs/open-questions.md` — each rule with its evidence, and the list
+   "Still to confirm" at the end.
+3. `docs/EVIDENCE.md` — every file, screenshot and recording the user sent,
+   what it proved and which test pins it.
+4. `docs/file-formats.md` — every decoded byte of the `.ntw` and spec files.
+5. `docs/lode-data-manual-notes.md` — the vendor manual (22 PDFs, read in
+   full in the first sessions).
+
+`README.md`'s "Status" section is from the first week and out of date; the
+files above are current. Do not edit `README.md` unless the user asks.
+
 ## The goal
 
-Rebuild the Lode Data **Design Assistant** 12.11 (HFC/CATV network design
-software) as a web app that looks and behaves the same:
+Rebuild Lode Data **Design Assistant 12.11** (HFC/CATV network design) as a
+web app that looks and behaves exactly like it: read, display, edit and save
+`.ntw` files — saved files must open in Lode Data with every change — for
+every spec set, at least:
 
-* key in a network from scratch with the same keyboard-driven screens
-* open a real `.ntw` with its spec set
-* "upgrade" a network by attaching a different spec set
+| name used here | network | spec set | notes |
+|---|---|---|---|
+| AL004 | `AL004.ntw` | WV750-2026 | current Lode 12 files; the reference |
+| older AL004 | the August `AL004.ntw` | WVEXT862 | Lode 4 spec formats (file-formats 3.0) |
+| SN001 | `SN001_MID.ntw` | SHINN1GHz Mid (SHINSTON) | lines with Notes text; 1 GHz |
 
-The user is a Lode Data designer. What they want:
+The user is a Lode Data designer. Current focus: **the application itself**.
+(An earlier request added server deployment files — `DEPLOY.md`,
+`install.sh`, `start-server.sh`, `run-tests.sh`, `deploy/` and
+`tests/test_server.py`. They are not the focus; leave them as they are and
+keep their tests passing.)
 
-* Match the real program exactly; don't guess. When evidence is missing,
-  ask them for a specific screenshot.
-* Don't overengineer.
-* Work through open questions **one at a time**.
+## How the user works — standing instructions
 
-## Repository and git
+* "Match the real program exactly; don't guess." When evidence is missing,
+  **ask** for a specific screenshot, recording or test save — say exactly
+  what to do in Lode Data and what it will settle.
+* "Don't overengineer." "Don't add any other features other than what I
+  mentioned."
+* "Altering anything to fit a spec or ntw file must not change any spec or
+  ntw file that already works and reads well." Before every push run the
+  regression check below; if a change would alter what an existing file
+  shows or writes, **ask first**, with the evidence.
+* "Iterate one set of questions at a time; after fixing everything, the
+  next set." Group questions in sets (QUESTIONS.md), send one set, fix
+  everything it shows, then the next.
+* "Analyze everything in depth." Check every number on every screenshot,
+  not just the one asked about. Zoom into screenshots; measure colours and
+  character positions when layout matters.
+* If the user's words and a screenshot disagree, follow the screenshot and
+  say so (SHINSTON3 Q2: text "102[34]", screenshot `108<10>`).
+* Report plainly: what matches, what does not, what was guessed. Give the
+  download link after pushing:
+  https://github.com/kaushalk24/Lodedata/archive/refs/heads/claude/lode-data-reverse-engineer-65vgkc.zip
+  (the user runs it on Windows with `run.bat`, http://localhost:8000).
 
-* Repo `kaushalk24/Lodedata`, branch `claude/lode-data-reverse-engineer-65vgkc`.
-* Commit with `-c user.email=kaushall2424@gmail.com -c user.name="Kaushal"`.
-  End messages with the Co-Authored-By / Claude-Session trailers the session
-  gives you.
-* Push with `git push -u origin claude/lode-data-reverse-engineer-65vgkc`.
-  No pull requests unless asked.
+## Security — never break these
 
-## Run and test
+* **Never commit** `.ntw`, spec (`.par .atv .tap .cpr .cbl`) or test files.
+  `samples/` is gitignored; only `samples/README.md` is tracked (add it with
+  `git add -f`). Screenshots and recordings are never committed either.
+* **Never write licence numbers or user ids** from the files' 512-byte
+  headers into docs, tests, code or commit messages (the current files are
+  clean; QUESTIONS 26 asks whether to scrub old history — unanswered).
+* Test `.ntw` files for the user go by SendUserFile from the scratchpad.
 
-* Windows: double-click `run.bat`. Linux: `./run.sh`. Both start
-  `uvicorn api:app --app-dir app` on port 8000.
-* `python -m pytest -q` → 104 tests. The browser tests use Playwright with
-  `/opt/pw-browsers/chromium`.
-* The sample-based tests **skip unless the sample files are present**:
-  * `samples/AL004-WV750/AL004.ntw`
-  * `samples/AL004-WV750/WV750-2026.{par,atv,tap,cpr,cbl}` — the user's
-    `aloo4_apec.zip`
-  * optionally `samples/partest/paratest.par`, `s1.par` … `s8.par` and
-    `v1.par` … `v10.par`: the user's test copy of the .par and two chains of
-    saves changing one setting each
-  * optionally the older `samples/KERMIT750-2026.*`, `samples/WVBeck750.*` and
-    `samples/AL00{2,3,4,5}.ntw` from the earlier OneDrive zips
-  * optionally `samples/AL004-WVEXT862/AL004.ntw` (the August AL004) with
-    `WVEXT862.{par,atv,tap,cpr,cbl}`, the older Lode 4 spec set it was saved
-    with (`tests/test_classic_specs.py`)
-  * optionally `samples/SN001-SHINSTON/SN001_MID.ntw` with
-    `SHINN1GHz Mid.{par,atv,tap,cpr,cbl}` (`tests/test_sn001.py`): a line
-    with text, and an 11.1 .atv
-* `samples/` is gitignored; a new session needs these files uploaded again.
+## Git
+
+* Repo `kaushalk24/Lodedata`, branch **`claude/lode-data-reverse-engineer-65vgkc`**
+  (all work is there; a session may be assigned another branch name by the
+  environment — keep working on this one unless the user says otherwise).
+* Commit as the user: `git -c user.email=kaushall2424@gmail.com -c user.name="Kaushal" commit`,
+  ending the message with the Co-Authored-By / Claude-Session trailers the
+  session gives. No model names in commits. Push with
+  `git push -u origin claude/lode-data-reverse-engineer-65vgkc`. No pull
+  requests unless asked.
+* A stop hook may ask to re-author commits as Claude; the user asked for
+  their own name — keep it, and re-author only if the user asks.
+
+## Setting up a new session
+
+1. The user uploads `lodedata-samples.zip` (and `lodedata-evidence.zip`).
+2. `unzip -o lodedata-samples.zip -d .` in the repository root → `samples/…`
+   as listed in `samples/README.md`. Unzip the evidence outside the repo
+   (e.g. the scratchpad); `docs/EVIDENCE.md` indexes it.
+3. `python -m pytest -q`. Expected with the samples zip in place and
+   Playwright/Chromium present: **all pass, 34 skipped** — the 34 need the
+   **WVBeck750** spec set, which no pack has (QUESTIONS 23). The browser
+   tests use `/opt/pw-browsers/chromium` (or `CHROMIUM_PATH`).
+4. `python tools/regression.py snapshot /tmp/base.json`, then
+   `python tools/regression.py diff samples/regression-baseline.json /tmp/base.json`
+   — must print "0 of 70 changed": the new session starts exactly where the
+   last one ended (the baseline was taken on commit d4d2065's engine with
+   the full samples pack). `/tmp/base.json` is then the baseline for the
+   regression check below.
+
+## Regression check (every change)
+
+    python tools/regression.py snapshot /tmp/after.json
+    python tools/regression.py diff /tmp/base.json /tmp/after.json
+
+Opens every `.ntw` in `samples/` with no spec and with every spec set there,
+and compares every screen row, the Test list, the branch list and the saved
+bytes. Anything that changes must be the change intended; anything else is
+asked about before pushing. Add every new sample the user sends to
+`samples/` so it joins the check.
 
 ## Where things are
 
 | path | what |
 |---|---|
-| `tools/lodedata/obfuscation.py` | .ntw decryption: `plain = nibswap((cipher - KEY[i%100]) & 0xFF)` from offset 512 |
-| `tools/lodedata/network.py` | .ntw layout: branch records, node records, all fields |
-| `tools/lodedata/specs.py` | .cbl .cpr .atv (+ in-line Q table) .tap (454-byte rows) .par (levels, supplies, frequencies); the older Lode 4 layouts too (file-formats 3.0) |
-| `app/hfc/importer.py` | spec set → Library; `design_from_ntw()` |
-| `app/hfc/screen.py` | the engine: Design levels, tap checks, end lines, coupler brackets, powering, amp info |
+| `tools/lodedata/obfuscation.py` | `.ntw` payload: `plain = nibswap((cipher - KEY[i % 100]) & 0xFF)` from offset 512 |
+| `tools/lodedata/network.py` | `.ntw` reader: branch records, node records (1970 / 2504 bytes, + text at +698), every field |
+| `tools/lodedata/writer.py` | `.ntw` writer over the opened file; every preamble total rebuilt; `blank()` = Lode's empty file |
+| `tools/lodedata/specs.py` | `.cbl .cpr .atv .tap .par`, current and older (Lode 4) layouts by the version at byte 26 |
+| `tools/lodedata/diff.py`, `cli.py` | `python -m lodedata diff a.ntw b.ntw` — what bytes a save changed |
+| `tools/regression.py` | the every-file × every-spec check above |
+| `app/hfc/importer.py` | spec set → library; `design_from_ntw()` (with or without a spec) |
+| `app/hfc/screen.py` | the engine: levels, Test list, brackets, boxes, powering, expanded block |
+| `app/hfc/exporter.py` | design → writer input |
+| `app/hfc/entry.py` | typed codes: taps `4.23`, couplers `-8` / `3=`, Active IDs |
 | `app/hfc/model.py`, `plant.py` | parts library; Design / Branch / Node |
-| `app/api.py` | FastAPI; `POST /api/import/ntw` takes the .ntw plus spec files |
-| `app/web/` | the UI: menus as in 12.11, screen menus, grid, info box, Project Settings |
-| `tests/test_ntw.py` | AL004 checked against the user's screenshots |
-| `docs/file-formats.md` | every decoded format, with how each was confirmed |
-| `docs/open-questions.md` | **the queue of open questions** |
-| `docs/lode-data-manual-notes.md` | notes from the vendor manual |
+| `app/api.py` | FastAPI; networks in SQLite (`data/designs.db`) |
+| `app/web/` | the UI: 12.11's menus, screen menus, grid, tip box, dialogs, keys, mouse |
+| `tests/test_ntw.py` | AL004 against the user's screenshots, Parameters chains, Test list |
+| `tests/test_ntw_writer.py` | byte-for-byte saves, totals, new networks |
+| `tests/test_classic_specs.py` | older AL004 + WVEXT862 |
+| `tests/test_sn001.py` | SN001 + SHINSTON |
+| `tests/test_ui.py` | the page in a real browser (Playwright) |
 
 ## Where it stands
 
-AL004 imports with every reference resolved: 45 branches, 275 nodes. The
-Design screen matches every screenshot number on branches 1, 4, 6, 9, 11, 18,
-19, 21 and 22, including:
-
-* end-of-branch lines and tap port outputs
-* tap colours
-* the coupler column
-* the info boxes (tap, coupler preview, power supply, amplifier)
-
-Power currents and volts match on all 29 lines of branch 4.
-
-## Rules learned from the user's screens
-
-* Levels shown are after the span on that line, before its equipment.
-* Order of equipment on a line: amp (replaces the level) → in-line Qn → taps
-  (cascaded) → couplers.
-* Leg designations:
-  * `8[2]`: the downstream leg is the high (thru) leg.
-  * `8-[2]` (keyed `8-` or `-8`): the thru leg goes to the branch.
-  * `3=`: the thru leg goes to the second branch.
-* Power:
-  * current is constant-wattage, interpolated between the power steps
-  * voltage drop = current × span resistance, the span's resistance being
-    whole milliohms, truncated (feet × µΩ/ft // 1000)
-  * a node's current is the current in the span on its supply side
-  * a power stop cuts the span leading into its node
-* Branch numbers are the file order, 1…n. Deleting a branch moves the later
-  ones up (the user: 2(3), 8(4), 12(5) → delete 2(3) → 8(3), 12(4)).
-* Coupler brackets (nothing in the file stores them): `<n>` if the branch has
-  no footage on non-1xx cable and its first span matches the nearest span
-  behind or ahead of the coupler on the parent branch (what BkFeed/FwdFd
-  copy), otherwise `[n]`. Confirmed by experiment (11.1 changed 105 → 106
-  turned 4.14 into `3-[11]<12>`) and by 6.1's `100[7]`.
-* Cable ID 0 is a real cable (index 0), not "none".
-* "Mileage" for the bracket rule = footage on a series ticked under
-  Parameters → Strand/Trench Types (WV750: 000 200 300 400).
-* Taps: 8-port is `<n>` on the Design screen, `{n}` in the preview box.
-* Tap test (Test, screen menu 5): below min / above max (yellow within the
-  tap margin, red beyond), over window (forward above min + window) and
-  below window (return below max − window), both yellow, crossover (> Max.
-  Crossover, yellow); levels compared to the hundredth. AL004's 37-line list
-  is reproduced exactly (`tests/test_ntw.py`).
-* Levels print to the hundredth, halves up: AL004 34.7 shows 21.115 as
-  21.12 and 37.865 as 37.87 (`as_shown` in `app/hfc/screen.py`).
-* Design keying from the user: `0` then `.` runs ftg → hc → cab → lv and
-  stops there; `. +` on an amplifier opens Amplifier Definition (names
-  unique in any case, "Amp Exists"; the last name offered, `+`/`-` step
-  it); `Insert` adds a 0-ft line above, `. Insert` below, with the cable of
-  the line above. See open-questions item 8.
-* Keys: in Design the digits are the screen menu; `0` Alters (tap prompt
-  "Enter desired tap {# of ports}.{ID #}: [home] for list", Home = Select
-  Tap), `5` Test, `/` expanded display, Esc closes. Entry types directly.
-
-## Saving .ntw
-
-`tools/lodedata/writer.py` writes a design back over the `.ntw` it was opened
-from. `app/hfc/exporter.py` turns the app's design into the writer's input.
-`POST /api/networks/{id}/ntw` backs File → Save Network / Save Network As….
-The app keeps the opened file in the `ntw_files` table and the file ids on
-nodes (`Node.rec`) and branches (`Branch.end_rec`). AL004 comes back byte for
-byte, and the layout is in file-formats 3.8. Open question 11 lists what is
-still to be confirmed in Lode Data.
-
-Every total the preamble keeps is rebuilt on save (`writer.tallies`), bar
-two undecoded counts. A network keyed from scratch is written over
-`writer.blank()`, the program's own empty file. A .ntw opens without a spec
-set (`design_from_ntw(data, None)`); attaching one through Project Settings
-(`POST /api/networks/{id}/library/spec`) writes the network out and reads it
-back against the new set by position, as the program does. Parts a spec set
-cannot name are kept as the file has them (`Node.kept_active`,
-`TapPlacement.file_ports`, coupler record and supply type left in place).
+* **AL004 + WV750:** 45 branches, 275 lines, all resolved. Every number on
+  every Design screenshot (branches 1, 3, 4, 6, 9, 11, 14, 18–22, 34), the
+  Power screen of branch 4 (29 volts, 29 currents), the 37-line Test list
+  (and the 36-line one with changed settings), expanded display blocks, info
+  boxes, Select Tap, pads/EQs (the program's pick on all 27 actives).
+* **Older AL004 + WVEXT862:** opens with nothing unresolved and saves byte
+  for byte; branches 6 and 7 match line for line; 67 of Lode's 94 Test lines.
+* **SN001 + SHINSTON:** 47 branches, 390 lines; branches 1, 2, 5, 8, 15, 18,
+  24, 28 match; 15-line Test list; Notes written exactly as Lode writes them.
+* **Coupler brackets:** 64 of 64 seen match (AL004 23, older 13, SN001 28).
+* **Saving:** byte-for-byte round trips; Lode opened every file the app
+  saved (seven edit tests, NEW_T1 keyed from scratch, Notes).
+* **Keys and mouse:** Design screen menu digits, `0` Alter, `.`-moves,
+  Insert, Delete, Amplifier Definition, Notes, Select Tap, double-click a
+  coupler to enter its branch, **mouse wheel** moves the cursor within the
+  branch and, up past the first line, back to the coupler line it was
+  entered from (commit d4d2065).
 
 ## Next step
 
-Questions 1–5, 8 and the Parameters file are closed; item 7's leftovers are
-parked. The user's next topic is the design engine itself — the main
-question they want to move on to.
+**Question set A** (older AL004) in `docs/QUESTIONS.md` was sent to the user
+and is waiting for their screenshots: cascade position (2/3/4 vs the app's
+1/3/3), the red "64" on 11.18, the "input … to LE" / "output … from LE" /
+"LE 11/5 before/0 after" Test lines, 15.4's 23.18 vs 23.19, and four
+brackets not yet on screen.
+
+With that set, build the **550 (F3) column** and its **14 Tap(550) Test
+lines** — this needs nothing from the user:
+
+* WVEXT862's Parameters has a third forward frequency, F3 = 550
+  (file-formats 3.0: "870 54 550 / 40 5"; Min F3 per level at 2976 + 24·lv
+  in the current `.par`, file-formats 3.5). Lode shows the column between
+  54 and 40 with WVEXT862 (19.55 at 44.1, 0.00 under it); with WV750 F3 is
+  off and there is no column.
+* Cable, coupler and tap loss blocks carry it: slot 2 of the ten-slot block
+  (0 F-high, 1 F-low, 2–5 F3–F6, 6 Rh, 7 Rl, 8–9 R3–R4; file-formats 3.1).
+* Older `.atv` actives hold F3–F6 inputs at +135 and outputs at +151 (i32
+  ×1e6): 0 inputs; outputs 43.0 on the LEs and FNB99, 41.1 on NC4000, 43.5
+  on HLN 3842 NODE. Checked by hand against Lode's screen: 4.1 = 35.20 and
+  4.2 = 33.28.
+* Then compare every 550 value on the older-AL004 screenshots (sets
+  SHINSTON2 5a–5f, SHINSTON3 1c/4a/4b in the evidence pack) and the Tap(550)
+  lines of its 94-line Test list, and run the regression check (AL004 and
+  SN001 must not change).
+
+After set A: sets B–G of QUESTIONS.md, one at a time.
+
+**Later topics the user named, not started:** the design engine itself
+(what Recalc, AutoCpl and the other screen-menu commands do — "the main
+question regarding the design"), and connecting networks (PCD connect,
+networks sharing a power supply).
+
+## Tooling notes
+
+* Never `pkill -f` a pattern that appears in your own command line — it
+  kills the shell. Stop servers by pid.
+* `git add` of a gitignored path aborts the whole add; use `-f` only for
+  `samples/README.md`.
+* Screen recordings: extract frames when the screen changes (plus a
+  settled frame 0.5 s later) to read them.
+* LibreOffice/Playwright/Chromium: Chromium is at `/opt/pw-browsers/chromium`.
