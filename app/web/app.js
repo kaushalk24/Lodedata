@@ -1443,11 +1443,17 @@ function showHelp() {
 }
 
 // ---------------------------------------------------------------- files
+// The last network this browser opened from a .ntw: one keyed in from
+// scratch here is written with that file's licence and user fields, as the
+// program on the person's own PC would -- not someone else's on the server.
+function lastOpened() {
+  try { return localStorage.getItem('ntw.lastOpened') || null; } catch (_) { return null; }
+}
 async function newNetwork() {
   const name = prompt('Name for the new network', 'lode-1'); if (!name) return;
   const d = await api('/api/networks', { method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, sample_specs: false }) });
+    body: JSON.stringify({ name, sample_specs: false, header_from: lastOpened() }) });
   await loadList(d.id); await open(d.id);
 }
 async function openNetwork() {
@@ -1546,6 +1552,7 @@ function importNtw() {
       return;
     }
     const r = out.report;
+    try { localStorage.setItem('ntw.lastOpened', out.id); } catch (_) {}
     if (picked && picked.name === f.name) await keepFile(out.id, picked);
     closeModal();
     await loadList(out.id);
@@ -1705,7 +1712,7 @@ $('#tbDelete').onclick = deleteNode;
   if (!id) {
     const d = await api('/api/networks', { method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'lode-1', sample_specs: false }) });
+      body: JSON.stringify({ name: 'lode-1', sample_specs: false, header_from: lastOpened() }) });
     id = await loadList(d.id);
   }
   await open(id);

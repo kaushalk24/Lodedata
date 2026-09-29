@@ -54,26 +54,38 @@ journalctl -u lodedata -f                                # its log
 
 ## Several people at once
 
-Yes — several people can use it at the same time, each in their own
-browser. (It is one Python process: a team of designers is fine; it is not
-built for hundreds at once.)
+Yes. Each person opens their own `.ntw` in their own browser, and may use
+the same spec set as others.
 
-* **One list of networks.** The networks people open are kept on the server
-  in `data/designs.db`, and everyone sees the same list. There are no
-  logins or per-user folders.
-* **Working on the same network.** Changes are applied one at a time, so
-  two people changing one network at the same moment both keep their
-  changes. Each sees the other's changes when their screen next refreshes
-  (after their own next change, or when they reopen the network). The
-  simplest practice is one person per network at a time.
+* **Everyone's files stay apart.** Every `.ntw` opened becomes its own
+  network on the server, with its own copy of the spec set it was opened
+  with. Two people opening files with the same name, or with the same spec
+  set, do not touch each other's work.
+* **Speed.** One change (a footage, a tap …) and the screen redrawn takes
+  about 0.2 s. Measured on a 4-core machine, with everyone changing their
+  own large network (AL004 / SN001) at the very same moment:
+
+  | people changing at once | 1 server process | 4 server processes |
+  |---|---|---|
+  | 5  | 0.9 s | 0.3 s |
+  | 10 | 1.7 s | 0.5 s |
+  | 20 | 3.7 s | 0.8 s |
+
+  People think between keystrokes, so real waits are shorter.
+  `start-server.sh` runs one process per CPU core, at most 4;
+  `WORKERS=2 ./start-server.sh` sets it yourself.
+* **A network started from scratch** (File > New) is saved with the
+  licence and user fields of the last `.ntw` that person opened in their
+  browser — as Lode Data on their own PC would — never someone else's
+  (blank if they have opened none; Lode Data opens that too).
+* **One list of networks.** Everyone sees every network in File > Open.
+  If two people ever do change the same network, both changes are kept —
+  they are applied one after the other.
 * **Opening and saving .ntw files** happens on each person's own PC: Open
   reads a file from their PC, Save writes it back there. Chrome and Edge
   write straight into the file only on `https://` addresses (or on the
   server itself); on a plain `http://` address the saved file is downloaded
   instead — to the Downloads folder — and they keep it from there.
-* **One server process.** Run it with `start-server.sh` as given; do not
-  add uvicorn's `--workers`, which would split the networks' one-at-a-time
-  handling across processes.
 * **No password.** Anyone who can reach the port can open, change and
   delete networks. Keep the port inside the company network (or VPN), or
   put it behind the company's reverse proxy with a login and HTTPS, for
@@ -116,7 +128,10 @@ CHROMIUM_PATH=$(ls -d ~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome | h
 
 ## Back up and update
 
-* Back up `data/designs.db` — it holds every network on the server.
+* Back up `data/` — `designs.db` holds every network on the server. While
+  the server runs, copy it with
+  `sqlite3 data/designs.db ".backup /backups/designs.db"`
+  (or stop the service and copy the folder).
 * To update: stop the service, unzip the new version over the old one
   (`data/` is kept), run `./install.sh` again, start the service.
 

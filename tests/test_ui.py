@@ -685,7 +685,7 @@ def test_other_spec_files_bring_up_the_spec_file_mismatch_box(page, tmp_path):
 def test_a_network_keyed_from_scratch_saves_as_ntw(server):
     """File > New, a spec set, a few lines; Save Network writes a .ntw as the
     program writes a new network (the header's licence and user fields from
-    the last .ntw opened), and it reads back."""
+    the last .ntw opened in the same browser), and it reads back."""
     import requests
     pair = SAMPLES / "AL004-WV750"
     if not (pair / "AL004.ntw").exists():
@@ -694,7 +694,8 @@ def test_a_network_keyed_from_scratch_saves_as_ntw(server):
     r = requests.post(f"{server}/api/import/ntw",
                       files=[("file", ("AL004.ntw", (pair / "AL004.ntw").read_bytes()))] + specs)
     assert r.json()["imported"]
-    nid = requests.post(f"{server}/api/networks", json={"name": "Untitled"}).json()["id"]
+    nid = requests.post(f"{server}/api/networks",
+                        json={"name": "Untitled", "header_from": r.json()["id"]}).json()["id"]
     requests.post(f"{server}/api/networks/{nid}/library/spec",
                   files=[("files", s[1]) for s in specs]).raise_for_status()
     base = f"{server}/api/networks/{nid}"

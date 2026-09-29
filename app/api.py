@@ -34,13 +34,26 @@ DB_PATH = Path(os.environ.get("LODEDATA_DB",
 
 app = FastAPI(title="Design Assistant")
 
-# Several people can use one server at once.  A change reads the whole
-# network, changes it and writes it back, so two changes to the same network
-# arriving together would lose one: they are taken one after the other.
-# Different networks are not held up.  (One server process: run it without
-# --workers.)
-_NETWORK_PATH = re.compile(r"^/api/networks/([^/]+)")
+# Several people can use one server at once, each on their own network.  A
+# change reads the whole network, changes it and writes it back, so two
+# changes to the same network arriving together would lose one: they are
+# taken one after the other -- within a server process by an asyncio lock,
+# across processes (start-server.sh's WORKERS) by a lock file.  Different
+# networks are not held up.
+try:
+    import fcntl
+except ImportError:              # Windows: one process, the asyncio lock is enough
+    fcntl = None
+_NETWORK_PATH = re.compile(r"^/api/networks/([A-Za-z0-9_-]+)")
 _network_locks: dict = {}
+
+
+def _hold_lock_file(nid: str):
+    folder = DB_PATH.parent / "locks"
+    folder.mkdir(parents=True, exist_ok=True)
+    f = open(folder / f"{nid}.lock", "a")
+    fcntl.flock(f, fcntl.LOCK_EX)          # released when the file is closed
+    return f
 
 
 @app.middleware("http")
@@ -48,15 +61,23 @@ async def one_change_at_a_time(request, call_next):
     found = _NETWORK_PATH.match(request.url.path)
     if not found or request.method == "GET":
         return await call_next(request)
-    lock = _network_locks.setdefault(found.group(1), asyncio.Lock())
-    async with lock:
-        return await call_next(request)
+    nid = found.group(1)
+    async with _network_locks.setdefault(nid, asyncio.Lock()):
+        held = await asyncio.to_thread(_hold_lock_file, nid) if fcntl else None
+        try:
+            return await call_next(request)
+        finally:
+            if held:
+                held.close()
 
 
 # --------------------------------------------------------------------------
 def db() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
+    # several server processes share the file: wait for another's write
+    # rather than fail, and let reads go on while one writes
+    con = sqlite3.connect(DB_PATH, timeout=30)
+    con.execute("PRAGMA journal_mode=WAL")
     con.execute("CREATE TABLE IF NOT EXISTS designs ("
                 "id TEXT PRIMARY KEY, name TEXT, updated TEXT, doc TEXT)")
     # the .ntw a network was opened from, or last saved as: a save is built
@@ -66,7 +87,11 @@ def db() -> sqlite3.Connection:
     return con
 
 
-LAYOUT_FILE = "__layout__"      # the last .ntw opened: a new network takes its header
+def layout_key(design_id: str) -> str:
+    """Where a network keyed in from scratch keeps the header it is written
+    with: the licence and user fields of the last .ntw opened in the browser
+    that started it -- that person's, on a server several people use."""
+    return f"layout:{design_id}"
 
 
 def ntw_file(design_id: str) -> bytes | None:
@@ -109,6 +134,7 @@ def save(d: Design) -> Design:
 class NewNetwork(BaseModel):
     name: str = "lode-1"
     sample_specs: bool = False
+    header_from: str | None = None     # the last network this browser opened from a .ntw
 
 
 @app.get("/api/networks")
@@ -128,6 +154,9 @@ def new_network(body: NewNetwork):
     if body.sample_specs:
         d.library = starter_library()
     save(d)
+    opened = ntw_file(body.header_from) if body.header_from else None
+    if opened:
+        keep_ntw_file(layout_key(d.id), opened[:512])
     return d.to_dict()
 
 
@@ -140,7 +169,7 @@ def get_network(nid: str):
 def delete_network(nid: str):
     con = db()
     con.execute("DELETE FROM designs WHERE id=?", (nid,))
-    con.execute("DELETE FROM ntw_files WHERE id=?", (nid,))
+    con.execute("DELETE FROM ntw_files WHERE id IN (?, ?)", (nid, layout_key(nid)))
     con.commit()
     con.close()
     return {"deleted": nid}
@@ -520,7 +549,7 @@ def _read_again(nid: str, d: Design, base: Path) -> Design:
     network is under the new set.  What a .ntw does not hold yet (TSG, map,
     location, address, notes) is carried across line by line."""
     source = ntw_file(nid)
-    layout = ntw_file(LAYOUT_FILE)
+    layout = ntw_file(layout_key(nid))
     data, _ = export_ntw(d, source, name=d.name,
                          header=layout[:512] if source is None and layout else None)
     new, _ = design_from_ntw(data, base, name=d.name)
@@ -569,8 +598,6 @@ async def import_ntw(file: UploadFile = File(...),
     d.id = new_id("ntw")
     save(d)
     keep_ntw_file(d.id, data)
-    # the header a network keyed in from scratch is written with
-    keep_ntw_file(LAYOUT_FILE, data)
     return {"imported": True, "id": d.id, "name": d.name, "report": report, **info}
 
 
@@ -590,8 +617,9 @@ def save_ntw(nid: str, filename: str | None = None):
     header = None
     if source is None:
         # keyed in from scratch: written as the program writes a new network,
-        # with the licence and user fields of the last .ntw opened here
-        layout = ntw_file(LAYOUT_FILE)
+        # with the licence and user fields of the last .ntw its person opened
+        # (blank if none -- Lode Data opens that too)
+        layout = ntw_file(layout_key(nid))
         header = layout[:512] if layout else None
     try:
         data, report = export_ntw(d, source, name=stem or d.name, header=header)
