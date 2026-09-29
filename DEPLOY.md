@@ -8,15 +8,21 @@ on the users' PCs.
 
 * A Linux server, x86_64 (64-bit Intel/AMD).
 * Python 3.10, 3.11, 3.12 or 3.13, with its `venv` module
-  (Debian/Ubuntu: `sudo apt install python3 python3-venv`;
-  RHEL/Rocky/Alma: `sudo dnf install python3`).
-* No internet: the zip carries every package in `wheels/`. (On an ARM
-  server `install.sh` fetches them from the internet instead.)
+  (`python3 --version` shows which you have).
+  Debian/Ubuntu: `sudo apt install python3 python3-venv`.
+  RHEL/Rocky/Alma 9 come with 3.9, which is too old:
+  `sudo dnf install python3.11`, then `PYTHON=python3.11 ./install.sh`.
+* No internet: the zips carry every package in `wheels/` —
+  `lodedata-server.zip` for Python 3.10–3.12, and `lodedata-python313.zip`
+  adds the packages for Python 3.13 (unzip it into the same place, only if
+  the server's Python is 3.13). On an ARM server `install.sh` fetches the
+  packages from the internet instead.
 
 ## Install
 
 ```sh
 sudo unzip lodedata-server.zip -d /opt          # makes /opt/lodedata
+sudo unzip lodedata-python313.zip -d /opt       # only with Python 3.13
 sudo chown -R "$USER": /opt/lodedata
 cd /opt/lodedata
 ./install.sh                                    # or: PYTHON=python3.12 ./install.sh

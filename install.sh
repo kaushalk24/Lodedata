@@ -27,7 +27,13 @@ fi
 
 if [ -d wheels ] && ls wheels/*.whl >/dev/null 2>&1; then
   echo "Installing the packages from wheels/ (offline)..."
-  .venv/bin/python -m pip install --no-index --find-links wheels -r requirements.txt
+  if ! .venv/bin/python -m pip install --no-index --find-links wheels -r requirements.txt; then
+    echo >&2
+    echo "wheels/ has no packages for $("$PYTHON" --version) on this machine." >&2
+    echo "With Python 3.13, unzip lodedata-python313.zip into the same folder first;" >&2
+    echo "or, with internet access, delete the wheels folder and run ./install.sh again." >&2
+    exit 1
+  fi
 else
   echo "Installing the packages from the internet..."
   .venv/bin/python -m pip install -r requirements.txt
