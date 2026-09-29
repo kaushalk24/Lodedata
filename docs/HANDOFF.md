@@ -48,7 +48,10 @@ new Python dependencies go in `requirements.txt` (and, if PyInstaller does
 not find them, in `desktop/build.bat`); new files the page loads go under
 `app/web/`; Open/Save in the page go through `showOpenFilePicker` /
 `showSaveFilePicker`, which the program replaces with Windows' dialogs
-(`desktopFile` in `app/web/app.js`).
+(`desktopFile` in `app/web/app.js`). Keep `desktop/LodeData.exe.config`
+beside the exe (build.bat copies it): without it a copy unzipped from a
+download cannot open its window — the user's laptop showed this, and the
+build's "as if downloaded" start checks it every time.
 
 ## How the user works — standing instructions
 

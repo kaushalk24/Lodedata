@@ -8,6 +8,7 @@ python -m PyInstaller --noconfirm --clean --windowed --name LodeData ^
   --collect-all webview --collect-submodules uvicorn ^
   --hidden-import python_multipart --hidden-import multipart ^
   desktop\lodedata_desktop.py || exit /b 1
+copy /y desktop\LodeData.exe.config dist\LodeData\ >nul || exit /b 1
 del lodedata-check.log 2>nul
 start "" /wait dist\LodeData\LodeData.exe --check
 if %errorlevel% neq 0 (type lodedata-check.log & echo LodeData.exe failed its check & exit /b 1)
