@@ -22,7 +22,7 @@ export function defaultState() {
       celebrations: true, restOn: true, restSec: 165, remindDays: 4, sound: true,
       oneRmOn: false, formula: 'epley', gymId, repLow: 8, repHigh: 12, stepKg: 2.5, showTargets: true, rpeOn: false,
     },
-    ui: { templatesCollapsed: false, shareTipDismissed: false, reminderDismissed: null, tipIndex: 0, sessionStyle: 'cards', sessionRange: 'week', dupIgnore: [] },
+    ui: { templatesCollapsed: false, shareTipDismissed: false, reminderDismissed: null, tipIndex: 0, sessionStyle: 'cards', sessionRange: 'week', dupIgnore: [], backupAt: 0, backupSnooze: 0 },
   };
 }
 

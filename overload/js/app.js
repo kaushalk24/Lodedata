@@ -5,7 +5,7 @@ import * as store from './store.js';
 import { demoState } from './dataio.js';
 import { initNav, wireEvents, setGlobalActions, showTab, push, back, refreshAll, currentTab, topScreen, toast } from './ui.js';
 import { startRest, stopRest, addRest, restExId, restoreRest, unlockAudio } from './timer.js';
-import { openSettings } from './screens/settings.js';
+import { openSettings, saveBackup } from './screens/settings.js';
 import './screens/home.js';
 import './screens/exercises.js';
 import './screens/exercise.js';
@@ -61,6 +61,7 @@ async function boot() {
     tab: el => showTab(el.dataset.tab),
     settings: () => openSettings(),
     'open-import': () => openSettings('data'),
+    'backup-now': () => saveBackup(),
     'open-exercise': el => push('exercise', { id: el.dataset.id }),
     'load-demo': () => { store.replaceState(demoState(store.getState())); toast('Demo data loaded. Erase it any time in Settings › Import & Export.'); },
     'timer-open': () => {
@@ -85,7 +86,10 @@ async function boot() {
   restoreRest();
   document.body.classList.add('ready');
   if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !window.OVERLOAD_DEMO) {
-    navigator.serviceWorker.register('sw.js').catch(() => { /* offline cache is optional */ });
+    // Check for a new version on launch and whenever the app comes back to the front; it applies on the next launch.
+    navigator.serviceWorker.register('sw.js').then(reg => document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => { /* offline */ });
+    })).catch(() => { /* offline cache is optional */ });
   }
 }
 

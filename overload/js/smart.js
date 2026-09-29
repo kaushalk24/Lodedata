@@ -238,3 +238,16 @@ export function warmupRamp(work, { bar = 0, smallestPlate = 1.25, step = 2.5 } =
   }
   return rows;
 }
+
+/* ---------- backup reminder ---------- */
+
+/**
+ * How many sets aren't in any backup yet, once some of them have gone 30 days without one (else 0).
+ * Needs at least 10 such sets, so a new log isn't nagged on day one.
+ */
+export function unsavedSets(sets, { backupAt = 0, snoozeUntil = 0 } = {}, now = Date.now()) {
+  if (now < snoozeUntil) return 0;
+  let count = 0, oldest = Infinity;
+  for (const s of sets) if (s.ts > backupAt) { count++; if (s.ts < oldest) oldest = s.ts; }
+  return count >= 10 && now - oldest >= 30 * DAY ? count : 0;
+}

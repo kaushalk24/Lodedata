@@ -3,6 +3,7 @@
 This repository holds two independent projects:
 
 - **[Overload](overload/)**: a free, offline-first workout tracker (installable web app) modelled on Setgraph,
+  live at https://kaushalk24.github.io/Lodedata/overload/ once GitHub Pages is on (see its README),
   with a screen-by-screen [teardown](overload/docs/01-setgraph-teardown.md) and an
   [improvement plan](overload/docs/02-improvements.md).
 - **HFC Plant Designer** (below): a clean-room take on the Lode Data *Design Assistant*.

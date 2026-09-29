@@ -8,6 +8,7 @@ const ago = (d, h = 0, m = 0) => now - ((d * 24 + h) * 60 + m) * 60000;
 
 test('relative times match the exercise list', () => {
   assert.equal(relTime(now - 11000, now), '11 secs ago');
+  assert.equal(relTime(now - 400, now), '1 sec ago');
   assert.equal(relTime(ago(0, 3), now), '3h ago');
   assert.equal(relTime(ago(1), now), 'Yesterday');
   assert.equal(relTime(ago(2), now), '2d ago');

@@ -159,6 +159,7 @@ export function demoState(base, now = Date.now()) {
   ];
   s.settings.gymId = 'gym-a';
   s.settings.rpeOn = true;
+  s.ui.backupAt = now;
   s.exercises = []; s.workouts = []; s.sets = []; s.sessions = []; s.body = [];
   const exByName = {};
   for (const [wname, def] of Object.entries(DEMO)) {

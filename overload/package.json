@@ -5,6 +5,7 @@
   "description": "Offline-first workout tracker (PWA). No build step: serve this folder.",
   "scripts": {
     "test": "node --test",
+    "stamp": "node tools/stamp-sw.mjs",
     "start": "npx --yes serve -l 5173 ."
   }
 }

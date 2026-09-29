@@ -32,13 +32,27 @@ Open the printed address. On first launch, tap **Try demo data** to explore with
 
 ## Put it on your phone (free)
 
-1. Host the `overload/` folder on any static host. GitHub Pages is free: *Settings → Pages → Deploy from a branch*,
-   then open `https://<you>.github.io/<repo>/overload/`. Netlify Drop and Cloudflare Pages also work.
-2. **iPhone**: open the link in Safari → Share → **Add to Home Screen**. It then runs full screen and offline.
-3. **Android**: open it in Chrome → menu → **Install app**.
+The app needs nothing but free static hosting: no account, no server and no AI service. GitHub Pages hosts it from
+this repository.
 
-Data lives in the browser's storage on that phone (IndexedDB). Save a backup now and then from
-*Settings → Import & Export*.
+1. **Publish (once):** on GitHub open the repository's *Settings → Pages*. Under *Build and deployment* choose
+   *Deploy from a branch*, pick the branch that holds this code and the `/ (root)` folder, then *Save*. After a minute
+   the app is live at **https://kaushalk24.github.io/Lodedata/overload/** (the site root forwards there).
+2. **iPhone:** open that link in Safari → Share → **Add to Home Screen**. It runs full screen and works offline.
+3. **Android:** open it in Chrome → menu → **Install app**.
+
+Worth knowing on iPhone:
+
+- **Log in the Home Screen app, not a Safari tab.** They keep separate data.
+- **Your log lives only on the phone.** Removing the app from the Home Screen can erase it, so save a backup from
+  *Settings → Import & Export* now and then (My Workouts reminds you after 30 days). Progress photos aren't in backups.
+- **Updates install themselves.** Every push to the published branch goes live; the app downloads the new version in
+  the background and switches to it the next time it starts (Settings shows the version).
+
+### Changing the code
+
+Edit any file, then run `npm run stamp` in `overload/` before committing. It writes the file list and version into
+`sw.js`, so phones fetch the whole new version at once (the tests fail if you forget).
 
 ## Bring your history
 
@@ -53,7 +67,7 @@ cd overload && npm test      # or `node --test` from the repo root
 ```
 
 The tests cover the analytics against the exact numbers in the recording, plus the planner, CSV import/export,
-date parsing and muscle guessing.
+date parsing, muscle guessing, the typed-set parser, the smart features, and that `sw.js` caches every file.
 
 ## Layout
 
@@ -71,5 +85,6 @@ overload/
     chart.js     SVG chart                              bodymap.js  SVG muscle map
     screens/     home, exercises, exercise, setentry, flow (supersets), sessions, body, today, settings
   tests/         node --test suites
+  tools/         stamp-sw.mjs: writes the offline file list and version into sw.js (npm run stamp)
   docs/          teardown and improvement notes
 ```

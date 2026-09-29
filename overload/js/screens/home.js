@@ -6,7 +6,7 @@ import { registerScreen, renderScreen, push, openSheet, toast, confirmDialog, he
 import { TEMPLATES, libByName, MUSCLES } from '../library.js';
 import { generatePlan, planDayText, GOALS } from '../planner.js';
 import { weeklyStreak, heatmap, daysSinceLast, muscleReport } from '../stats.js';
-import { whatToTrain } from '../smart.js';
+import { whatToTrain, unsavedSets } from '../smart.js';
 import { COLORS } from './common.js';
 
 const TIPS = [
@@ -21,6 +21,7 @@ registerScreen('home', {
     const streak = weeklyStreak(store.allSets(), st.settings.weeklyGoal);
     const since = daysSinceLast(store.allSets());
     const showReminder = since != null && since >= st.settings.remindDays && st.ui.reminderDismissed !== dayKey(Date.now());
+    const unsaved = unsavedSets(st.sets, { backupAt: st.ui.backupAt, snoozeUntil: st.ui.backupSnooze });
     const groups = [...new Set(st.workouts.map(w => w.group).filter(Boolean))];
     const wRow = (w, i) => html`<div class="row-wrap">
       ${p.edit ? html`<button class="row-del" data-a="delete-workout" data-id="${w.id}" aria-label="Delete ${w.name}">${icon('minus')}</button>` : ''}
@@ -44,6 +45,11 @@ registerScreen('home', {
           <span class="banner-icon">${icon('bell')}</span>
           <div><b>${since} days since your last workout</b><p>Everything has recovered, so today is a good day to train.</p></div>
           <button class="circle small" data-a="dismiss-reminder" aria-label="Dismiss">${icon('x')}</button></div>` : ''}
+        ${unsaved ? html`<div class="banner backup-nudge">
+          <span class="banner-icon">${icon('download')}</span>
+          <div><b>Back up your log</b><p>${unsaved.toLocaleString()} sets are only on this phone. Save a copy to Files or iCloud Drive.</p>
+            <button class="pill-btn small" data-a="backup-now">Back Up Now</button></div>
+          <button class="circle small" data-a="snooze-backup" aria-label="Remind me next week">${icon('x')}</button></div>` : ''}
         <div class="card list">
           <button class="row accent" data-a="new-workout"><span class="row-icon">${icon('plus')}</span><span class="row-main">New Workout…</span></button>
           <button class="row accent" data-a="planner"><span class="row-icon">${icon('wand')}</span><span class="row-main">New Custom Plan…</span></button>
@@ -86,6 +92,7 @@ registerScreen('home', {
     planner: () => plannerSheet(),
     streak: () => streakSheet(),
     'dismiss-reminder': () => store.setUi('reminderDismissed', dayKey(Date.now())),
+    'snooze-backup': () => store.setUi('backupSnooze', Date.now() + 7 * 86400000),
   },
 });
 

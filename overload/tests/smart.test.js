@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   typoCheck, normalizeName, sameName, editDistance, findDuplicates, learnedRest, plateauInfo, projectGoal,
-  whatToTrain, warmupRamp, pairKey,
+  whatToTrain, warmupRamp, pairKey, unsavedSets,
 } from '../js/smart.js';
 
 const DAY = 86400000;
@@ -149,4 +149,20 @@ test('warm-up ramp', () => {
   assert.deepEqual(warmupRamp(2.5, { step: 2.5 }), []);
   // Only loads that exist: 1.25 kg plates make 2.5 kg jumps above the bar.
   for (const r of warmupRamp(87.5, { bar: 20, smallestPlate: 1.25 })) assert.equal(((r.kg - 20) * 100) % 250, 0);
+});
+
+test('backup reminder: only once unsaved sets are 30 days old', () => {
+  const now = at(2026, 9, 29, 12);
+  const log = (days, count = 10) => Array.from({ length: count }, (_, i) => set('a', now - days * DAY + i * 60000, 8, 50));
+  assert.equal(unsavedSets([], {}, now), 0);
+  assert.equal(unsavedSets(log(3), {}, now), 0, 'a new log is not nagged');
+  assert.equal(unsavedSets(log(31, 9), {}, now), 0, 'too few sets to matter');
+  assert.equal(unsavedSets(log(31), {}, now), 10, 'never backed up, oldest set a month old');
+  assert.equal(unsavedSets([...log(31), ...log(1)], {}, now), 20);
+  // After a backup only newer sets count, and their own age starts the clock.
+  assert.equal(unsavedSets([...log(40), ...log(5)], { backupAt: now - 20 * DAY }, now), 0);
+  assert.equal(unsavedSets([...log(40), ...log(31)], { backupAt: now - 35 * DAY }, now), 10);
+  // "Not now" hides it until the snooze ends.
+  assert.equal(unsavedSets(log(31), { snoozeUntil: now + DAY }, now), 0);
+  assert.equal(unsavedSets(log(31), { snoozeUntil: now - 1 }, now), 10);
 });

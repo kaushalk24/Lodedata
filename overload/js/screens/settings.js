@@ -1,5 +1,5 @@
 /* Settings sheet with its own page stack. */
-import { html, raw, fmtNum, fmtClock, dayKey } from '../util.js';
+import { html, raw, fmtNum, fmtClock, dayKey, relTime } from '../util.js';
 import { icon } from '../icons.js';
 import * as store from '../store.js';
 import { openSheet, toast, choose, confirmDialog, promptDialog, circle, toggle } from '../ui.js';
@@ -9,7 +9,7 @@ import { streakSheet } from './home.js';
 import { erasePhotos } from './body.js';
 import { learnedRest } from '../smart.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 
 const row = (a, ic, label, meta = '', extra = '') => html`<button class="row" data-a="${a}" ${raw(extra)}><span class="row-icon">${icon(ic)}</span><span class="row-main">${label}</span>${meta ? html`<span class="row-meta">${meta}</span>` : ''}<span class="chev">${icon('chevronRight')}</span></button>`;
 const swRow = (a, ic, label, on) => html`<div class="row static"><span class="row-icon">${icon(ic)}</span><span class="row-main">${label}</span>${toggle(a, on)}</div>`;
@@ -27,6 +27,8 @@ function learnedSection(s) {
       <button class="pill-btn small" data-a="apply-rest" data-id="${x.ex.id}" data-s="${x.r.sec}">Apply</button></div>`)}
     ${rows.length > 1 ? html`<button class="row accent" data-a="apply-all-rest"><span class="row-main">Apply to all exercises</span></button>` : ''}</div>`;
 }
+
+const lastBackup = ts => { const r = relTime(ts); return !ts ? 'never' : r === 'Yesterday' ? 'yesterday' : r; };
 
 const THEMES = { system: 'Match Device', dark: 'Dark', light: 'Light' };
 
@@ -145,12 +147,13 @@ const PAGES = {
   data: {
     title: 'Import & Export',
     render() {
+      const st = store.getState();
       return html`<div class="section-label">Backup</div>
         <div class="card list">
           ${row('backup', 'download', 'Save backup file (.json)')}
           <label class="row"><span class="row-icon">${icon('upload')}</span><span class="row-main">Restore from backup…</span><input type="file" accept=".json,application/json" data-in="restore" hidden><span class="chev">${icon('chevronRight')}</span></label>
         </div>
-        <p class="hint">A backup holds everything: exercises, sets, workouts, gyms and settings. Save one to Files or iCloud Drive every few weeks.</p>
+        <p class="hint">Last backup: ${lastBackup(st.ui.backupAt)}. A backup holds your exercises, sets, workouts, measurements, gyms and settings (not progress photos). Save one to Files or iCloud Drive every few weeks.</p>
         <div class="section-label">Spreadsheet</div>
         <div class="card list">
           ${row('export-csv', 'download', 'Export sets as CSV')}
@@ -169,6 +172,8 @@ const PAGES = {
     render() {
       return html`<div class="card pad prose">
         <h3>Install on iPhone</h3><p>Open this page in Safari, tap Share, then <b>Add to Home Screen</b>. It opens full screen and works offline, including in a basement gym with no signal.</p>
+        <p>Log in the Home Screen app rather than a Safari tab, because they keep separate data. Removing the app from the Home Screen can erase your log, so save a backup first.</p>
+        <h3>Updates</h3><p>New versions download in the background and take over the next time the app starts. Your data stays as it is.</p>
         <h3>Install on Android</h3><p>In Chrome, open the menu and tap <b>Install app</b>.</p>
         <h3>Logging fast</h3><p>The set sheet opens with your last set filled in. If nothing changed, tap the green check. The stack button next to + logs a copy of the last set in one tap.</p>
         <h3>Machine settings</h3><p>Use an exercise's pinned note for seat and pin positions so they're always at the top.</p>
@@ -258,7 +263,7 @@ const ACTIONS = {
     const v = await choose({ title: 'Smallest weight jump', options: opts.map(o => ({ label: `${o} ${lb ? 'lb' : 'kg'}`, value: o })) });
     if (v) store.setSetting('stepKg', lb ? v * 0.45359237 : v);
   },
-  backup: () => downloadFile(`overload-backup-${dayKey(Date.now())}.json`, JSON.stringify(store.exportState()), 'application/json'),
+  backup: () => saveBackup(),
   'export-csv': () => downloadFile(`overload-sets-${dayKey(Date.now())}.csv`, setsToCSV(store.getState()), 'text/csv'),
   demo: async () => {
     if (store.getState().sets.length && !(await confirmDialog({ title: 'Replace your data with demo data?', message: 'Save a backup first if you want to keep what you have.', confirm: 'Load Demo Data' }))) return;
@@ -284,17 +289,26 @@ const INPUTS = {
   csv: async el => { const f = el.files?.[0]; el.value = ''; if (f) importSheet(await f.text(), f.name); },
 };
 
-/** Save a file: share sheet on phones (Save to Files), download link elsewhere. */
+/** Save a full backup and remember when, for the reminder on My Workouts. */
+export async function saveBackup() {
+  const now = Date.now(), st = store.exportState();
+  // The file records its own time, so restoring it doesn't bring the reminder straight back.
+  const text = JSON.stringify({ ...st, ui: { ...st.ui, backupAt: now } });
+  if (await downloadFile(`overload-backup-${dayKey(now)}.json`, text, 'application/json')) store.setUi('backupAt', now);
+}
+
+/** Save a file: share sheet on phones (Save to Files), download link elsewhere. Resolves false if cancelled. */
 export async function downloadFile(name, text, type) {
   const blob = new Blob([text], { type });
   try {
     const file = new File([blob], name, { type });
-    if (navigator.canShare?.({ files: [file] }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) { await navigator.share({ files: [file] }); return; }
-  } catch (e) { if (e?.name === 'AbortError') return; }
+    if (navigator.canShare?.({ files: [file] }) && /iPhone|iPad|Android/i.test(navigator.userAgent)) { await navigator.share({ files: [file] }); return true; }
+  } catch (e) { if (e?.name === 'AbortError') return false; }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   toast(`Saved ${name}`, { iconName: 'download' });
+  return true;
 }
 
 const FIELD_NAMES = { exercise: 'Exercise *', date: 'Date *', time: 'Time', reps: 'Reps *', weight: 'Weight', note: 'Note', label: 'Set type / label', unit: 'Unit column' };

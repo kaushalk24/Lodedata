@@ -75,7 +75,7 @@ export function relTime(ts, now = Date.now()) {
   const days = daysBetween(ts, now);
   if (days === 0) {
     const s = Math.floor(diff / 1000);
-    if (s < 60) return `${Math.max(1, s)} sec${s === 1 ? '' : 's'} ago`;
+    if (s < 60) return `${Math.max(1, s)} sec${s <= 1 ? '' : 's'} ago`;
     const m = Math.floor(s / 60);
     if (m < 60) return `${m} min${m === 1 ? '' : 's'} ago`;
     return `${Math.floor(m / 60)}h ago`;

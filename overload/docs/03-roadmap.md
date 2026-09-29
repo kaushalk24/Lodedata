@@ -47,6 +47,8 @@ Phone (Overload PWA) ──► Cloudflare Worker (free tier) ──► Claude AP
    └── only what a feature needs is sent, and you see it first
 ```
 
+- **The app never depends on it.** Everything in sections 1 and 2 works with no account, no network and no AI. These
+  features would use a pay-per-use Anthropic API key, not a Claude subscription, and the app keeps working without them.
 - **The API key never goes into the app.** A tiny Cloudflare Worker (free tier: 100,000 requests a day) keeps the key as
   a secret, checks a private token stored on your phone, and forwards the request. A monthly spend limit in the
   Anthropic Console is the hard cap.
