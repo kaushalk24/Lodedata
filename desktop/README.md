@@ -16,12 +16,18 @@ under the repository's Actions tab, as the run's LodeData-windows artifact).
 
 ## Use it
 
-1. Unzip `LodeData-windows.zip` anywhere, e.g. `C:\LodeData` or a shared drive.
+1. Unzip `LodeData-windows.zip` onto the laptop, e.g. `C:\LodeData`.
 2. Open the `LodeData` folder and double-click `LodeData.exe`. Keep the
-   folder together — the `.exe` needs the `_internal` folder beside it.
-   Right-click → Send to → Desktop (create shortcut) for a desktop icon.
+   folder together — the `.exe` needs the `_internal` folder and
+   `LodeData.exe.config` beside it. Right-click → Send to → Desktop (create
+   shortcut) for a desktop icon.
 3. The first time, Windows may say "Windows protected your PC" (the program
    is not signed): **More info → Run anyway**.
+
+Windows marks files unzipped from a download, and .NET — which the window
+uses — refuses to load marked files ("could not open its window").
+`LodeData.exe.config` allows them, so the zip does not need unblocking; the
+build checks the program opens as unzipped from a download.
 
 Windows 10 or 11, 64-bit. The window is Edge's WebView2, which Windows 11
 already has.

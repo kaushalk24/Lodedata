@@ -50,11 +50,9 @@ jobs:
           if (-not (Start-Check "dist/LodeData")) { throw "LodeData.exe did not open its window" }
           "as built: the window opened and the page loaded"
 
-          Copy-Item dist/LodeData "$env:RUNNER_TEMP/without-config" -Recurse
-          Remove-Item "$env:RUNNER_TEMP/without-config/LodeData.exe.config"
-          Mark-Downloaded "$env:RUNNER_TEMP/without-config"
-          "downloaded, without LodeData.exe.config: window opened = $(Start-Check "$env:RUNNER_TEMP/without-config") (expected False: the user's problem)"
-
+          # Without LodeData.exe.config such a copy cannot open its window:
+          # "Failed to resolve Python.Runtime.Loader.Initialize" (run 3 of this
+          # workflow showed it, as on the user's laptop).
           Copy-Item dist/LodeData "$env:RUNNER_TEMP/downloaded" -Recurse
           Mark-Downloaded "$env:RUNNER_TEMP/downloaded"
           if (-not (Start-Check "$env:RUNNER_TEMP/downloaded")) { throw "unzipped from a download, LodeData.exe did not open its window" }
