@@ -26,8 +26,8 @@ class LodeHeader:
     format_major: int    # byte 26 -- 12 for ntw/atv, 11 for cbl/cpr/par/tap
     format_minor: int    # byte 27 -- 1 in every sample seen
     app_version: str     # e.g. "Design 12.11"; only .ntw fills this in
-    license_id: str      # e.g. "LP-13X00J3" -- the dongle/licence the file came from
-    user_id: str         # e.g. "vk1091", "SEASTMAN", "CCJ"
+    license_id: str      # "LP-..." -- the dongle/licence the file came from
+    user_id: str         # the user id the file was saved under
     raw: bytes
 
     @property

@@ -3,6 +3,9 @@
 Reverse engineering of the Lode Data Design Assistant file formats, and the
 groundwork for an HFC network design application that can read them.
 
+* Running it on a Linux server for several users: [`DEPLOY.md`](DEPLOY.md)
+* What still has to be checked in Lode Data: [`docs/QUESTIONS.md`](docs/QUESTIONS.md)
+
 ## Status
 
 **Solved**

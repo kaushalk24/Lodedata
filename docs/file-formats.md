@@ -15,8 +15,8 @@ levels like 538.97 dB. In both sample sets the real actives occupy slots 7–46.
 
 | file | kind | source |
 |---|---|---|
-| `AL002.ntw` … `AL005.ntw` | network designs | written by *Design 12.11*, licence `LP-13X00J3`, user `vk1091` |
-| `KERMIT750-2026.{par,cbl,cpr,tap,atv}` | equipment spec set | licence `LP-BSQN2J3` (`.atv`: `LP-990XYP3-1`) |
+| `AL002.ntw` … `AL005.ntw` | network designs | written by *Design 12.11*, with a licence id and user id |
+| `KERMIT750-2026.{par,cbl,cpr,tap,atv}` | equipment spec set | with a licence id (the `.atv` another) |
 | `WVBeck750.{par,cbl,cpr,tap,atv}` | equipment spec set | same licences, different content |
 
 The layouts below were inferred from the bytes and cross-checked against real
@@ -39,8 +39,8 @@ Every Lode Data file — network and spec alike — starts with the same header.
 | 27 | 1 | format minor version (always `1` in the samples) |
 | 28 | 100 | application version string, e.g. `Design 12.11` (only `.ntw` fills this in) |
 | 128 | 1 | zero |
-| 129 | 16 | licence / dongle id, e.g. `LP-13X00J3`, NUL-terminated |
-| 145 | 16 | user id, e.g. `vk1091`, `SEASTMAN`, `CCJ` |
+| 129 | 16 | licence / dongle id, `LP-` and letters and digits, NUL-terminated |
+| 145 | 16 | user id, NUL-terminated |
 | 161 | 351 | reserved; `.ntw` sets a single byte `0xE2` at offset 402 **(unconfirmed)** |
 | 512 | — | payload starts |
 

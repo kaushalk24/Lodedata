@@ -1,17 +1,19 @@
-Put real Lode Data files here to test the readers against them.
+Put real Lode Data files here to run the checks against them.
 
     samples/
-      KERMIT750-2026.par  .atv  .tap  .cpr  .cbl
-      WVBeck750.par  .atv  .tap  .cpr  .cbl
-      AL005.ntw
-      AL004-WV750/AL004.ntw + WV750-2026.*   (a design with its own spec set;
-                                              tests/test_ntw.py checks it
-                                              against the screens)
+      AL004-WV750/      AL004.ntw + WV750-2026.par .atv .tap .cpr .cbl
+      AL004-WVEXT862/   AL004.ntw (the older one) + WVEXT862.par .atv .tap .cpr .cbl
+      SN001-SHINSTON/   SN001_MID.ntw, SN001_NOTES_test.ntw (Lode Data's save)
+                        + "SHINN1GHz Mid".par .atv .tap .cpr .cbl
+      partest/          the Parameters test copies (paratest.par, s1-s8, v1-v10,
+                        act.atv)
+      KERMIT750-2026.*  WVBeck750.*    (both spec sets: tests/test_import.py,
+                                        tests/test_entry.py)
 
-Anything under this directory is found automatically (nested folders are fine),
-and `pytest` then runs the checks that read real spec files. Without them those
-tests skip and the rest of the suite still passes.
+Anything under this directory is found automatically, and `pytest` then runs
+the checks that read real files. Without them those checks are skipped and the
+rest of the suite still passes.
 
-Point somewhere else with `LODEDATA_SAMPLES=/path/to/files pytest -q`.
+Point somewhere else with `LODEDATA_SAMPLES=/path/to/files ./run-tests.sh`.
 
-This directory is gitignored — your spec files stay out of the repository.
+This directory is kept out of the repository -- your files stay private.

@@ -4,8 +4,10 @@ Run with:  ./run.sh   (python -m uvicorn api:app --app-dir app)
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+import re
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -31,6 +33,24 @@ DB_PATH = Path(os.environ.get("LODEDATA_DB",
                               Path(__file__).parent.parent / "data" / "designs.db"))
 
 app = FastAPI(title="Design Assistant")
+
+# Several people can use one server at once.  A change reads the whole
+# network, changes it and writes it back, so two changes to the same network
+# arriving together would lose one: they are taken one after the other.
+# Different networks are not held up.  (One server process: run it without
+# --workers.)
+_NETWORK_PATH = re.compile(r"^/api/networks/([^/]+)")
+_network_locks: dict = {}
+
+
+@app.middleware("http")
+async def one_change_at_a_time(request, call_next):
+    found = _NETWORK_PATH.match(request.url.path)
+    if not found or request.method == "GET":
+        return await call_next(request)
+    lock = _network_locks.setdefault(found.group(1), asyncio.Lock())
+    async with lock:
+        return await call_next(request)
 
 
 # --------------------------------------------------------------------------

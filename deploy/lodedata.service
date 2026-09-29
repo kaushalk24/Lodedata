@@ -1,0 +1,19 @@
+# Keeps the Design Assistant running on the server, and starts it at boot.
+#
+# 1. Change User= and the two /opt/lodedata paths to where you unzipped it.
+# 2. sudo cp deploy/lodedata.service /etc/systemd/system/
+# 3. sudo systemctl daemon-reload && sudo systemctl enable --now lodedata
+# 4. sudo systemctl status lodedata      (logs: journalctl -u lodedata -f)
+[Unit]
+Description=Design Assistant (Lode Data replica)
+After=network.target
+
+[Service]
+User=lodedata
+WorkingDirectory=/opt/lodedata
+Environment=PORT=8000
+ExecStart=/opt/lodedata/start-server.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
