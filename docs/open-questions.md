@@ -289,8 +289,22 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       pads and EQs (the program does not pick them) and, unnamed, has no
       Amp Name line in its box. Done.
 
+    * The older AL004 opens with the older WVEXT862 spec set (Lode 4's
+      files); its 11.16 and 11.18 are taps feeding a branch from the port,
+      `117+` and `104+`, and 44.1 reads Lode's 19.90 18.38 36.31 35.43.
+      Done (file-formats 3.0 and 3.8).
+
     Still to confirm:
-    * the old AL004's 11.16 and 11.18 drawn `- [43]`, `- [44]`;
+    * Lode's info boxes call the older AL004's tap-fed branches 42 and 43;
+      the file stores 43 and 44 (its 42 hangs from 40.4);
+    * where the Branch: line sits in the tap box, and which tap feeds the
+      branch when a line has more than one;
+    * what 0 on a tap feeding a branch does (kept here, fed by nothing);
+    * the cascade position: Lode reads 4 on the WIFI OMNI at the older
+      AL004's 44.1 (NC4000 node, AL00416, AL00419, then it) and 1 on
+      AL00416; counting the actives upstream gives 1 and 3;
+    * the extra 550 column Lode shows with WVEXT862 (19.55 at 44.1, 0.00
+      under it): how F3 is carried from the node and through an active;
     * 23481/23483 and the three pairs at 36121;
     * what Lode Data writes when it saves one of these files itself;
     * which new lines get their house list filled in;

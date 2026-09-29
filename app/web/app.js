@@ -299,8 +299,10 @@ function infoTap(r, k) {
   const part = (r.tap_parts || [])[k] || '';
   const lv = r.tap_levels ? r.tap_levels[k] : null;
   const fq = (S.scr && S.scr.frequencies) || [];
-  if (!lv) return `${r.branch}.${r.node}\nTap Type:  ${part}`;
-  return `${r.branch}.${r.node}\nTap Type:            ${part.replace(/ \(.*$/, '')}\n\n` +
+  // a tap feeding a branch from its port names it (the old AL004's 11.16)
+  const fed = (r.tap_branches || [])[k] ? `Branch:              ${r.tap_branches[k]}\n` : '';
+  if (!lv) return `${r.branch}.${r.node}\nTap Type:  ${part}\n${fed}`;
+  return `${r.branch}.${r.node}\nTap Type:            ${part.replace(/ \(.*$/, '')}\n${fed}\n` +
     `Frequency\n  Forward\n` +
     `${pad(fq[0], 8)}: ${pad(f2(lv[0]), 7)}\n${pad(fq[1], 8)}: ${pad(f2(lv[1]), 7)}\n\n` +
     `  Return\n${pad(fq[2], 8)}: ${pad(f2(lv[2]), 7)}\n${pad(fq[3], 8)}: ${pad(f2(lv[3]), 7)}\n\n` +

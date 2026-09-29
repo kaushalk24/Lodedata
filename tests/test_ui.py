@@ -28,7 +28,7 @@ pytestmark = pytest.mark.skipif(
 
 def _spec_files():
     # The keying tests type KERMIT750 tap codes (4.23, 8.21); prefer that set.
-    cbls = sorted(SAMPLES.rglob("*.cbl"), key=lambda p: "KERMIT" not in p.name)
+    cbls = sorted(SAMPLES.rglob("*.cbl"), key=lambda p: ("KERMIT" not in p.name, str(p)))
     cbl = next(iter(cbls), None)
     if not cbl:
         return []
@@ -878,4 +878,30 @@ def test_two_branches_at_a_line_delete_and_zero(page):
     page.wait_for_timeout(1500)
     assert page.evaluate("S.scr.branches.length") == 43
     assert _row(page, 4, 14)["couplers"] == ["2[15]"]            # the old 4.15
+    assert not page.errors
+
+
+def test_the_older_al004_with_its_older_spec_set(page):
+    """The older AL004 against WVEXT862 (Lode 4's files), as the user's
+    screenshots of Lode show it: 870 54 40 5, 11.16's tap "117+" feeding a
+    branch from its port, and 11.18's "104+" whose WIFI OMNI reads 19.90
+    18.38 36.31 35.43."""
+    pair = SAMPLES / "AL004-WVEXT862"
+    if not (pair / "AL004.ntw").exists():
+        pytest.skip("the older AL004 not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "AL004.ntw"))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("WVEXT862.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    assert page.evaluate("S.scr.frequencies.slice(0, 4)") == [870, 54, 40, 5]
+    assert _row(page, 11, 16)["taps"] == ["117+"]
+    fed = page.evaluate("S.scr.branches.find(b => b.parent_branch === 11 && b.parent_node === 18)")
+    assert _row(page, 11, 18)["taps"] == ["104+"]
+    assert _row(page, fed["number"], 1)["levels"] == [19.9, 18.38, 36.31, 35.43]
+    _goto(page, 11, 18, "tap0")
+    page.wait_for_timeout(300)
+    info = page.evaluate("document.getElementById('info').textContent")
+    assert "AN-WIFI-204" in info and f"Branch:              {fed['number']}" in info
     assert not page.errors

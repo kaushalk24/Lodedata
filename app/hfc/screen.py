@@ -66,6 +66,7 @@ class Row:
     out_levels: dict = field(default_factory=dict)  # level carried on to the next node
     tap_ports: list = field(default_factory=list)
     tap_parts: list = field(default_factory=list)  # part numbers, for the panel
+    tap_branches: list = field(default_factory=list)  # per tap, the branch its port feeds, 0 = none
     couplers: list = field(default_factory=list)   # e.g. "200[2]"
     coupler_parts: list = field(default_factory=list)
     cumulative_ft: float = 0.0
@@ -111,7 +112,8 @@ class Row:
             "power_stop": self.power_stop,
             "port_levels": [as_shown(v) for v in self.port_levels],
             "port_severity": self.port_severity,
-            "tap_parts": self.tap_parts, "coupler_parts": self.coupler_parts,
+            "tap_parts": self.tap_parts, "tap_branches": self.tap_branches,
+            "coupler_parts": self.coupler_parts,
             "cumulative_ft": round(self.cumulative_ft, 0),
             "volts": None if self.volts is None else round(self.volts, 2),
             "current": round(self.current, 2),
@@ -227,6 +229,7 @@ def build(design: Design) -> Screen:
         last_tap = None
         for idx, node in enumerate(branch.nodes):
             last_tap = None
+            fed_from_taps = []      # (tap, branch, port levels): drawn after this line
             amp = node.amp
             if not amp and node.kept_active and not design.has_specs:
                 # no spec set: the Active ID of the program's own (Unnamed)
@@ -294,6 +297,7 @@ def build(design: Design) -> Screen:
                     if slot.file_ports:
                         row.taps.append(bracket(f"{0:>2}", TAP_BRACKETS.get(slot.file_ports, "[]")))
                         row.tap_ports.append(slot.file_ports)
+                        row.tap_branches.append(slot.branch)
                         last_tap = ("file", {f: 0.0 for f in freqs}, [""] * len(freqs))
 
             # taps: the through loss applies to everything downstream
@@ -305,10 +309,13 @@ def build(design: Design) -> Screen:
                 style = TAP_BRACKETS.get(tap.ports, "[]")
                 # the Design screen shows the Tap ID, integer part only
                 shown = tap.tap_id or int(round(tap.tap_value_db))
-                row.taps.append(bracket(f"{shown:>2}", style))
+                # a tap feeding a branch from its port: "117+" (the old
+                # AL004's 11.16; "104+" at 11.18, a 2-port)
+                row.taps.append(f"{shown}+" if slot.branch else bracket(f"{shown:>2}", style))
                 row.tap_ports.append(tap.ports)
                 row.tap_parts.append(
                     f"{tap.name} ({tap.ports} port, {tap.tap_value_db:g} dB)")
+                row.tap_branches.append(slot.branch)
                 # a tap sees the level after whatever precedes it on the line:
                 # the amplifier, an in-line Q device, an earlier tap
                 ports = _tap_ports(p, freqs, levels, tap)
@@ -320,6 +327,8 @@ def build(design: Design) -> Screen:
                 for e_sev, e_msg in errors:
                     row.tap_notes.append((e_sev, f"{e_msg} at {branch.number}.{row.node}."))
                 last_tap = (tap, ports, per_port)
+                if slot.branch and design.branch(slot.branch):
+                    fed_from_taps.append((tap, design.branch(slot.branch), dict(ports)))
                 if tap.self_terminating:
                     levels = {f: 0.0 for f in freqs}
                     continue
@@ -329,6 +338,17 @@ def build(design: Design) -> Screen:
 
             row.after_taps = dict(levels)
             scr.rows.append(row)
+
+            # a tap the spec set cannot name (or no spec set) still has its
+            # branch, drawn from 0.00 as the rest of such a screen is
+            walked = {child.number for _, child, _ in fed_from_taps}
+            for slot in node.taps:
+                child = design.branch(slot.branch) if slot.branch else None
+                if child is not None and child.number not in walked:
+                    fed_from_taps.append((None, child, {f: 0.0 for f in freqs}))
+            for tap, child, ports in fed_from_taps:
+                feeders[child.number] = tap.name if tap else ""
+                walk(child, ports, depth + 1, cum_ft, True)
 
             # couplers start branches, walked where their coupler sits.
             # The through (low-loss) leg goes downstream unless the node says
@@ -549,15 +569,21 @@ def _amp_info(design: Design, scr: Screen) -> None:
             bb, first = stack.pop()
             for nd in design.branch(bb).nodes[first - 1:]:
                 out.append(nd)
-                stack += [(c.branch, 1) for c in nd.couplers if design.branch(c.branch)]
+                stack += [(c.branch, 1) for c in nd.couplers + nd.taps
+                          if c.branch and design.branch(c.branch)]
         return out
+
+    def splits(nd) -> bool:
+        # a coupler, or a tap feeding a branch from its port: the old AL004's
+        # 44.1 is 6 ft from its split, the tap at 11.18 (Lode's info box)
+        return bool(nd.couplers or any(t.branch for t in nd.taps))
 
     for (b, n), r in rows.items():
         nd = node(b, n)
         last = n == len(design.branch(b).nodes)
         # a branch's first node shows it at 22.1 (0 ft); whether that is for
         # being first or for the 0 ft is not yet known, so only both
-        block = bool(has_amp(nd) or nd.couplers or last or (n == 1 and not nd.ftg))
+        block = bool(has_amp(nd) or splits(nd) or last or (n == 1 and not nd.ftg))
         if not (has_amp(nd) or block):
             continue
         d = dict.fromkeys(("aerial_prev", "aerial_start", "total_split",
@@ -573,7 +599,7 @@ def _amp_info(design: Design, scr: Screen) -> None:
                 if has_amp(here):
                     found_active = True
                     cascade += 1
-                if has_amp(here) or here.couplers:
+                if has_amp(here) or splits(here):
                     found_split = True
             ft, db = here.ftg, loss(here)
             d["total_start"] += ft
@@ -612,8 +638,13 @@ def _amp_info(design: Design, scr: Screen) -> None:
         stored = list(nd.pads[:4])
         shown_as = []
         for c, v in enumerate((stored + [0, 0, 0, 0])[:4]):
-            prefix, labels = part.pad_eq[c][:2] if part and len(part.pad_eq) == 4 else ("", [])
-            label = labels[v].strip() if 0 <= v < len(labels) else str(v)
+            column = part.pad_eq[c] if part and len(part.pad_eq) == 4 else ["", []]
+            prefix, labels = column[:2]
+            # 255 is row 0, "VOID" (the older AL004's WIFI OMNIs, both EQs)
+            if v == 255 and len(column) > 3 and column[3]:
+                label = column[3]
+            else:
+                label = labels[v].strip() if 0 <= v < len(labels) else str(v)
             shown_as.append((label, prefix + label))
         (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as
         if not design.has_specs:

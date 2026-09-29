@@ -266,7 +266,8 @@ def delete_node(nid: str, branch: int, branch_node: int = 0, node: int = 0,
     n = next((x for x in b.nodes if x.seq == node), None)
     if n is not None and n.power_stop:
         raise HTTPException(409, detail={"error": "Cannot delete a line with a power stop."})
-    starts = [c.branch for c in (n.couplers if n else []) if d.branch(c.branch)]
+    starts = [c.branch for c in (n.couplers + n.taps if n else [])
+              if c.branch and d.branch(c.branch)]
     if starts and not confirm:
         raise HTTPException(409, detail={"branches": starts})
     # removing a branch takes its coupler off the line and closes the
@@ -276,6 +277,10 @@ def delete_node(nid: str, branch: int, branch_node: int = 0, node: int = 0,
         d.remove_branch(n.couplers[0].branch)
         if len(n.couplers) == before:
             n.couplers.pop(0)
+    for t in (n.taps if n else []):
+        if t.branch and d.branch(t.branch):
+            d.remove_branch(t.branch)
+        t.branch = 0
     b.nodes = [x for x in b.nodes if x is not n]
     if not b.nodes:
         b.nodes = [Node(seq=1)]
@@ -314,11 +319,17 @@ def set_tap(nid: str, branch: int, node: int, body: TapEdit):
 
     while len(n.taps) <= body.slot:
         n.taps.append(TapPlacement())
+    fed = n.taps[body.slot].branch
     if part is None:
         n.taps.pop(body.slot)
+        if fed and d.branch(fed):
+            # the branch its port fed stays, hanging from the line with
+            # nothing feeding it -- as the file keeps such a branch
+            n.couplers.append(CouplerPlacement(branch=fed, removed=True))
     else:
+        # typed over, the tap keeps the branch its port feeds
         n.taps[body.slot] = TapPlacement(part_id=part.id, ports=part.ports,
-                                         value_db=part.tap_value_db)
+                                         value_db=part.tap_value_db, branch=fed)
     save(d)
     return {"node": n.to_dict(),
             "placed": None if part is None else

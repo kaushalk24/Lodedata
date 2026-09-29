@@ -150,6 +150,41 @@ Live `.cbl` and `.cpr` records begin with the marker byte `0x6F`; empty slots ar
 zero-filled. Strings are NUL-terminated inside fixed-width fields, often
 right-aligned with leading spaces.
 
+### 3.0 Older spec files (WVEXT862, Lode 4)
+
+WVEXT862 was saved by an older program: format versions `.cbl`/`.cpr` 5.1,
+`.atv` 6.0, `.tap` 3.0, `.par` 2.10 (its header's text reads "Design 4.22"),
+against 11.1/12.1 in the current files. Lode 12 opens it with the older AL004
+design. The fields are the same; part names are 15 characters where the
+current files have 25, so every field after a name moves up 10, and the
+tables are smaller. A reader tells them apart by the version at byte 26
+(below 11: older).
+
+| file | older layout | current |
+|---|---|---|
+| `.cbl` | 512 + 384·n, 100 records, marker 0x33 (5·10 + 1); name char[15], then resistance +20, loss blocks +24/+64, parts +104/+119 | 394-byte records, fields +30 … |
+| `.cpr` | 616 + 104·n; name char[15]; loss blocks +20/+60, tap legs +100, internal +103 | 626 + 114·n |
+| `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, power steps +79, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, table +214 |
+| `.atv` banks | 4 banks from 17240, same 8816-byte bank and 68-byte row | 8 banks from 93884 |
+| `.atv` in-line | 25 records of 59 bytes from 57464, name char[15], losses +19 | 40 of 69 from 169372, +29 |
+| `.tap` | 63 rows of 414 bytes from 641; part slots of 102 at +5/+107/+209/+311, part char[15], loss blocks +15/+55 | 512 rows of 454, slots of 112 |
+| `.par` | 3102 bytes, below | 6515/6516 |
+
+The older `.par` holds the current fields at fixed shifts: 512 – 577 as is
+(tap type by ports, ports by homes); miscellaneous parts char[15] from 578;
+housings char[15] from 668; strand types, points and housing sizes at −190
+(863 …; room for 9 sizes); the tap windows, NIU, crossovers, cascades,
+levels, interpolation, max amps and EQ placement at −200 (levels at 954);
+15 power supplies, names char[15] from 1357 and the table from 1602; the
+extra levels, frequency table, EQ selection and the tap-window, tap-cascade
+and over-equalization flags at −810 (frequencies at 2982). It ends there:
+no 600 – 900 series, transformers, tilts, count types or pre-load. Read
+this way WVEXT862 gives 870 54 550 / 40 5, levels 0 – 1 of 19/10/45/45 and
+22/13/45/45, TV-60 … TV-1024 at 4 6 11 17 27, supplies NEW STANDBY,
+EXISTING STDBY, EXISTING 90v, and WIFI OMNI (86, index 38) in 0 −5 22 22,
+out 48.5 34 47 47 — what Lode draws on the older AL004's branch fed from
+11.18.
+
 ### 3.1 `.cbl` — cable types (394 bytes)
 
 | offset | type | field |
@@ -673,9 +708,25 @@ records with no name and no object id. Both kinds are kept as they are.
 **A coupler taken off, its branch kept.** Typing 0 on a coupler whose branch
 has lines on it takes the coupler off and leaves the branch, drawn `- [55]`
 and fed by nothing: it starts at 0.00 (the user's recording, AL002 55.1:
-112 ft of cable 0 reads −2.42 −0.60 0.52 0.18). The old AL004's branches 43
-and 44 are two: coupler 0, listed on no line, their head's first field the
-id of the line they hang from (11.16, 11.18).
+112 ft of cable 0 reads −2.42 −0.60 0.52 0.18). How the program saves one is
+not seen yet; this writer keeps it as below.
+
+**A branch fed from a tap's port.** The older AL004's branches 43 and 44 have
+coupler 0, are listed on no line, and their head's first field is the id of
+the line they hang from, 11.16 and 11.18. Each of those lines has one tap,
+and Lode draws it `117+` (AN-WIFI-417, 4-port) and `104+` (AN-WIFI-204,
+2-port), its info box reading `Branch:`. The branch starts at the port's
+level: 11.18's 24.24 21.71 32.98 32.22 less the tap value (4.2 3.3, return
+plus 3.3 3.2), then 6 ft of cable 0, gives 44.1's 19.90 18.38 36.31 35.43,
+Lode's screen to the hundredth. Nothing in the head or the tap slot says
+which tap feeds it; with one tap on the line it is that one. The amp box
+counts the line as a split: 44.1 is 6 ft from its previous act-split.
+Lode's info boxes number these two 42 and 43, not the 43 and 44 the file
+stores (still to settle).
+
+**A pad or EQ of 255.** A design stores a bank row minus one, so 255 is row 0,
+VOID in every bank seen: the WIFI OMNIs on 43.1 and 44.1 hold 255 for both
+EQs and Lode's box shows Forward Eq VOID, Return Eq VOID.
 
 **No spec set.** Opened with none, the program shows levels 0.00, the level
 columns as high low Rh Rl, every coupler's ID as 0 (0<2> 0[3] …) and AL004's

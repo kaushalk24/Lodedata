@@ -81,8 +81,31 @@ ATV_CONFIG_SLOTS = 8
 ATV_EQ_BANKS, ATV_PAD_BANKS = 1, 3
 
 
+# Older spec files -- WVEXT862, saved by Lode 4 ("Design 4.22" in its .par):
+# .cbl and .cpr 5.1, .atv 6.0, .tap 3.0, .par 2.10 -- hold the same fields
+# with 15-character part names where the current files have 25, fewer slots
+# (51 actives, 4 Pads/EQs banks, 25 in-line devices, 63 tap rows, 15 power
+# supplies) and none of the later Parameters pages (transformers, tilts, the
+# 600-900 series).  Lode 12 reads them as they are; so do these readers.
+CLASSIC_NAME = 15
+CLASSIC_LAYOUT = {
+    "cbl": (512, 384, 5),
+    "cpr": (616, 104, 5),
+    "atv": (1021, 318, 5),       # record 0 is active index 0
+    "tap": (641, 414, 5),
+}
+CLASSIC_ATV_RECORDS = 51
+CLASSIC_TAP_PORT_SLOTS = {2: 5, 4: 107, 6: 209, 8: 311}
+
+
+def _classic(data: bytes) -> bool:
+    """A file in the older layout: its format version (bytes 26-27) is below
+    the 11.1 / 12.1 the current files carry."""
+    return 0 < data[26] < 11
+
+
 def _records(data: bytes, kind: str):
-    start, stride, _ = LAYOUT[kind]
+    start, stride, _ = (CLASSIC_LAYOUT if _classic(data) else LAYOUT)[kind]
     n = (len(data) - start) // stride
     for i in range(n):
         off = start + i * stride
@@ -108,22 +131,23 @@ class CableSpec:
 def read_cables(data: bytes) -> list:
     out = []
     mark = _record_mark(data)
+    n = CLASSIC_NAME if _classic(data) else 25     # every field after the name moves
     for slot, off, seg in _records(data, "cbl"):
         if seg[0] != mark:
             continue
-        name = _name(seg[5:30])
+        name = _name(seg[5:5 + n])
         if not name:
             continue
         out.append(CableSpec(
             slot=slot,
             name=name,
             index=struct.unpack_from("<H", seg, 1)[0],
-            loop_resistance_ohm_per_ft=_fx(struct.unpack_from("<i", seg, 30)[0]),
-            forward_coeffs=[_fx(v) for v in struct.unpack_from("<10i", seg, 34)],
-            return_coeffs=[_fx(v) for v in struct.unpack_from("<10i", seg, 74)],
-            footage_part=_name(seg[114:129]),
-            connector_part=_name(seg[129:144]),
-            trailing=list(struct.unpack_from("<5i", seg, 144)),
+            loop_resistance_ohm_per_ft=_fx(struct.unpack_from("<i", seg, 5 + n)[0]),
+            forward_coeffs=[_fx(v) for v in struct.unpack_from("<10i", seg, 9 + n)],
+            return_coeffs=[_fx(v) for v in struct.unpack_from("<10i", seg, 49 + n)],
+            footage_part=_name(seg[89 + n:104 + n]),
+            connector_part=_name(seg[104 + n:119 + n]),
+            trailing=list(struct.unpack_from("<5i", seg, 119 + n)),
         ))
     return out
 
@@ -149,20 +173,21 @@ class CouplerSpec:
 def read_couplers(data: bytes) -> list:
     out = []
     mark = _record_mark(data)
+    n = CLASSIC_NAME if _classic(data) else 25
     for slot, off, seg in _records(data, "cpr"):
         if seg[0] != mark:
             continue
-        name = _name(seg[5:30])
+        name = _name(seg[5:5 + n])
         if not name:
             continue
         out.append(CouplerSpec(
             slot=slot,
             name=name,
-            alt_name=_name(seg[13:30]),
+            alt_name=_name(seg[13:5 + n]),
             code=_fx(struct.unpack_from("<i", seg, 1)[0]),
-            tap_legs=seg[110] + 1,
-            internal=bool(seg[113]),
-            values=[_fx(v) for v in struct.unpack_from("<20i", seg, 30)],
+            tap_legs=seg[85 + n] + 1,
+            internal=bool(seg[88 + n]),
+            values=[_fx(v) for v in struct.unpack_from("<20i", seg, 5 + n)],
         ))
     return out
 
@@ -215,12 +240,19 @@ def _plausible_active(name: str, levels: list, table: list) -> bool:
 
 def read_actives(data: bytes) -> list:
     out = []
+    classic = _classic(data)
+    # the older record: name char[15], then 15 bytes (blank in WVEXT862, so
+    # its option parts are not placed), levels at +39 (current +59), the
+    # Configuration Table at +170 (current +214); record 0 is index 0
+    levels_at, config_at = (39, 170) if classic else (59, ATV_CONFIG_BASE)
     for slot, off, seg in _records(data, "atv"):
-        name = _name(seg[5:30])
+        if classic and slot >= CLASSIC_ATV_RECORDS:
+            break
+        name = _name(seg[5:20] if classic else seg[5:30])
         if not name:
             continue
-        parts = [x for x in (_name(seg[30:40]), _name(seg[40:45])) if x]
-        nums = [_fx(v) for v in struct.unpack_from("<24i", seg, 59)]
+        parts = [] if classic else [x for x in (_name(seg[30:40]), _name(seg[40:45])) if x]
+        nums = [_fx(v) for v in struct.unpack_from("<24i", seg, levels_at)]
         # +99 onward is a (volts, amps) table, terminated by a zero volts entry
         table = []
         for i in range(8, 24, 2):
@@ -231,12 +263,12 @@ def read_actives(data: bytes) -> list:
         if not _plausible_active(name, levels, table):
             continue
         ids = [_name(seg[o + 5:o + 10]) for o in range(
-            ATV_CONFIG_BASE, ATV_CONFIG_BASE + ATV_CONFIG_STRIDE * ATV_CONFIG_SLOTS,
+            config_at, config_at + ATV_CONFIG_STRIDE * ATV_CONFIG_SLOTS,
             ATV_CONFIG_STRIDE)]
         out.append(ActiveSpec(
             slot=slot,
             name=name,
-            index=slot - ATV_INDEX_BASE,
+            index=slot if classic else slot - ATV_INDEX_BASE,
             active_id=ids[0],
             config_ids=[i for i in ids if i],
             housing=_name(seg[18:20]),
@@ -288,17 +320,21 @@ def _loss4(seg: bytes, base: int) -> list:
 
 def read_taps(data: bytes) -> list:
     out = []
+    # the older row: 102-byte part slots, part char[15], the two loss blocks
+    # at +15 and +55
+    classic = _classic(data)
+    slots, width = (CLASSIC_TAP_PORT_SLOTS, CLASSIC_NAME) if classic else (TAP_PORT_SLOTS, 25)
     for slot, off, seg in _records(data, "tap"):
         ports = {}
-        for count, o in TAP_PORT_SLOTS.items():
-            part = _name(seg[o:o + 20])
+        for count, o in slots.items():
+            part = _name(seg[o:o + min(width, 20)])
             if not part:
                 continue
             ports[count] = TapPort(
                 ports=count,
                 part=part,
-                tap_value=_loss4(seg, o + TAP_VALUE_BLOCK),
-                insertion=_loss4(seg, o + TAP_INSERTION_BLOCK),
+                tap_value=_loss4(seg, o + TAP_VALUE_BLOCK - 25 + width),
+                insertion=_loss4(seg, o + TAP_INSERTION_BLOCK - 25 + width),
             )
         if not ports:
             continue
@@ -330,6 +366,32 @@ PAR_SUPPLY_SLOTS = 25          # the Powering tab lists ID 1-25
 PAR_FREQUENCIES, PAR_FREQUENCY_STRIDE = 3792, 10
 PAR_FREQUENCY_NAMES = ("F1", "F2", "F3", "F4", "F5", "F6", "R1", "R2", "R3", "R4")
 
+# The older .par (2.10, 3102 bytes: WVEXT862, "Design 4.22") holds the same
+# fields.  Its part names are char[15] -- the miscellaneous parts from 578,
+# the housings from 668, the supplies from 1357 -- it has 15 power supplies
+# (table from 1602) and ends where the current file's 600 Series flag
+# starts.  Everything else sits at a fixed shift from the current offset:
+# (first current offset, end, shift).  Checked field by field against
+# WV750-2026: the tap-type and ports tables, strand types 000/200/300/400,
+# the points, the housing sizes, levels 0-1, the max amperage row, the
+# frequency table (870 54 550 / 40 5) and the EQ selection all line up.
+CLASSIC_PAR_SIZE = 3102
+CLASSIC_PAR_SHIFTS = ((512, 578, 0), (1053, 1072, -190), (1082, 1514, -200),
+                      (2712, 3912, -810))
+CLASSIC_PAR_MISC, CLASSIC_PAR_HOUSING_PARTS = 578, 668
+CLASSIC_PAR_SUPPLY_NAMES, CLASSIC_PAR_SUPPLY_TABLE, CLASSIC_PAR_SUPPLY_SLOTS = 1357, 1602, 15
+
+
+def _par_at(data: bytes, offset: int):
+    """Where ``data`` holds the Parameters field the current layout keeps at
+    ``offset``; None when the older layout has no such field."""
+    if not _classic(data):
+        return offset
+    for lo, hi, shift in CLASSIC_PAR_SHIFTS:
+        if lo <= offset < hi:
+            return offset + shift
+    return None
+
 
 def read_frequencies(data: bytes) -> dict:
     """Column labels of the design frequencies, e.g. {"F1": "750", "R1": "40"}.
@@ -339,8 +401,8 @@ def read_frequencies(data: bytes) -> dict:
     spec files hold a loss per column rather than per MHz."""
     out = {}
     for k, key in enumerate(PAR_FREQUENCY_NAMES):
-        o = PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k
-        if o + 6 > len(data):
+        o = _par_at(data, PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k)
+        if o is None or o + 6 > len(data):
             break
         if data[o + 5]:
             out[key] = _name(data[o:o + 5])
@@ -363,14 +425,20 @@ class InlineSpec:
     losses: list         # dB at F1, F2, R1, R2
 
 
+# the older .atv: 25 records of 59 bytes from 57464, name char[15], losses at +19
+CLASSIC_INLINE = (57464, 59, 25, 19)
+
+
 def read_inline(data: bytes) -> list:
     out = []
-    for k in range(1, ATV_INLINE_SLOTS):
-        o = ATV_INLINE + ATV_INLINE_STRIDE * k
-        if o + ATV_INLINE_LOSS + 16 > len(data):
+    base, stride, slots, at = CLASSIC_INLINE if _classic(data) else (
+        ATV_INLINE, ATV_INLINE_STRIDE, ATV_INLINE_SLOTS, ATV_INLINE_LOSS)
+    for k in range(1, slots):
+        o = base + stride * k
+        if o + at + 16 > len(data):
             break
-        name = _name(data[o:o + 20])
-        losses = [round(_fx(v), 3) for v in struct.unpack_from("<4i", data, o + ATV_INLINE_LOSS)]
+        name = _name(data[o:o + min(at, 20)])
+        losses = [round(_fx(v), 3) for v in struct.unpack_from("<4i", data, o + at)]
         if name and all(abs(v) < 60 for v in losses):
             out.append(InlineSpec(number=k, name=name, losses=losses))
     return out
@@ -398,16 +466,24 @@ class PadEqBank:
     prefixes: list       # forward pad, return pad, forward EQ, return EQ
     labels: list         # per column, the labels by stored value (row 1 on)
     values: list         # per row from row 1: fwd pad, fwd EQ F1-F6, ret pad, ret EQ R1-R4
+    # row 0's four labels ("VOID"): a design stores row - 1, so 255 is row 0
+    # (the older AL004's WIFI OMNIs hold 255 for both EQs; Lode shows VOID)
+    void: list = field(default_factory=list)
 
 
 def _label(raw: bytes) -> str:
     return raw.split(b"\0")[0].decode("latin-1")
 
 
+CLASSIC_BANKS, CLASSIC_BANK_COUNT = 17240, 4     # the older .atv's banks 1-4
+
+
 def read_pad_eq_banks(data: bytes) -> list:
     out = []
-    for k in range(ATV_BANK_COUNT):
-        base = ATV_BANKS + ATV_BANK_STRIDE * k
+    first, count = (CLASSIC_BANKS, CLASSIC_BANK_COUNT) if _classic(data) else (
+        ATV_BANKS, ATV_BANK_COUNT)
+    for k in range(count):
+        base = first + ATV_BANK_STRIDE * k
         end = base + ATV_BANK_ROW * ATV_BANK_ROWS
         if end + 44 > len(data):
             break
@@ -423,7 +499,8 @@ def read_pad_eq_banks(data: bytes) -> list:
             prefixes=[_label(data[end + 11 * i:end + 11 * i + 11]) for i in range(4)],
             labels=labels,
             values=[[round(_fx(v), 3) for v in struct.unpack_from("<12i", row, 10)]
-                    for row in rows]))
+                    for row in rows],
+            void=[_label(data[base + o:base + o + 5]).strip() for o in ATV_BANK_LABELS]))
     return out
 
 
@@ -442,12 +519,13 @@ def read_levels(data: bytes) -> dict:
     """
     levels = []
     for k in range(PAR_LEVEL_COUNT):
-        o = PAR_LEVELS + PAR_LEVEL_STRIDE * k
-        if o + 16 > len(data):
+        o = _par_at(data, PAR_LEVELS + PAR_LEVEL_STRIDE * k)
+        if o is None or o + 16 > len(data):
             break
         levels.append([round(_fx(v), 2) for v in struct.unpack_from("<4i", data, o)])
-    margin = _fx(struct.unpack_from("<i", data, PAR_TAP_MARGIN)[0]) \
-        if PAR_TAP_MARGIN + 4 <= len(data) else 0.0
+    at = _par_at(data, PAR_TAP_MARGIN)
+    margin = _fx(struct.unpack_from("<i", data, at)[0]) \
+        if at is not None and at + 4 <= len(data) else 0.0
     return {"levels": levels, "tap_margin": round(margin, 2)}
 
 
@@ -455,15 +533,21 @@ def read_supplies(data: bytes) -> list:
     """Power supply types 1-25: name, voltage rating, current rating and
     % capacity -- the Powering tab's table."""
     out = []
-    for k in range(PAR_SUPPLY_SLOTS):
-        o = PAR_SUPPLY_TABLE + PAR_SUPPLY_STRIDE * k
+    if _classic(data):
+        names, stride, width, table, slots = (CLASSIC_PAR_SUPPLY_NAMES, CLASSIC_NAME, CLASSIC_NAME,
+                                              CLASSIC_PAR_SUPPLY_TABLE, CLASSIC_PAR_SUPPLY_SLOTS)
+    else:
+        names, stride, width, table, slots = (PAR_SUPPLY_NAMES, PAR_SUPPLY_NAME_STRIDE, 23,
+                                              PAR_SUPPLY_TABLE, PAR_SUPPLY_SLOTS)
+    for k in range(slots):
+        o = table + PAR_SUPPLY_STRIDE * k
         if o + 12 > len(data):
             break
         volts, amps, rating = (_fx(v) for v in struct.unpack_from("<3i", data, o))
         if volts <= 0:
             continue
-        n = PAR_SUPPLY_NAMES + PAR_SUPPLY_NAME_STRIDE * k
-        out.append(SupplySpec(type_id=k + 1, name=_name(data[n:n + 23]),
+        n = names + stride * k
+        out.append(SupplySpec(type_id=k + 1, name=_name(data[n:n + width]),
                               volts=round(volts, 2), amps=round(amps, 2),
                               rating=round(rating, 2)))
     return out
@@ -525,63 +609,79 @@ def read_parameters(data: bytes) -> dict:
     form, replacement cables, overvoltage, over-equalization, the tilts and
     the other points.
     """
-    if len(data) < PAR_TILTS + PAR_TILT_STRIDE * 16:
+    classic = _classic(data)
+    if len(data) < (CLASSIC_PAR_SIZE if classic else PAR_TILTS + PAR_TILT_STRIDE * 16):
         return {}
-    fx = lambda o: round(_fx(struct.unpack_from("<i", data, o)[0]), 3)
-    mask = data[PAR_STRAND_SERIES] & 0x3F
+
+    def fx(o):
+        at = _par_at(data, o)
+        return round(_fx(struct.unpack_from("<i", data, at)[0]), 3) if at is not None else 0.0
+
+    def u8(o):
+        at = _par_at(data, o)
+        return data[at] if at is not None and at < len(data) else 0
+
+    def text(o, width):
+        at = _par_at(data, o)
+        return _name(data[at:at + width]) if at is not None else ""
+
+    mask = u8(PAR_STRAND_SERIES) & 0x3F
     strand = [n for n in range(6) if mask >> n & 1] + \
-        [6 + k for k in range(4) if data[PAR_STRAND_600 + k]]
-    label = [_name(data[PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k:
-                        PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k + 5]) for k in range(10)]
+        [6 + k for k in range(4) if u8(PAR_STRAND_600 + k)]
+    label = [text(PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k, 5) for k in range(10)]
     fwd, ret = label[:6], label[6:]
-    eq_sel = struct.unpack_from("<4H", data, PAR_EQ_SELECTION)
+    eq_sel = struct.unpack_from("<4H", data, _par_at(data, PAR_EQ_SELECTION))
     windows = {}
     for k, key in enumerate(PAR_FREQUENCY_NAMES):
         windows[key] = fx(PAR_FREQUENCIES + PAR_FREQUENCY_STRIDE * k + 6)
+    width = CLASSIC_NAME if classic else 25
+    parts, misc = (CLASSIC_PAR_HOUSING_PARTS, CLASSIC_PAR_MISC) if classic else (
+        PAR_HOUSING_PARTS, PAR_MISC_PARTS)
     housings = []
     for k in range(PAR_HOUSINGS):
-        name = _name(data[PAR_HOUSING_PARTS + 25 * k:PAR_HOUSING_PARTS + 25 * k + 25])
+        name = _name(data[parts + width * k:parts + width * k + width])
         if name:
             housings.append({"number": k + 1, "part": name,
-                             "min_points": data[PAR_HOUSING_SIZE + k]})
+                             "min_points": u8(PAR_HOUSING_SIZE + k)})
+    transformers = [] if classic else [t for t in (
+        {"id": k + 1,
+         "part": _name(data[PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + (k == 0):
+                            PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + PAR_TRANSFORMER_VOLTS]),
+         "volts": fx(PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + PAR_TRANSFORMER_VOLTS)}
+        for k in range(8)) if t["part"] or t["volts"]]
     return {
         "strand_series": strand,
         "distance_units": {0: "Ftg", 1: "m", 2: "dM"}.get(int(fx(PAR_DISTANCE_UNITS)), fx(PAR_DISTANCE_UNITS)),
         "signal_display": {0: "dBmV", 1: "dBuV"}.get(int(fx(PAR_SIGNAL_DISPLAY)), fx(PAR_SIGNAL_DISPLAY)),
-        "show_count_types": bool(data[PAR_SHOW_COUNT_TYPES]),
+        "show_count_types": bool(u8(PAR_SHOW_COUNT_TYPES)),
         "eq_placement": {0: "EQ-", 1: "EQ+", 2: "EQe"}.get(int(fx(PAR_EQ_PLACEMENT)), fx(PAR_EQ_PLACEMENT)),
         "optimization": {0: "OP-", 1: "OFf", 2: "OP+"}.get(int(fx(PAR_OPTIMIZATION)), fx(PAR_OPTIMIZATION)),
-        "enforce_tap_window": bool(data[PAR_ENFORCE_TAP_WINDOW]),
-        "enforce_tap_tilt": bool(data[PAR_ENFORCE_TAP_TILT]),
-        "pre_load": len(data) > PAR_PRE_LOAD and bool(data[PAR_PRE_LOAD]),
+        "enforce_tap_window": bool(u8(PAR_ENFORCE_TAP_WINDOW)),
+        "enforce_tap_tilt": bool(u8(PAR_ENFORCE_TAP_TILT)),
+        "pre_load": len(data) > PAR_PRE_LOAD and bool(u8(PAR_PRE_LOAD)),
         "eq_selection": {"fwd_high": fwd[eq_sel[0] % 6], "fwd_low": fwd[eq_sel[1] % 6],
                          "ret_high": ret[eq_sel[2] % 4], "ret_low": ret[eq_sel[3] % 4]},
-        "transformers": [t for t in (
-            {"id": k + 1,
-             "part": _name(data[PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + (k == 0):
-                                PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + PAR_TRANSFORMER_VOLTS]),
-             "volts": fx(PAR_TRANSFORMERS + PAR_TRANSFORMER_STRIDE * k + PAR_TRANSFORMER_VOLTS)}
-            for k in range(8)) if t["part"] or t["volts"]],
-        "flag_hi_lo_tilt": bool(data[PAR_FLAG_TILT]),
-        "power_interpolation": INTERPOLATION.get(data[PAR_INTERPOLATION], "constant_wattage"),
+        "transformers": transformers,
+        "flag_hi_lo_tilt": bool(u8(PAR_FLAG_TILT)),
+        "power_interpolation": INTERPOLATION.get(u8(PAR_INTERPOLATION), "constant_wattage"),
         "max_amps_through": {k: fx(PAR_MAX_AMPS + 4 * i) for i, k in enumerate(MAX_AMPS_THROUGH)},
-        "tap_type_by_ports": {n: (2, 4, 6, 8)[data[PAR_TAP_TYPE_BY_PORTS + n] & 3]
+        "tap_type_by_ports": {n: (2, 4, 6, 8)[u8(PAR_TAP_TYPE_BY_PORTS + n) & 3]
                               for n in range(1, 33)},
-        "ports_by_homes": {n: data[PAR_PORTS_BY_HOMES + n] for n in range(1, 33)},
-        "misc_parts": {k: _name(data[PAR_MISC_PARTS + 25 * i:PAR_MISC_PARTS + 25 * i + 25])
+        "ports_by_homes": {n: u8(PAR_PORTS_BY_HOMES + n) for n in range(1, 33)},
+        "misc_parts": {k: _name(data[misc + width * i:misc + width * i + width])
                        for i, k in enumerate(("hth_connectors", "splices", "terminators"))},
         "housings": housings,
-        "points": {k: data[o] for k, o in PAR_POINTS.items()},
+        "points": {k: u8(o) for k, o in PAR_POINTS.items()},
         "niu": {k: fx(PAR_NIU + 4 * i) for i, k in enumerate(NIU_FIELDS)},
         "max_crossover": fx(PAR_CROSSOVER),
         "max_return_crossover": fx(PAR_RETURN_CROSSOVER),
         "max_le_cascade": int(fx(PAR_MAX_LE_CASCADE)),
-        "max_tap_cascade": data[PAR_MAX_TAP_CASCADE],
+        "max_tap_cascade": u8(PAR_MAX_TAP_CASCADE),
         "lines_per_form": int(fx(PAR_LINES_PER_FORM)),
         "replacement_cables": {"backfeed": int(fx(PAR_BACKFEED_CABLE)),
                                "fwd_feed": int(fx(PAR_FWDFEED_CABLE))},
-        "allow_over_equalization": bool(data[PAR_OVER_EQUALIZATION]),
-        "overvoltage_check": bool(data[PAR_OVERVOLTAGE]),
+        "allow_over_equalization": bool(u8(PAR_OVER_EQUALIZATION)),
+        "overvoltage_check": bool(u8(PAR_OVERVOLTAGE)),
         "tilts": [[fx(PAR_TILTS + PAR_TILT_STRIDE * lv + 4 * j) for j in range(4)]
                   for lv in range(16)],
         "tap_windows": windows,

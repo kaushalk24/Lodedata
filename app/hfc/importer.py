@@ -123,13 +123,15 @@ _BANK_LOSSES = ((0,), (7,), (1, 2), (8, 9))
 
 
 def _pad_eq(bank, column: int) -> list:
-    """[prefix, labels, losses] of one Fwd Pad / Ret Pad / Fwd EQ / Ret EQ
-    column, both lists by the value a design stores."""
+    """[prefix, labels, losses, row 0's label] of one Fwd Pad / Ret Pad /
+    Fwd EQ / Ret EQ column, both lists by the value a design stores (255,
+    stored for row 0, is the last item)."""
     if bank is None:
-        return ["", [], []]
+        return ["", [], [], ""]
     labels = bank.labels[column]
     losses = [[bank.values[v][i] for i in _BANK_LOSSES[column]] for v in range(len(labels))]
-    return [bank.prefixes[column], labels, losses]
+    void = bank.void[column] if len(bank.void) == 4 else ""
+    return [bank.prefixes[column], labels, losses, void]
 
 
 def library_from_spec_set(base: str | Path,
@@ -363,11 +365,19 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path | None,
                     node.through_leg = THROUGH_FIRST if k == 1 else THROUGH_SECOND
             br.nodes.append(node)
         design.branches[number] = br
+    # a branch no coupler starts hangs from its line's tap port (the old
+    # AL004's 43 and 44, from the only tap on 11.16 and on 11.18; which tap
+    # of several would feed one is not known); with no tap there, nothing
+    # feeds it
     for number, nb in net.branches.items():
         pb, pn = nb.parent
         if nb.tap_port and pb in design.branches and 0 < pn <= len(design.branches[pb].nodes):
-            design.branches[pb].nodes[pn - 1].couplers.append(
-                CouplerPlacement(branch=number, removed=True))
+            line = design.branches[pb].nodes[pn - 1]
+            tap = next((t for t in line.taps if (t.part_id or t.file_ports) and not t.branch), None)
+            if tap is not None:
+                tap.branch = number
+            else:
+                line.couplers.append(CouplerPlacement(branch=number, removed=True))
     return design, report
 
 

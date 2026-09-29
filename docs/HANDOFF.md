@@ -40,6 +40,9 @@ The user is a Lode Data designer. What they want:
     saves changing one setting each
   * optionally the older `samples/KERMIT750-2026.*`, `samples/WVBeck750.*` and
     `samples/AL00{2,3,4,5}.ntw` from the earlier OneDrive zips
+  * optionally `samples/AL004-WVEXT862/AL004.ntw` (the August AL004) with
+    `WVEXT862.{par,atv,tap,cpr,cbl}`, the older Lode 4 spec set it was saved
+    with (`tests/test_classic_specs.py`)
 * `samples/` is gitignored; a new session needs these files uploaded again.
 
 ## Where things are
@@ -48,7 +51,7 @@ The user is a Lode Data designer. What they want:
 |---|---|
 | `tools/lodedata/obfuscation.py` | .ntw decryption: `plain = nibswap((cipher - KEY[i%100]) & 0xFF)` from offset 512 |
 | `tools/lodedata/network.py` | .ntw layout: branch records, node records, all fields |
-| `tools/lodedata/specs.py` | .cbl .cpr .atv (+ in-line Q table) .tap (454-byte rows) .par (levels, supplies, frequencies) |
+| `tools/lodedata/specs.py` | .cbl .cpr .atv (+ in-line Q table) .tap (454-byte rows) .par (levels, supplies, frequencies); the older Lode 4 layouts too (file-formats 3.0) |
 | `app/hfc/importer.py` | spec set → Library; `design_from_ntw()` |
 | `app/hfc/screen.py` | the engine: Design levels, tap checks, end lines, coupler brackets, powering, amp info |
 | `app/hfc/model.py`, `plant.py` | parts library; Design / Branch / Node |
