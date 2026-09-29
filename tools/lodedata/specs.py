@@ -202,6 +202,7 @@ class ActiveSpec:
     index: int = 0                  # how a design file refers to it
     active_id: str = ""             # what the amp column shows
     config_ids: list = field(default_factory=list)   # base + plug-in variants
+    config_slots: list = field(default_factory=list)  # the same by slot, "" for an empty one
     housing: str = ""
     option_parts: list = field(default_factory=list)
     # levels required at, and produced by, the active at the four design
@@ -275,6 +276,7 @@ def read_actives(data: bytes) -> list:
             index=slot if classic else slot - ATV_INDEX_BASE,
             active_id=ids[0],
             config_ids=[i for i in ids if i],
+            config_slots=ids,
             housing=_name(seg[18:20]),
             option_parts=parts,
             input_levels=levels[0:4],

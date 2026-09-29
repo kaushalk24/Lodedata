@@ -141,6 +141,8 @@ table.grid td.j{border-right-color:transparent;padding:0 1px}
 table.grid th.j{text-align:center}
 table.grid td.stop{width:10px;padding:0 2px;text-align:center}
 table.grid td.stop.on{color:#3cd3e0}
+table.grid td.pslabel{color:#3cd3e0}
+table.grid td.cab.hasnote::after{content:"\266A";color:var(--yellow)}
 .msgbox .mbtext{font-size:13px;line-height:1.5;margin:10px 18px 14px}
 table.grid td.spill{white-space:pre}
 .tbset[hidden]{display:none}

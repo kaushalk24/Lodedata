@@ -226,6 +226,7 @@ def library_from_spec_set(base: str | Path,
             id=new_id("act"),
             name=a.name,
             active_id=a.active_id or str(a.slot),
+            config_ids=list(a.config_slots),
             index=a.index,
             kind="node" if (fibre_fed or "NODE" in a.name.upper()) else "line_extender",
             fibre_fed=fibre_fed,
@@ -309,6 +310,8 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path | None,
             node = Node(seq=i, ftg=float(nn.ftg), hc=nn.hc, cab=nn.cable, lv=nn.lv,
                         power_stop=nn.power_stop, amp_label=nn.label, pads=list(nn.pads),
                         fixed=nn.fixed, rec=nn.id)
+            # the line's Notes (the text at +698), kept as the file has them
+            node.note = node.note_file = nn.text.decode("latin-1")
             if nn.inline:
                 q = inline.get(nn.inline)
                 node.inline = nn.inline
@@ -339,6 +342,12 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path | None,
                 act = actives.get(nn.active_index)
                 if act:
                     node.amp, node.amp_part = act.active_id, act.id
+                    # the Configuration Table slot the line keeps: SN001's
+                    # FM902Bs hold 2 and Lode shows 63U
+                    node.amp_config = nn.config
+                    ids = act.config_ids
+                    if 0 < nn.config < len(ids) and ids[nn.config]:
+                        node.amp = ids[nn.config]
                 else:
                     node.kept_active = nn.active_index
                     miss(f"{number}.{i}: active index {nn.active_index}")

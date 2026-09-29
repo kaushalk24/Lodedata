@@ -627,9 +627,10 @@ numbers are the file order, 1…n; no number is stored.
 |---|---|
 | 14 + 21·k | tap slot: i32 row (−1 empty), u8 port code, then `ff ff 00` ×4 and 4 zeros on every slot |
 | 108 | u8 1 on a node carrying an in-line device Qn |
+| 111 | u8 the active's Configuration Table slot: 0 the base ID (every active of AL002 – AL005), 2 on SN001's, which Lode shows as `63U` / `11U` (FM902B: 63 63N 63U 63M …), 3 on its 5.8 (`11M`) |
 | 112 + 3·k | (flag, value, 0): the pads/EQs. A node whose amplifier was taken away keeps them (9.20 holds 9.21's) |
 | 137 | u32 id of the active or supply placed here; 0 once it is taken away |
-| 698 | the line's text, C-style — see below |
+| 698 | the line's Notes, C-style — see below |
 | 718 | u32 the node's own id, in an extended record |
 | 726 | char[16] power supply label, NUL-terminated; the rest is left (18.1: `A\0004A`, once `AL004A`) |
 | 981 | char[16] amplifier name, the same way |
@@ -641,8 +642,10 @@ An extended record (2504 bytes) is the same record with 534 zero bytes put in
 at +1706: the three tail fields move to 2240, 2248 and 2376. Taking the
 active away takes the block out again.
 
-**The line's text.** At +698 every line holds a C string. It is empty (one
-NUL) in every design but SN001_MID, whose 1.1 holds 63 characters:
+**The line's Notes.** At +698 every line holds a C string: its Notes (Lode's
+`..+ Notes`). Lode marks a line that has them with a yellow ♪ after the cable
+(SN001's 1.1, the user's screenshot). It is empty (one NUL) in every design
+but SN001_MID, whose 1.1 holds 63 characters:
 `SHIN1 - 4953 - P-003938~0POWERED BY PS "PS1A"~0DATE :02/20/26~0`. The record
 grows by the text's length and every field after it moves with it: 1.1's
 extended flag is at 764 and its own id at 781, and 1.2 starts 2504 + 63
@@ -651,12 +654,20 @@ Read without it, SN001 came out as one branch of garbage with 826 305 bytes
 left over, which is why the app could not attach its spec set. After the
 text come two zero bytes, then the flag (701 in an empty-text record): one
 text and two fixed bytes, or three texts of which only the first was ever
-filled — every file fits both. What Lode calls this text, and what `~0`
-stands for, is still to confirm. A branch head (a line's record less its
+filled — every file fits both. What `~0` stands for, and so how an edited
+note is written, is still to confirm; notes read from a file are written
+back as they are. A branch head (a line's record less its
 first 4 bytes) would hold the same field at +694; it is empty in every file.
 
 The power supply label at 726 is the whole C string: SN001's supplies are
-`1A`, `1B`, `1C` (1.1's text: POWERED BY PS "PS1A").
+`1A`, `1B`, `1C`, and Lode shows `1A` in 1.1's amp box and 4.1's supply box.
+On the Design screen the label sits in the first free cplr[branch] column,
+cyan (4.1). The node box on a supply's line (4.1, no active) carries the
+distances and homes and then the supply's own lines.
+
+**A pad or EQ column with nothing in its bank** is blank in the amp box:
+SN001's Ripple-2 on 1.1 (bank 4) shows Forward Pad and Return Pad empty, and
+VOID for both EQs (stored 255).
 
 **Preamble.** Parts are counted by where the part is. A part on an
 underground node counts as underground: the node's cable file index is odd.

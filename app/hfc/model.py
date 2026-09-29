@@ -157,6 +157,9 @@ class ActiveType:
     # The Active ID typed at the amp column -- text, since the Configuration
     # Table allows "11H" as readily as "61".
     active_id: str = ""
+    # the Configuration Table's IDs by slot: the base ID, then plug-in
+    # variants (FM902B: 63 63N 63U 63M 63S 63B); a design stores the slot
+    config_ids: list = field(default_factory=list)
     index: int = -1                            # actives table index, as a design refers to it
     fibre_fed: bool = False                    # no RF input: an optical node
     outputs: int = 1

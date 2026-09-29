@@ -301,12 +301,24 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       Power supply labels are the whole C string (1A 1B 1C). SHINSTON's .atv
       (11.1) is the current layout up to the in-line devices. Done.
 
+    * SN001 against the user's screenshots: branches 1 and 2 (91 lines),
+      4.1, the 13 tap lines of the Test list, four amp boxes and two
+      expanded blocks all match. From them: the Configuration Table slot at
+      +111 (63U, 11U), the text at +698 is the line's Notes (yellow ♪ after
+      the cable), a supply's label in the cplr column, blank pads where the
+      bank has none, the node box on a supply's line. Done.
+
     Still to confirm:
-    * what the text on SN001's 1.1 is in Lode (address, notes, map/location?),
-      how it is shown, and what "~0" means; whether a line can hold more
-      than one such text;
+    * SN001's `63<15>` and `63<5>`: the <n> rule (no mileage and a matching
+      span) gives [15] and [5]; dropping "no mileage" would break AL004's
+      108[10]. The branches where candidate rules differ: 9 (8.3), 18
+      (15.10), 20 (18.9), 28 (24.7), 35 (28.9);
+    * "Fslope/Rslope too low to equalize at 1.1": SN001's Ripple-2 has no EQ
+      rows in its bank; does the older AL004's WIFI OMNI (bank 3, no EQ
+      rows either) get the same lines?
+    * the Notes window, and "~0"; the node box on a coupler line and on a
+      branch's last line with no active or supply;
     * the older AL004's 21.1 supply label: the file holds "AL004A";
-    * SN001's screens against Lode (none seen yet);
     * Lode's info boxes call the older AL004's tap-fed branches 42 and 43;
       the file stores 43 and 44 (its 42 hangs from 40.4);
     * where the Branch: line sits in the tap box, and which tap feeds the

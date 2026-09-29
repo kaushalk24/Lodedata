@@ -82,6 +82,7 @@ class Row:
     amp_info: dict = field(default_factory=dict)
     block: dict = field(default_factory=dict)      # the expanded display's cyan block
     housing: int = 0            # underground housing number, 0 = none
+    note: str = ""              # the line's Notes; Lode marks the line with a yellow ♪
     # checks
     flags: list = field(default_factory=list)      # (severity, message)
 
@@ -121,6 +122,7 @@ class Row:
             "supply_label": self.supply_label, "supply_type": self.supply_type,
             "supply_name": self.supply_name, "powered_by": self.powered_by,
             "amp_info": self.amp_info, "block": self.block, "housing": self.housing,
+            "note": self.note,
             "supply_pct": self.supply_pct,
             "flags": [{"severity": s, "message": m} for s, m in self.flags + self.tap_notes],
             "severity": self.severity,
@@ -240,7 +242,8 @@ def build(design: Design) -> Screen:
                       depth=depth, ftg=node.ftg, hc=node.hc, cab=node.cab,
                       lv=node.lv, tsg=node.tsg, amp=amp, fixed=node.fixed,
                       power_stop=node.power_stop,
-                      amp_label=node.amp_label, supply=node.supply_volts)
+                      amp_label=node.amp_label, supply=node.supply_volts,
+                      note=node.note)
             ports = sum(lib.taps[s.part_id].ports if s.part_id in lib.taps else s.file_ports
                         for s in node.taps)
             if node.hc > ports:
@@ -643,6 +646,10 @@ def _amp_info(design: Design, scr: Screen) -> None:
             # 255 is row 0, "VOID" (the older AL004's WIFI OMNIs, both EQs)
             if v == 255 and len(column) > 3 and column[3]:
                 label = column[3]
+            elif part and len(part.pad_eq) == 4 and not labels:
+                # the bank has nothing in that column: Lode leaves it blank
+                # (SN001's Ripple-2 on 1.1, bank 4, Forward and Return Pad)
+                label = ""
             else:
                 label = labels[v].strip() if 0 <= v < len(labels) else str(v)
             shown_as.append((label, prefix + label))

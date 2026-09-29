@@ -19,7 +19,7 @@ from hfc.model import Library, DesignParameters, new_id
 from hfc.plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
                        BRANCH_NORMAL)
 from hfc.screen import build, tap_candidates
-from hfc.entry import resolve_tap, resolve_coupler, resolve_active, EntryError
+from hfc.entry import resolve_tap, resolve_coupler, resolve_active, config_slot, EntryError
 from hfc.starter import starter_library
 from hfc.reports import level_report, bill_of_materials, powering_report, to_csv
 from hfc.importer import (library_from_spec_set, inspect_ntw, relink_library,
@@ -194,7 +194,7 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
     n = _node(d, branch, node)
     if body.clear_amp:
         n.amp, n.amp_part, n.amp_label = "", None, ""
-        n.pads, n.kept_active = [], 0
+        n.pads, n.kept_active, n.amp_config = [], 0, 0
     if body.amp_code is not None:
         n.kept_active = 0
         # a newly placed active holds 0 in its pads and EQs: the program does
@@ -205,9 +205,11 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
         except EntryError as e:
             raise HTTPException(400, str(e))
         if part is None:
-            n.amp, n.amp_part = "", None
+            n.amp, n.amp_part, n.amp_config = "", None, 0
         else:
-            n.amp, n.amp_part = part.active_id or "", part.id
+            n.amp_config = config_slot(part, body.amp_code)
+            n.amp = part.config_ids[n.amp_config] if n.amp_config else (part.active_id or "")
+            n.amp_part = part.id
     for f, v in body.model_dump(exclude_none=True).items():
         if f in ("clear_amp", "amp_code"):
             continue

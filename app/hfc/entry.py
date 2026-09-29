@@ -118,6 +118,13 @@ def resolve_coupler(lib: Library, code: str) -> tuple:
 
 
 # --------------------------------------------------------------------------
+def config_slot(part: ActiveType, code: str) -> int:
+    """The Configuration Table slot an Active ID names: 0 for the base ID."""
+    ids = part.config_ids or []
+    code = (code or "").strip()
+    return ids.index(code) if code in ids and code != part.active_id else 0
+
+
 def resolve_active(lib: Library, code: str) -> ActiveType | None:
     """An Active ID from the spec set.  Returns None for a clear."""
     code = (code or "").strip()
@@ -128,6 +135,10 @@ def resolve_active(lib: Library, code: str) -> ActiveType | None:
     wanted = code
     for part in lib.actives.values():
         if str(part.active_id) == wanted:
+            return part
+    # a Configuration Table variant: 63U is FM902B's slot 2 (SN001_MID)
+    for part in lib.actives.values():
+        if wanted in (part.config_ids or []):
             return part
     have = sorted(str(p.active_id) for p in lib.actives.values() if p.active_id)
     raise EntryError(

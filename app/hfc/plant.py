@@ -93,6 +93,9 @@ class Node:
     tsg: int = 0                # tap selection group, 0 = the file default
     amp: str = ""               # Active ID placed here, "" = none
     amp_part: str | None = None
+    # which Configuration Table slot of the active: 0 the base ID, 2 "63U"
+    # (SN001_MID's FM902Bs), 3 "11M"
+    amp_config: int = 0
     amp_label: str = ""         # from the Amplifier Definition window
     pads: list = field(default_factory=list)   # fwd pad, ret pad, fwd EQ, ret EQ as stored
     inline: int = 0             # an in-line device Qn in the amp column, 0 = none
@@ -104,7 +107,11 @@ class Node:
     map: str = ""
     loc: str = ""
     address: str = ""
+    # the line's Notes (Lode's ..+ Notes; a yellow ♪ after the cable marks a
+    # line with them), as the file holds them: SN001's 1.1 reads
+    # "SHIN1 - 4953 - P-003938~0POWERED BY PS "PS1A"~0DATE :02/20/26~0"
     note: str = ""
+    note_file: str = ""         # the notes as read from the .ntw, to tell an edit
     supply_volts: float = 0.0   # a power supply placed on this node
     supply_label: str = ""      # its name, e.g. "A"
     supply_part: str | None = None

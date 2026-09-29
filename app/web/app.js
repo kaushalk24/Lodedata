@@ -137,10 +137,19 @@ function cellText(r, c) {
       if (k === 0 && S.mode === 'design' && r.amp_label && !r.taps.length) return r.amp_label;
       return r.taps[k] || '';
     }
-    case 'cplr0': case 'cplr1':
-      return r.couplers[+c.key.slice(4)] || '';
+    case 'cplr0': case 'cplr1': {
+      // a power supply's label sits in the first free cplr column of the
+      // Design screen, cyan (SN001_MID 4.1: "1A")
+      const k = +c.key.slice(4);
+      if (psInCplr(r, k)) return r.supply_label;
+      return r.couplers[k] || '';
+    }
   }
   return '';
+}
+
+function psInCplr(r, k) {
+  return S.mode === 'design' && !r.end && !!r.supply_label && k === (r.couplers || []).length;
 }
 
 // ---------------------------------------------------------------- render
@@ -248,12 +257,14 @@ function renderGrid() {
       let text = cellText(r, c);
       if (i === S.row && j === S.col && S.buffer !== null) text = S.buffer + '_';
       let extra = '';
-      if (c.key === 'cab') extra = ' cab';
+      // a line with Notes: a yellow ♪ after the cable (SN001_MID 1.1)
+      if (c.key === 'cab') extra = ' cab' + (r.note && S.mode === 'design' ? ' hasnote' : '');
       if (c.key === 'hc' && r.hc_severity) extra = ' ' + r.hc_severity;
       if (c.key === 'stop' && r.power_stop) extra = ' on';
       if (c.key === 'ampname') extra = ' amp';
       if (c.key === 'tap0' && S.mode === 'design' && r.amp_label && !r.taps.length) extra = ' amp spill';
       if (c.key === 'supply' && r.supply) extra = ' spill';
+      if (/^cplr\d$/.test(c.key) && psInCplr(r, +c.key.slice(4))) extra = ' pslabel';
       if (/^tap\d$/.test(c.key)) {
         const k = +c.key.slice(3);
         const sev = r.end ? (r.port_severity || [])[k] : (r.tap_severity || [])[k];
@@ -369,17 +380,26 @@ function infoAmp(r) {
 // As AL004 shows it: 1.1 (the fibre node) and 11.1 have the short box, 6.1
 // (bridger AL00415, cascade 1) the long one.
 function infoNode(r) {
-  const a = r.amp_info || {};
+  let a = r.amp_info || {};
   const line = (label, v) => `${label.padEnd(33)}${v === undefined || v === null ? '' : v}\n`;
-  const amp = a.cascade ?
+  // a supply's line with no active has them too, from its block, and then
+  // the supply's own lines (SN001_MID 4.1: 0 7740 0 0 7740, 0 homes, 1A)
+  const supplyLine = !!r.supply_label && !r.amp && !!(r.block && r.block.distances);
+  if (supplyLine) {
+    const [ap, as, ts, tp, tt] = r.block.distances;
+    a = { aerial_prev: ap, aerial_start: as, total_split: ts, total_prev: tp, total_start: tt,
+          homes_down: r.block.homes };
+  }
+  const amp = (a.cascade || supplyLine) ?
     line('Aerial Dist to Previous Active:', a.aerial_prev) +
     line('Aerial Dist to Start of Network:', a.aerial_start) +
     line('Tot Dist to Previous Act-split:', a.total_split) +
     line('Total Dist to Previous Active:', a.total_prev) +
     line('Total Dist to Start of Network:', a.total_start) +
     line('Housecounts downstream:', a.homes_down) : '';
+  const ps = r.supply_label ? '\n' + infoSupply(r).split('\n').slice(1).join('\n') : '';
   return `${r.branch}.${r.node}\n${r.address || 'No Address'}\n${r.cab_name || ''}\n` + amp +
-    `<double-click or [.][ENTER] to edit address>`;
+    `<double-click or [.][ENTER] to edit address>` + ps;
 }
 
 function renderInfo() {
@@ -1103,7 +1123,7 @@ async function nameAmp() {
 }
 async function notes() {
   const r = curRow(); if (!r) return;
-  const v = prompt('Note at this node', '');
+  const v = prompt('Note at this node', r.note || '');
   if (v === null) return;
   await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },

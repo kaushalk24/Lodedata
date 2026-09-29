@@ -42,6 +42,10 @@ N_PREV, N_NEXT, N_FTG = 4, 8, 12
 N_TAPS, TAP_SLOT, TAP_SLOTS = 14, 21, 4
 N_BRANCH_A, N_BRANCH_B = 98, 102
 N_AMP_INDEX, N_AMP_INDEX2 = 106, 107
+# the active's Configuration Table slot: 0 (the base ID) on every active of
+# AL002 - AL005, 2 on SN001_MID's, which Lode shows as 63U and 11U (FM902B:
+# 63 63N 63U ...; FML332: 11 11N 11U ...), 3 on its 5.8 (11M)
+N_CONFIG = 111
 # The amp column holds either an active -- both bytes the actives index -- or
 # an in-line device from the Actives file's Bridgers/Feedermakers/Inline Eqs
 # page, shown as Q1, Q2 ...: then the first byte is 80 - n and the second
@@ -96,6 +100,7 @@ class NtwNode:
     taps: list = field(default_factory=list)          # NtwTap
     branches: list = field(default_factory=list)      # branch numbers started here
     active_index: int = 0     # actives table index, 0 = none
+    config: int = 0           # the active's Configuration Table slot
     inline: int = 0           # in-line device Qn in the amp column, 0 = none
     fixed: bool = False       # locked against the semi-automatic design commands
     label: str = ""           # Amplifier Definition name
@@ -200,6 +205,7 @@ def _node(r: _Reader, p: int) -> NtwNode:
         n.inline = INLINE_BASE - idx
     elif idx:
         n.active_index = idx
+        n.config = r.u8(p + N_CONFIG)
         n.pads = [r.u8(p + N_PADS + 3 * k + 1) for k in range(4)]
     if r.u8(p + t + N_HAS_ACTIVE):
         n.label = _text(r.d[p + t + N_LABEL:p + t + N_LABEL + 16])

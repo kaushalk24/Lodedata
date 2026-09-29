@@ -184,6 +184,7 @@ class NodeOut:
     pad_banks: list | None = None  # the active's Pads/EQs banks less one (fwd pad,
                                    # ret pad, fwd EQ, ret EQ); None = leave them
     text: bytes | None = None    # the line's text at N_TEXT; None = leave it
+    config: int | None = None    # the active's Configuration Table slot; None = leave it
 
 
 @dataclass
@@ -461,6 +462,8 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
         placed = rec[N.N_AMP_INDEX] != nd.active_index or rec[N_INLINE_FLAG]
         rec[N.N_AMP_INDEX] = rec[N.N_AMP_INDEX2] = nd.active_index & 0xFF
         rec[N_INLINE_FLAG] = 0
+        if nd.config is not None:
+            rec[N.N_CONFIG] = nd.config & 0xFF
         if nd.pad_banks is not None and placed:
             # each pad and EQ is (the bank it comes from, its value, 0): AL004's
             # Ripple node, banks 4, holds (3, 0, 0) four times

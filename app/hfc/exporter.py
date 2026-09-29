@@ -73,11 +73,12 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
                     # an empty column ahead of a tap, or a tap the spec set
                     # could not name: the file keeps what it had there
                     taps.append(W.KEEP if n.rec else None)
-            active, pads, pad_banks = 0, None, None
+            active, pads, pad_banks, config = 0, None, None, None
             if n.amp:
                 part = lib.actives.get(n.amp_part) if n.amp_part else None
                 if part is not None and part.index > 0:
                     active = part.index
+                    config = n.amp_config
                     if len(part.banks) == 4:
                         pad_banks = [b - 1 for b in part.banks]
                     if n.pads:
@@ -97,9 +98,14 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
                 note(f"{where}: a power supply given only a voltage is not written")
             if n.tsg:
                 note(f"{where}: TSG {n.tsg} is not written (where the file keeps it is not known yet)")
-            for field, text in (("map", n.map), ("loc", n.loc), ("address", n.address), ("note", n.note)):
+            for field, text in (("map", n.map), ("loc", n.loc), ("address", n.address)):
                 if text:
                     note(f"{where}: {field} is not written (where the file keeps it is not known yet)")
+            # Notes the file had are kept as they are; one typed here waits
+            # on how Lode writes them ("~0" between lines, SN001's 1.1)
+            if n.note != n.note_file:
+                note(f"{where}: the note is not written (how Lode keeps an edited note "
+                     "is still to be confirmed)")
             nodes.append(W.NodeOut(
                 rec=n.rec, ftg=int(round(n.ftg)), hc=n.hc, cable=n.cab, lv=n.lv,
                 # a branch whose coupler was taken off is listed on no line
@@ -107,7 +113,7 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
                                      if c.branch in number and not c.removed],
                 active_index=active, inline=n.inline, pads=pads, fixed=n.fixed,
                 power_stop=n.power_stop, label=n.amp_label if (n.amp or n.rec) else None,
-                supply=supply, supply_type=supply_type, pad_banks=pad_banks))
+                supply=supply, supply_type=supply_type, pad_banks=pad_banks, config=config))
 
         coupler, through = 0, False
         if br.parent_branch in design.branches:

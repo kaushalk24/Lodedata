@@ -935,3 +935,33 @@ def test_sn001_opened_alone_then_its_spec_set_attached(page):
     assert page.evaluate("S.scr.frequencies.slice(0, 4)") == [1002, 102, 85, 5]
     assert _row(page, 1, 2)["levels"] == [53, 37, 9, 9]
     assert not page.errors
+
+
+def test_sn001_screen_marks_as_lode_draws_them(page):
+    """SN001 with SHINSTON, as the user's screenshots show it: a yellow note
+    mark after 1.1's cable, 63U / 11U in the amp column, 1A in 4.1's cplr
+    column, and 4.1's node box with its distances and the supply."""
+    pair = SAMPLES / "SN001-SHINSTON"
+    if not (pair / "SN001_MID.ntw").exists():
+        pytest.skip("SN001_MID not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "SN001_MID.ntw"))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("SHINN1GHz Mid.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    _goto(page, 1, 1, "cab")
+    page.wait_for_timeout(300)
+    cab = page.eval_on_selector('#grid tbody tr:nth-child(1) td.cab', "e => e.className")
+    assert "hasnote" in cab
+    assert _row(page, 1, 15)["amp"] == "63U" and _row(page, 1, 27)["amp"] == "11U"
+    _goto(page, 4, 1, "cplr0")
+    page.wait_for_timeout(300)
+    cell = page.eval_on_selector('#grid tbody tr:nth-child(1) td.pslabel', "e => e.textContent")
+    assert cell == "1A"
+    _goto(page, 4, 1, "ftg")
+    page.wait_for_timeout(300)
+    info = page.evaluate("document.getElementById('info').textContent")
+    assert "Aerial Dist to Start of Network: 7740" in info
+    assert "Power Supply Information" in info and "NEW ALPHA XM2 90V" in info
+    assert not page.errors
