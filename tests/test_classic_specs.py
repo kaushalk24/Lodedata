@@ -161,3 +161,43 @@ def test_the_test_list_is_lodes():
     open_ = LODE_TESTS.index("Tap(870) 23.18 below min at 15.4.")
     assert got[open_] == "Tap(870) 23.19 below min at 15.4."
     assert got[:open_] + got[open_ + 1:] == LODE_TESTS[:open_] + LODE_TESTS[open_ + 1:]
+
+
+def test_branches_6_and_7_as_lode_shows_them():
+    # the user's screenshots: Q1 (LEQ-PEA-8, the in-line equaliser) reads EQ
+    # at 6.9 and 7.6, Q5 stays Q5; the red taps and ports as Lode draws them
+    from hfc.screen import as_shown
+    d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
+    scr = build(d)
+    want = {
+        6: [(19.74, 18.22, 35.75, 33.97), (48.50, 34.00, 21.00, 21.00), (46.08, 33.43, 21.46, 21.17),
+            (43.91, 32.94, 21.88, 21.32), (41.40, 32.36, 22.36, 21.49), (39.57, 31.94, 22.71, 21.61),
+            (35.81, 31.09, 23.43, 21.87), (33.21, 30.03, 24.44, 22.94), (30.10, 29.32, 25.03, 23.15),
+            (28.29, 21.01, 39.23, 36.85), (24.49, 18.11, 42.13, 39.75)],
+        7: [(48.50, 34.00, 21.00, 21.00), (46.80, 33.30, 21.70, 21.90), (43.68, 32.57, 22.29, 22.12),
+            (39.21, 31.09, 23.66, 23.05), (34.75, 29.56, 25.08, 24.16), (30.91, 28.22, 26.34, 25.32),
+            (29.10, 19.91, 39.54, 38.02), (25.30, 17.01, 42.44, 40.92)]}
+    for b, levels in want.items():
+        rows = [r for r in scr.rows if r.branch == b]
+        assert [tuple(as_shown(r.levels[f]) for f in scr.frequencies) for r in rows] == levels
+    rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+    assert [rows[k].amp for k in ((6, 3), (6, 9), (7, 3), (7, 6))] == ["Q5", "EQ", "Q5", "EQ"]
+    assert rows[(6, 9)].amp_name == rows[(7, 6)].amp_name == "LEQ-PEA-8"
+    assert [rows[k].taps for k in ((6, 7), (6, 9), (6, 10), (7, 6), (7, 7))] == \
+        [["/14/"], ["<43>"], ["/ 8/"], ["<42>"], ["/ 8/"]]
+    assert rows[(6, 7)].tap_severity == ["yellow"] and rows[(6, 10)].tap_severity == ["red"]
+    ends = {b: [r for r in scr.rows if r.branch == b and r.end][0] for b in (6, 7)}
+    assert [as_shown(v) for v in ends[6].port_levels] == [19.19, 13.51, 46.73, 44.45]
+    assert [as_shown(v) for v in ends[7].port_levels] == [20.00, 12.41, 47.04, 45.62]
+    assert ends[6].port_severity == ["", "", "red", ""] and ends[7].port_severity == ["", "", "red", "red"]
+
+
+def test_the_couplers_are_drawn_as_lode_draws_them():
+    # branch 4 (the user's screenshot of 4.13) and branch 11 (4.14's):
+    # 11.1 starts 105 ft on 410 cable, mileage, so 4.14 is 3[11]<12> here
+    d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
+    scr = build(d)
+    cpl = lambda b: [c for r in scr.rows if r.branch == b and not r.end for c in r.couplers]
+    assert cpl(4) == ["12<6>", "100[9]", "3[11]<12>"]
+    assert cpl(11) == ["2[19]", "1<21>", "16<22>", "100[23]", "3[24]<27>", "8[25]"]
+    assert cpl(6) == ["100[7]"] and cpl(7) == ["112<8>"]

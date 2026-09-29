@@ -1004,4 +1004,10 @@ def test_sn001_preview_box_and_node_box_as_lode_prints_them(page):
     info = page.evaluate("document.getElementById('info').textContent")
     assert "Aerial Dist to Previous Active:" in info and "Housecounts downstream:" in info
     assert info.split("Housecounts downstream:")[1].split("\n")[0].strip() == "227"
+    # a branch's last line has them too (28.16: 9856 ft to the start, 2 homes)
+    _goto(page, 28, 16, "ftg")
+    page.wait_for_timeout(300)
+    info = page.evaluate("document.getElementById('info').textContent")
+    assert info.split("Total Dist to Start of Network:")[1].split("\n")[0].strip() == "9856"
+    assert info.split("Housecounts downstream:")[1].split("\n")[0].strip() == "2"
     assert not page.errors

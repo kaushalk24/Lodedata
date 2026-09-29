@@ -394,10 +394,12 @@ function infoAmp(r) {
 function infoNode(r) {
   let a = r.amp_info || {};
   const line = (label, v) => `${label.padEnd(33)}${v === undefined || v === null ? '' : v}\n`;
-  // a line with no active has them too, from its block, where it splits
-  // (SN001_MID 1.2: all 0, 227 homes), starts a branch at 0 ft or carries a
-  // supply -- then the supply's own lines (4.1: 0 7740 0 0 7740, 0 homes, 1A)
-  const blockLine = (r.node_box || !!r.supply_label) && !r.amp && !!(r.block && r.block.distances);
+  // a line with no active has them too, from its block: where it splits
+  // (SN001_MID 1.2: all 0, 227 homes), a branch's last line (28.16) or its
+  // 0-ft first line, and a supply's line -- then the supply's own lines (4.1:
+  // 0 7740 0 0 7740, 0 homes, 1A).  An in-line EQ is no active.
+  const blockLine = (r.node_box || !!r.supply_label) && (!r.amp || !!r.inline) &&
+    !!(r.block && r.block.distances);
   if (blockLine) {
     const [ap, as, ts, tp, tt] = r.block.distances;
     a = { aerial_prev: ap, aerial_start: as, total_split: ts, total_prev: tp, total_start: tt,

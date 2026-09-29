@@ -40,23 +40,31 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 ## Open, in the order to settle them
 
 1. **`<n>` versus `[n]` on couplers — closed.** Nothing in the file marks it
-   (file-formats 3.7); the program derives it from footage. `<n>` when the
-   branch adds no mileage (no footage, or only 1xx cable) **and** its first
-   span matches the nearest span behind or ahead of the coupler on the
-   **parent branch** — the span `BkFeed` (`.2`) / `FwdFd` (`..2`) copy: 6
-   starts on branch 4's 121 backward, 11 on its 105 forward, 12 on its 99
-   backward. Evidence:
+   (file-formats 3.7); the program derives it from the spans. `<n>` when the
+   branch has no footage, or when its first span is on non-mileage (1xx)
+   cable and as long as the **parent branch's** nearest span behind or ahead
+   of the coupler — the span `BkFeed` (`.2`) / `FwdFd` (`..2`) copy. The walk
+   to that span takes each line's own span (the coupler's line first, going
+   back) and ends at the first line that has one or at a line with a power
+   stop. All 64 seen fit (AL004 23, the older AL004 13, SN001 28). Evidence:
    * branch 1: `570<2> 570[3] 570[4] 570[5]` — 3 is all 1xx but branch 1 has
      no spans;
    * 11.1 changed 105 → 106 in Lode Data turned 4.14 into `3-[11]<12>`;
+   * 9.1's `108[10]`: 10.1 is 300 ft on 100, as 9.3's span, but 9.2 (0 ft)
+     between them holds a power stop; the user took it off and Lode Data
+     read `108<10>`. The branch's later mileage (10.7 on) does not matter:
+     SN001's 5, 9, 15, 18, 20, 28 and 35 have mileage and are `<`;
+   * SN001 1.15's `63<15>` on 1.14's 550 — a power stop on the line whose
+     span it is does not end the walk;
    * branch 6: `100[7]`. 6.1 is bridger AL00415 at 4.4's pole and 100 its
      internal DC-12; 7 runs as a second cable along branch 4's 156 (the user's
      map confirms it), but only branch 6's own span, 121, is compared.
 
-   Not seen yet: `{n}` (backfeed) — 6 and 12 run backward and are drawn `<`.
-   Nor `(n)`, the manual's "no footage": 12.11 draws AL004's no-footage
-   branches 2, 18, 19 and 24 as `<n>`. Asked the user whether either
-   appears at all.
+   Not seen yet: a power stop on the coupler's own line (0 ft) with the
+   span behind matching: the older AL004's 16.4 (`8[17]` by the rule),
+   AL002's 16.10 and AL003's 29.5. Nor `{n}` (backfeed) — 6 and 12 run
+   backward and are drawn `<` — or `(n)`, the manual's "no footage": Lode
+   draws AL004's no-footage branches 2, 18, 19 and 24 as `<n>`.
 2. **8-port tap brackets — closed.** The Design screen draws an 8-port tap
    `<n>` (11.2: `<15>`), like the 6-port-slot pad `<43>`; the preview box
    draws 2/4/8-port as `(17)` `[8]` `{15}`. Both already reproduced.
@@ -317,34 +325,38 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       arithmetic leaves a hair under rounding up (9.17's 3.445, "Tap(54)
       6.55"). Lode numbers the tap-fed branches 43 and 44, as stored. Done.
 
+    * The user's third set: Lode Data read the app's notes (SN001's 1.1 with
+      a fourth row, a new note on 1.2) and its own save of them is the app's
+      byte for byte but for the header's licence fields, the name and the
+      cursor; the power stop behind AL004's 108[10] (`<n>` rule above); the
+      three half-up values (14.2 34.76, 20.13 21.98, 20.15's 41.23) as Lode
+      shows them; Q1 reads EQ on the older AL004 (6.9, 7.6: LEQ-PEA-8); the
+      node box lists the distances on a branch's last line (28.16). AL004's
+      branches 9, 14 and 20 and the older AL004's 6 and 7 match line for
+      line; its AL00416 box names the supply AL004A, as the file holds it.
+      Done.
+
     Still to confirm:
-    * the `<n>` rule. SN001 draws `<` on 3 4 5 9 14 15 16 18 19 20 27 28 29
-      35 40 41 and `[` on 2 7 8 13 21 24 25 31 33 34 36 39. "The first span
-      matches the nearest span behind or ahead of the coupler on the parent
-      branch, and is on 1xx cable (or the branch has no footage)" fits all of
-      them and 16 of AL004's 17, but not AL004's 108[10] (300 ft on 100
-      alongside 9.3's 300 on 410). The app still uses the AL004 rule, so
-      SN001's 5, 9, 15, 18, 20, 28 and 35 show `[` where Lode has `<`;
-    * Q1 as EQ on the older AL004 (6.9, 7.6 …) and AL002 – AL005, which
-      place Q1 where the newer AL004 has Q2;
-    * the three AL004 values the half-up rounding moved: 14.2 at 5 MHz
-      (34.755: 34.76), 20.13 at 40 MHz (21.975: 21.98), 20.15's tap;
+    * the couplers the power-stop rule changed where no screenshot shows
+      them: AL004's 5.19 `100<29>` (was `[29]`: its branch has mileage), the
+      older AL004's 16.4 `8[17]` (a power stop on the coupler's own line),
+      9.1 `108<10>` and 5.19 `100<32>`;
+    * the cascade position on the older AL004: Lode reads 2 on AL00416
+      (4.13), 3 on 43.1 and 4 on 44.1; the app 1, 3 and 3. Its 1.1 is an
+      NC4000 where the newer AL004 has a Ripple, and there Lode reads 1 on
+      AL00416, as the app does;
+    * the older AL004's red 64 in 11.18's amp column: the line holds no
+      active (short record, index 0);
     * the older AL004's 15.4: Lode's "Tap(870) 23.18", the app 23.19 (the
       port is -4.191 here);
-    * the node box on a branch's last line with no active or supply;
-    * the older AL004's 21.1 supply label: the file holds "AL004A";
     * where the Branch: line sits in the tap box, and which tap feeds the
       branch when a line has more than one;
     * what 0 on a tap feeding a branch does (kept here, fed by nothing);
-    * the cascade position on the older AL004's 44.1 (4 in an earlier
-      screenshot; the app gives 3, as Lode's box does on 43.1);
     * the older AL004's Test lines not produced yet: Tap(550), Crossover,
       "870 input … to LE", "40 output … from LE", "LE 11/5 before/0 after";
     * the extra 550 column Lode shows with WVEXT862 (19.55 at 44.1, 0.00
       under it): how F3 is carried from the node and through an active;
     * 23481/23483 and the three pairs at 36121;
-    * what Lode Data writes when it saves one of these files itself;
     * which new lines get their house list filled in;
     * where TSG, Map, Loc and address go (listed as not written);
-    * that Lode reads a note the app wrote (AL004_NOTES / SN001_NOTES);
     * a new power supply's record;

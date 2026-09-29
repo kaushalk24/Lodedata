@@ -347,3 +347,57 @@ def test_notes_are_written_a_row_to_each_tilde_0():
     again, _ = design_from_ntw(data, SPEC)
     assert again.branch(1).nodes[1].note == "NEW~0"
     assert export_ntw(again, data)[0] == data
+
+
+# Every coupler on the user's screenshots of SN001: < where the branch has no
+# footage or starts on 1xx cable along its parent's span behind or ahead
+SN001_BRACKETS = {3: "<", 4: "<", 5: "<", 9: "<", 14: "<", 15: "<", 16: "<", 18: "<", 19: "<",
+                  20: "<", 27: "<", 28: "<", 29: "<", 35: "<", 40: "<", 41: "<",
+                  2: "[", 7: "[", 8: "[", 13: "[", 21: "[", 24: "[", 25: "[", 31: "[", 33: "[",
+                  34: "[", 36: "[", 39: "["}
+
+
+def test_every_coupler_bracket_is_lodes(sn001):
+    import re
+    d, scr = sn001
+    drawn = {}
+    for r in scr.rows:
+        for c in r.couplers:
+            for m in re.finditer(r"([\[<])(\d+)[\]>]", c):
+                drawn[int(m.group(2))] = m.group(1)
+    assert {b: drawn.get(b) for b in SN001_BRACKETS} == SN001_BRACKETS
+    rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+    assert [rows[k].couplers for k in ((8, 3), (15, 10), (18, 9), (24, 7), (28, 9))] == \
+        [["9<9>"], ["63<18>"], ["63<20>"], ["63<28>"], ["63<35>"]]
+
+
+def test_a_branch_s_last_line_has_the_distances(sn001):
+    # 28.16 (the user's screenshot): 739 9856 739 739 9856, 2 homes
+    d, scr = sn001
+    r = next(r for r in scr.rows if (r.branch, r.node) == (28, 16) and not r.end)
+    assert r.node_box and r.block["distances"] == [739, 9856, 739, 739, 9856]
+    assert r.block["homes"] == 2
+
+
+LODE_SAVED = PAIR / "SN001_NOTES_test.ntw"
+
+
+@pytest.mark.skipif(not LODE_SAVED.exists(), reason="Lode Data's save of SN001_NOTES not in samples")
+def test_notes_are_written_as_lode_data_writes_them():
+    # The user opened the app's SN001_NOTES (1.1 with a fourth row, a new
+    # note on 1.2) in Lode Data and saved it as SN001_NOTES_test: every line
+    # record, every count and every note is the app's byte for byte.  Only
+    # the header's licence and user fields (Lode's own), the name it was
+    # saved under and where its cursor was (1.2) differ.
+    src = NTW.read_bytes()
+    d, _ = design_from_ntw(src, SPEC)
+    n11 = d.branch(1).nodes[0]
+    n11.note = n11.note + "ADDED BY THE APP~0"
+    d.branch(1).nodes[1].note = "NEW NOTE ON 1.2~0"
+    data, _ = export_ntw(d, src, name="SN001_NOTES_test")
+    ours, lode = plain(data), plain(LODE_SAVED.read_bytes())
+    assert len(ours) == len(lode)
+    cursor = slice(W.P_CURSOR, W.P_CURSOR + 8)
+    assert lode[cursor] != ours[cursor]                      # Lode's cursor was on 1.2
+    assert ours[512:W.P_CURSOR] == lode[512:W.P_CURSOR]
+    assert ours[W.P_CURSOR + 8:] == lode[W.P_CURSOR + 8:]

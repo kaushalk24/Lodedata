@@ -199,32 +199,40 @@ def build(design: Design) -> Screen:
 
     starts, feeders = {}, {}      # per branch: levels out of its coupler, coupler name
 
-    # Nothing in the file marks a branch <n> or [n].  What fits all seventeen
-    # seen on AL004's screens (branch 1: 570<2> 570[3] 570[4] 570[5];
-    # branch 4: 12<6> 100[9] 3-<11><12> 2[17] 1<18> 16<19> 100[20]
-    # 3[21]<24> 8[22]; branch 6: 100[7]; branch 9: 108[10]): a branch is
-    # drawn <n> when it adds no mileage -- no footage, or only 1xx cable --
-    # and its first span matches the nearest span behind or ahead of the
-    # coupler on the parent branch, the span BkFeed or FwdFd copies (6
-    # starts on 4's 121 backward, 11 on its 105 forward, 12 on its 99
-    # backward).  Branch 3 is all 1xx
-    # too, but branch 1 has no spans, so it is [3].  Confirmed in Lode Data:
-    # 11.1 changed from 105 to 106 ft turns 4.14 into 3-[11]<12>.  Only the
-    # parent branch counts: 6.1 is a 0-ft branch start at 4.4, and 7 runs
-    # along 4's 156 from there, yet it is 100[7] -- 6's own span is 121.
-    def mileage(b: Branch) -> float:
-        return sum(n.ftg for n in b.nodes if n.cab // 100 not in p.non_mileage_series)
-
+    # Nothing in the file marks a branch <n> or [n]; the program works it out
+    # from the spans.  A branch is drawn <n> when it has no footage, or when
+    # its first span is on non-mileage (1xx) cable and as long as the parent
+    # branch's nearest span behind or ahead of the coupler -- the span BkFeed
+    # (.2) or FwdFd (..2) copies.  The walk to that span takes each line's
+    # own span, the coupler's line first going back, and ends at the first
+    # line that has one or at a line with a power stop.  All 64 seen fit
+    # (AL004, the older AL004, SN001_MID):
+    #   AL004 4.4 12<6> starts on 4's 121 behind, 4.14 3-<11><12> on the 99
+    #   behind and the 105 ahead, past 4.15's coupler (0 ft); 11.1 made 106
+    #   ft turns it 3-[11]<12> (the user, in Lode Data);
+    #   AL004 9.1 108[10]: 9.2 (0 ft) holds a power stop before 9.3's 300 --
+    #   taken off, Lode Data reads 108<10> (the user's test);
+    #   SN001 1.15 63<15> on 1.14's 550, a power stop on the line whose span
+    #   it is; 5.3 212[8] and 28.1 102[34] match nothing;
+    #   only the parent counts: AL004's 7 runs along 4's 156 from 6.1 (0 ft
+    #   at 4.4), yet it is 100[7] -- 6's own span is 121.
     def fed(b: Branch) -> bool:
-        first = next((n.ftg for n in b.nodes if n.ftg), 0)
+        first = next((n for n in b.nodes if n.ftg), None)
+        if first is None:
+            return True
         parent = design.branch(b.parent_branch)
-        if not first or parent is None:
-            return not first
-        spans = [n.ftg for n in parent.nodes]
-        k = b.parent_node               # spans[:k] runs up to the coupler's node
-        back = next((f for f in reversed(spans[:k]) if f), 0)
-        ahead = next((f for f in spans[k:] if f), 0)
-        return first in (back, ahead)
+        if parent is None or first.cab // 100 not in p.non_mileage_series:
+            return False
+
+        def nearest(lines) -> float:
+            for n in lines:
+                if n.ftg:
+                    return n.ftg
+                if n.power_stop:
+                    return 0.0
+            return 0.0
+        k = b.parent_node               # parent.nodes[:k] runs up to the coupler's line
+        return first.ftg in (nearest(reversed(parent.nodes[:k])), nearest(parent.nodes[k:]))
 
     def branch_style(cp) -> str:
         if cp.style != BRANCH_NORMAL:
@@ -232,7 +240,7 @@ def build(design: Design) -> Screen:
         b = design.branch(cp.branch)
         if b is None:
             return "<>"
-        return "<>" if mileage(b) == 0 and fed(b) else "[]"
+        return "<>" if fed(b) else "[]"
 
     def walk(branch: Branch, incoming: dict, depth: int, cum_ft: float,
              gutter_open: bool):
@@ -646,10 +654,11 @@ def _amp_info(design: Design, scr: Screen) -> None:
             first = False
         below = downstream(b, n)
         homes = sum(x.hc for x in below)
-        # the node box lists the distances and homes on a coupler line
-        # (SN001_MID's 1.2: all 0, 227 homes) and a branch's 0-ft first line
-        # (4.1; 44.1 of the user's test file), not on 8.1 (334 ft, bare)
-        r.node_box = bool(splits(nd) or (n == 1 and not nd.ftg))
+        # the node box lists the distances and homes wherever the block is
+        # drawn: a coupler line (SN001_MID's 1.2: all 0, 227 homes; AL004's
+        # 9.1), a branch's last line (28.16: 739 9856 739 739 9856, 2 homes)
+        # and its 0-ft first line (4.1), not 8.1 (334 ft, bare)
+        r.node_box = block
         if block:
             r.block = {
                 "distances": [d[k] for k in ("aerial_prev", "aerial_start", "total_split",

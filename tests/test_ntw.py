@@ -464,7 +464,30 @@ SHOTS = {
         (41.96, 35.49, 23.33, 22.93), (39.99, 35.00, 23.74, 23.08),
         (37.31, 34.33, 24.30, 23.28), (34.93, 33.73, 24.80, 23.45),
         (32.71, 33.18, 25.27, 23.62), (30.65, 32.66, 25.70, 23.77),
-        (29.29, 32.32, 25.98, 23.87), (24.69, 31.17, 26.95, 24.21)],
+        (29.29, 32.32, 25.98, 23.87), (24.69, 31.17, 26.95, 24.21),
+        (20.96, 30.24, 27.73, 24.49), (15.62, 28.90, 28.85, 24.89),
+        (45.09, 37.02, 21.82, 21.29), (40.42, 35.85, 22.80, 21.64),
+        (35.95, 34.74, 23.73, 21.97), (33.28, 34.07, 24.29, 22.17),
+        (45.17, 37.01, 21.84, 21.28), (40.54, 35.65, 23.06, 21.95),
+        (37.30, 34.39, 24.23, 22.81), (30.71, 32.23, 26.18, 24.09),
+        (30.46, 31.98, 26.48, 24.59), (49.00, 38.00, 21.00, 21.00),
+        (48.10, 37.60, 21.40, 21.40)],
+    # 14.2 at 5 MHz and 20.13 at 40 MHz are halves (34.755, 21.975) the
+    # arithmetic leaves a hair under: Lode shows 34.76 and 21.98
+    14: [(29.22, 24.18, 34.58, 33.58), (25.41, 22.79, 35.86, 34.76),
+         (22.28, 22.00, 36.50, 34.99), (49.00, 38.00, 21.00, 21.00),
+         (46.10, 36.20, 22.80, 22.90), (40.87, 34.42, 24.44, 24.09),
+         (35.40, 32.37, 26.38, 25.78), (0.0, 0.0, 0.0, 0.0)],
+    20: [(48.11, 37.78, 21.19, 21.07), (45.72, 37.18, 21.70, 21.24),
+         (42.14, 36.11, 22.67, 21.84), (38.30, 34.72, 23.95, 22.74),
+         (34.68, 33.39, 25.20, 23.90), (28.13, 31.08, 27.38, 25.57),
+         (49.00, 38.00, 21.00, 21.00), (45.53, 36.96, 21.95, 21.59),
+         (40.30, 35.23, 23.53, 22.60), (35.72, 33.61, 25.03, 23.74),
+         (29.73, 31.43, 27.08, 25.37), (49.00, 38.00, 21.00, 21.00),
+         (45.40, 36.93, 21.98, 21.60), (42.27, 35.72, 23.11, 22.45),
+         (38.90, 34.88, 23.83, 22.70), (35.07, 33.44, 25.16, 23.79),
+         (30.03, 31.51, 27.02, 25.35), (49.00, 38.00, 21.00, 21.00),
+         (45.42, 36.93, 21.97, 21.60), (44.32, 36.23, 22.67, 22.30)],
     11: [(41.23, 33.33, 25.58, 25.17), (36.99, 31.80, 27.01, 26.29),
          (29.68, 27.69, 30.92, 29.86), (0.00, 0.00, 0.00, 0.00)],
     18: [(-66.87, -73.29, 132.15, 131.67), (-66.87, -73.29, 132.15, 131.67)],
@@ -490,8 +513,6 @@ STARTS = {9: (49.00, 38.00, 21.00, 21.00), 11: (43.50, 33.90, 25.10, 25.00),
 def test_branch_levels_match_the_screenshots(screen, branch):
     rows = [r for r in screen.rows if r.branch == branch]   # end line included
     got = [tuple(as_shown(r.levels[f]) for f in screen.frequencies) for r in rows]
-    if branch == 9:              # the preview box shows its first ten lines
-        got = got[:10]
     assert got == SHOTS[branch]
 
 
@@ -733,3 +754,36 @@ def test_a_feed_stops_being_one_when_its_span_no_longer_matches():
     assert [t for r in rows for t in r.taps] == ["/17/", "<15>", "[ 8]"]
     assert [as_shown(v) for v in rows[-1].port_levels] == [21.55, 20.59, 38.13, 37.17]
     assert rows[-1].port_severity == [""] * 4
+
+
+def test_a_power_stop_ends_the_walk_to_the_parent_span(screen):
+    # 9.1's 108[10]: branch 10 starts 300 ft on 100 cable, as 9.3's span, but
+    # 9.2 (0 ft) between them holds a power stop.  The user took it off in
+    # Lode Data and 9.1 read 108<10>; the other couplers on the screen stayed
+    rows = _rows(screen, 9)
+    assert [r.couplers for r in rows if r.couplers] == \
+        [["108[10]"], ["100<13>"], ["100[40]"], ["1<43>"], ["100<41>"]]
+    design = design_from_ntw(NTW, SPEC)[0]
+    design.branch(9).nodes[1].power_stop = False
+    rows = _rows(build(design), 9)
+    assert [r.couplers for r in rows if r.couplers] == \
+        [["108<10>"], ["100<13>"], ["100[40]"], ["1<43>"], ["100<41>"]]
+    assert [c for r in _rows(screen, 14) for c in r.couplers] == ["8<15>"]
+    assert [c for r in _rows(screen, 20) for c in r.couplers] == ["100<44>"]
+
+
+def test_branches_14_and_20_as_the_screen_and_boxes_show_them(screen):
+    ends = {b: [r for r in screen.rows if r.branch == b and r.end][0] for b in (9, 14, 20)}
+    assert [as_shown(v) for v in ends[9].port_levels] == [26.00, 15.10, 43.90, 42.10]
+    assert [as_shown(v) for v in ends[14].port_levels] == [27.30, 25.27, 33.58, 33.08]
+    assert [as_shown(v) for v in ends[20].port_levels] == [25.42, 16.93, 41.97, 39.90]
+    rows = {r.node: r for r in _rows(screen, 20)}
+    assert [as_shown(v) for v in rows[13].tap_levels[0]] == [25.40, 16.93, 41.98, 39.90]
+    assert [as_shown(v) for v in rows[15].tap_levels[0]] == [21.50, 17.48, 41.23, 38.30]
+    r14 = {r.node: r for r in _rows(screen, 14)}
+    assert r14[1].taps == ["/14/"] and r14[1].tap_severity == ["red"]
+    keys = ("name", "type", "fwd_pad", "fwd_eq", "ret_pad", "ret_eq", "aerial_prev",
+            "aerial_start", "total_split", "total_prev", "total_start", "cascade",
+            "supply", "homes_down")
+    assert tuple(r14[3].amp_info[k] for k in keys) == \
+        ("AL00424", "LE 750MHz THM", "0", "7", "2", "2", 594, 2621, 294, 594, 2621, 2, "A", 17)

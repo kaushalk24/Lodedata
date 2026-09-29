@@ -675,7 +675,10 @@ text and two fixed bytes, or three texts of which only the first was ever
 filled — every file fits both. `~0` ends each row: Lode's Edit Notes window
 shows 1.1's note as three rows (SHIN1 - 4953 - P-003938 / POWERED BY PS
 "PS1A" / DATE :02/20/26). An edited note is written the same way, each row
-followed by `~0`; a note left alone goes back as it was. Nothing else in the
+followed by `~0`; a note left alone goes back as it was. Lode Data read the
+app's notes (1.1 given a fourth row, a new note on 1.2) and its own save of
+that file is the app's byte for byte, but for the header's licence fields,
+the name it was saved under and its cursor (41425: on 1.2). Nothing else in the
 record counts the note: the only bytes of 1.1 unlike every other extended
 record are its ids, active, pads and two fields (137, 718 of an empty-text
 record) that vary on every active and read 255 at 718 on every file's fibre
@@ -686,7 +689,10 @@ The power supply label at 726 is the whole C string: SN001's supplies are
 `1A`, `1B`, `1C`, and Lode shows `1A` in 1.1's amp box and 4.1's supply box.
 On the Design screen the label sits in the first free cplr[branch] column,
 cyan (4.1). The node box on a supply's line (4.1, no active) carries the
-distances and homes and then the supply's own lines.
+distances and homes and then the supply's own lines. So does the node box of
+any line with the expanded display's block and no active: a coupler line
+(1.2: all 0, 227 homes; AL004's 9.1), a branch's last line (28.16: 739 9856
+739 739 9856, 2 homes) or its 0-ft first line; not 8.1 (334 ft, bare).
 
 **A pad or EQ column with nothing in its bank** is blank in the amp box:
 SN001's Ripple-2 on 1.1 (bank 4) shows Forward Pad and Return Pad empty, and
