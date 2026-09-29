@@ -22,18 +22,43 @@ jobs:
       - name: Build and check LodeData.exe
         shell: cmd
         run: desktop\build.bat
-      - name: Start it as a user would
+      - name: Start it as a user would, also as unzipped from a download
         shell: pwsh
         run: |
-          $p = Start-Process dist/LodeData/LodeData.exe -PassThru
-          Start-Sleep 20
-          $log = "$env:LOCALAPPDATA/LodeData/lodedata.log"
-          if ($p.HasExited) { Get-Content $log -ErrorAction SilentlyContinue; throw "LodeData.exe closed by itself" }
-          if ((Test-Path $log) -and (Select-String -Path $log -Pattern "could not open" -Quiet)) { Get-Content $log; throw "the window did not open" }
-          $page = Invoke-WebRequest http://127.0.0.1:17170/ -UseBasicParsing
-          if ($page.Content -notmatch "app.js") { throw "the page did not load" }
-          Stop-Process $p -Force
-          "LodeData.exe started, its window stayed open and the page loaded"
+          # true when LodeData.exe stays open with its window and its page loads
+          function Start-Check([string]$dir) {
+            $log = "$env:LOCALAPPDATA/LodeData/lodedata.log"
+            Remove-Item $log -ErrorAction SilentlyContinue
+            $p = Start-Process "$dir/LodeData.exe" -PassThru
+            Start-Sleep 20
+            $ok = -not $p.HasExited
+            if ((Test-Path $log) -and (Select-String -Path $log -Pattern "could not open" -Quiet)) { $ok = $false; Get-Content $log }
+            if ($ok) {
+              try { $ok = (Invoke-WebRequest http://127.0.0.1:17170/ -UseBasicParsing).Content -match "app.js" } catch { $ok = $false }
+            }
+            Stop-Process $p -Force -ErrorAction SilentlyContinue
+            Start-Sleep 2
+            return $ok
+          }
+          # what Windows does to files unzipped from an internet download; the
+          # .exe itself the user lets run ("More info - Run anyway")
+          function Mark-Downloaded([string]$dir) {
+            Get-ChildItem $dir -Recurse -File | ForEach-Object {
+              Set-Content -Path $_.FullName -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3" }
+            Remove-Item "$dir/LodeData.exe" -Stream Zone.Identifier
+          }
+          if (-not (Start-Check "dist/LodeData")) { throw "LodeData.exe did not open its window" }
+          "as built: the window opened and the page loaded"
+
+          Copy-Item dist/LodeData "$env:RUNNER_TEMP/without-config" -Recurse
+          Remove-Item "$env:RUNNER_TEMP/without-config/LodeData.exe.config"
+          Mark-Downloaded "$env:RUNNER_TEMP/without-config"
+          "downloaded, without LodeData.exe.config: window opened = $(Start-Check "$env:RUNNER_TEMP/without-config") (expected False: the user's problem)"
+
+          Copy-Item dist/LodeData "$env:RUNNER_TEMP/downloaded" -Recurse
+          Mark-Downloaded "$env:RUNNER_TEMP/downloaded"
+          if (-not (Start-Check "$env:RUNNER_TEMP/downloaded")) { throw "unzipped from a download, LodeData.exe did not open its window" }
+          "downloaded, with LodeData.exe.config: the window opened and the page loaded"
       - name: Zip
         shell: pwsh
         run: Compress-Archive -Path dist/LodeData -DestinationPath LodeData-windows.zip
