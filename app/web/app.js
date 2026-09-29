@@ -299,6 +299,43 @@ $('#grid tbody').ondblclick = ev => {
   enterBranch(+c.key.slice(4));
 };
 
+// The mouse wheel moves the cursor a line at a time within the branch on
+// screen, never into another. Turned up on the branch's first line it goes
+// back to the branch it was entered from, on the coupler's line.
+let wheelSum = 0;
+$('.grid-wrap').addEventListener('wheel', ev => {
+  if (ev.ctrlKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return;  // zoom, sideways
+  ev.preventDefault();
+  if (!$('#modal').hidden || !pageRows().length) return;
+  // a mouse wheel's notch is one line; a touchpad's small moves add up to one
+  wheelSum += ev.deltaMode ? Math.sign(ev.deltaY) * 50 : ev.deltaY;
+  if (Math.abs(wheelSum) < 50) return;
+  const down = wheelSum > 0;
+  wheelSum = 0;
+  S.buffer = null; S.dot = false;
+  if (down) S.row = Math.min(pageRows().length - 1, S.row + 1);
+  else if (S.row > 0) S.row -= 1;
+  else { returnToParent(); showCursor(); return; }
+  renderGrid();
+  showCursor();
+}, { passive: false });
+
+// keep the cursor's line in sight, below the column heads, with the lines
+// the expanded display draws under it
+function showCursor() {
+  const wrap = $('.grid-wrap'), tr = $('#grid tbody tr.onrow');
+  if (!tr) return;
+  let last = tr;
+  while (last.nextElementSibling && last.nextElementSibling.classList.contains('xline')) {
+    last = last.nextElementSibling;
+  }
+  const w = wrap.getBoundingClientRect(), r = tr.getBoundingClientRect();
+  const top = w.top + $('#grid thead').offsetHeight, bottom = w.top + wrap.clientHeight;
+  const end = last.getBoundingClientRect().bottom;
+  if (r.top < top) wrap.scrollTop -= top - r.top;
+  else if (end > bottom) wrap.scrollTop += Math.min(end - bottom, r.top - top);
+}
+
 // The info box follows the cursor's column, as the program's does: a tap
 // shows its port levels, a coupler previews the branch it feeds, an
 // amplifier its definition, a power supply its type.
@@ -1438,6 +1475,9 @@ function showHelp() {
    <b>. &rarr;</b> goes into the branch beginning on the highlighted node and
    <b>. &larr;</b> comes back to the parent. <b>. &uarr;</b> / <b>. &darr;</b>
    go to the top and bottom of the branch.</p>
+   <p>The <b>mouse wheel</b> moves the cursor up and down the branch on
+   screen. Double-click a coupler to go into its branch; turning the wheel up
+   on that branch's first line comes back to the coupler's line.</p>
    <p>The numbered bars are the screen menu — click them or use the menu bar.</p>
    <div class="row"><button id="mClose" class="primary">Close</button></div>`);
 }

@@ -477,6 +477,67 @@ def test_double_clicking_a_coupler_enters_its_branch_and_show_tips_hides_the_box
     assert not page.errors
 
 
+def test_the_mouse_wheel_moves_along_the_branch_and_back_out_of_it(page):
+    """The wheel moves the cursor a line at a time within the branch on
+    screen and never goes into a branch. Turned up on the first line of a
+    branch entered by double-clicking its coupler, it goes back to that
+    coupler's line."""
+    _open_al004(page)
+    _goto(page, 4, 14, "cplr0")
+    i = page.evaluate("pageRows().findIndex(r => r.node === 14 && !r.end)")
+    j = page.evaluate("columns().findIndex(c => c.key === 'cplr0')")
+    page.dblclick(f'#grid td[data-r="{i}"][data-c="{j}"]')
+    page.wait_for_timeout(400)
+    assert page.evaluate("[S.branch, S.row]") == [11, 0]
+    n = page.evaluate("pageRows().length")
+    page.hover("#grid tbody tr:first-child td:nth-child(3)")
+
+    def wheel(dy, times=1):
+        for _ in range(times):
+            page.mouse.wheel(0, dy)
+            page.wait_for_timeout(60)
+        page.wait_for_timeout(200)
+        return page.evaluate("[S.branch, S.row]")
+
+    assert wheel(100, 2) == [11, 2]
+    # a touchpad's small moves add up to one line
+    assert wheel(-20, 2) == [11, 2]
+    assert wheel(-20) == [11, 1]
+    # down past the last line stays on it, on branch 11
+    assert wheel(100, n + 3) == [11, n - 1]
+    assert wheel(-100, n - 1) == [11, 0]
+    # one more up: back to 4.14, where the coupler is
+    assert wheel(-100) == [4, i]
+    assert page.evaluate("curRow().node") == 14
+    assert wheel(-100) == [4, i - 1]
+    # the feeder's first line is as far up as it goes
+    page.evaluate("gotoBranch(1)")
+    assert wheel(-100, 2) == [1, 0]
+    # down a long branch on the expanded display, the cursor's line and the
+    # lines drawn under it stay in sight below the column heads
+    b, n = page.evaluate("S.scr.branches.map(b => [b.number, S.scr.rows.filter(r => r.branch === b.number)"
+                         ".length]).sort((x, y) => y[1] - x[1])[0]")
+    page.evaluate(f"S.expanded = true; gotoBranch({b})")
+    in_sight = """() => {
+      const w = document.querySelector('.grid-wrap').getBoundingClientRect();
+      const top = w.top + document.querySelector('#grid thead').offsetHeight;
+      const bottom = w.top + document.querySelector('.grid-wrap').clientHeight;
+      let tr = document.querySelector('#grid tbody tr.onrow'), last = tr;
+      while (last.nextElementSibling && last.nextElementSibling.classList.contains('xline'))
+        last = last.nextElementSibling;
+      return tr.getBoundingClientRect().top >= top - 1 && last.getBoundingClientRect().bottom <= bottom + 1;
+    }"""
+    for _ in range(n + 1):
+        wheel(100)
+        assert page.evaluate(in_sight)
+    assert page.evaluate("[S.branch, S.row]") == [b, n - 1]
+    for _ in range(n - 1):
+        wheel(-100)
+        assert page.evaluate(in_sight)
+    assert page.evaluate("[S.branch, S.row]") == [b, 0]
+    assert not page.errors
+
+
 def _ntw_lines(data: bytes):
     sys.path.insert(0, str(ROOT / "tools"))
     from lodedata.obfuscation import deobfuscate
