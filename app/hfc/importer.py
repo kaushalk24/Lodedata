@@ -41,10 +41,18 @@ from .plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
 # The frequencies themselves live in the Parameters file, which is why import
 # takes the design's own parameters rather than assuming a frequency plan.
 BLOCK_HIGH, BLOCK_LOW, BLOCK_RH, BLOCK_RL = 0, 1, 6, 7
+BLOCK_F3 = 2
 
 # Loop resistance 99 means "never power this" -- the convention for fibre and
 # anything else not meant to carry power.
 NON_POWERING_LOOP_RESISTANCE = 99.0
+
+
+def _f3(params: DesignParameters, *values) -> list:
+    """[MHz, dB ...] at the third forward frequency when the Parameters have
+    it on, else empty.  Kept apart from the four points the other columns
+    interpolate between, so they come out exactly as before."""
+    return [params.f3_mhz, *(round(abs(v), 4) for v in values)] if params.f3_mhz else []
 
 
 def _four_points(four: list, params: DesignParameters) -> list:
@@ -100,6 +108,7 @@ def parameters_from_spec_set(base: str | Path,
     params.forward_low_mhz = num("F2", params.forward_low_mhz)
     params.return_high_mhz = num("R1", params.return_high_mhz)
     params.return_low_mhz = num("R2", params.return_low_mhz)
+    params.f3_mhz = num("F3", 0.0)
     if spec.levels and any(any(r) for r in spec.levels):
         params.levels = spec.levels
         params.tap_margin_db = spec.tap_margin
@@ -111,6 +120,8 @@ def parameters_from_spec_set(base: str | Path,
         params.power_interpolation = par["power_interpolation"]
         w = par["tap_windows"]
         params.tap_windows = [w["F1"], w["F2"], w["R1"], w["R2"]]
+        params.f3_tap_window = w["F3"] if params.f3_mhz else 0.0
+        params.f3_levels = [lv[0] for lv in par["extra_levels"]] if params.f3_mhz else []
         params.max_crossover_db = par["max_crossover"]
         params.housings = [[h["number"], h["min_points"]] for h in par["housings"]]
         params.equipment_points = dict(par["points"])
@@ -160,6 +171,7 @@ def library_from_spec_set(base: str | Path,
             kind="drop" if "RG" in c.name.upper() else "hardline",
             loop_resistance_ohm_per_1000ft=loop,
             attenuation=_loss_points(c.forward_coeffs, params),
+            f3=_f3(params, c.forward_coeffs[BLOCK_F3]),
             cable_index=c.index,
             notes="; ".join(
                 [f"cable ID {c.index} ({'aerial' if c.index % 2 == 0 else 'underground'})"]
@@ -190,6 +202,7 @@ def library_from_spec_set(base: str | Path,
                 # a zero insertion loss marks a terminating tap: nothing
                 # continues past it (the screen shows 0.00 on the next line)
                 self_terminating=not any(abs(v) for v in port.insertion),
+                f3=_f3(params, *port.f3),
                 source=f"lodedata:{base.name}.tap",
             ))
 
@@ -210,6 +223,8 @@ def library_from_spec_set(base: str | Path,
                         + [round(abs(tap_leg[BLOCK_HIGH]), 2)] * legs,
             power_passing=[True] * (legs + 1),
             leg_losses=[thru_pts] + [tap_pts] * legs,
+            f3_legs=[params.f3_mhz, [round(abs(thru_leg[BLOCK_F3]), 4)]
+                     + [round(abs(tap_leg[BLOCK_F3]), 4)] * legs] if params.f3_mhz else [],
             record=p.slot + 1,
             internal=p.internal,
             source=f"lodedata:{base.name}.cpr",
@@ -234,6 +249,7 @@ def library_from_spec_set(base: str | Path,
             in_return_high=ins[2], in_return_low=ins[3],
             out_forward_high=outs[0], out_forward_low=outs[1],
             out_return_high=outs[2], out_return_low=outs[3],
+            in_f3=a.f3_levels[0], out_f3=a.f3_levels[1],
             power_draw=a.power_draw,
             current_draw_a=next((amps for v, amps in a.power_draw
                                  if abs(v - 60.0) < 6), 0.0),
@@ -246,7 +262,8 @@ def library_from_spec_set(base: str | Path,
         lib.add(InlineType(
             id=new_id("inl"), name=q.name, number=q.number,
             losses=[[params.forward_high_mhz, q.losses[0]], [params.forward_low_mhz, q.losses[1]],
-                    [params.return_high_mhz, q.losses[2]], [params.return_low_mhz, q.losses[3]]],
+                    [params.return_high_mhz, q.losses[2]], [params.return_low_mhz, q.losses[3]]]
+                   + ([[params.f3_mhz, q.f3]] if params.f3_mhz else []),
             source=f"lodedata:{base.name}.atv"))
 
     for sup in spec.supplies:

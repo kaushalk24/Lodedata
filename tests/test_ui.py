@@ -1023,6 +1023,16 @@ def test_the_older_al004_with_its_older_spec_set(page):
     page.wait_for_timeout(300)
     info = page.evaluate("document.getElementById('info').textContent")
     assert "AN-WIFI-204" in info and f"Branch:              {fed['number']}" in info
+    # F3 = 550: its column after the two cplr[branch] columns, as Lode draws it
+    heads = page.evaluate("Array.from(document.querySelectorAll('#grid thead th'))"
+                          "  .map(h => h.textContent.trim())")
+    assert heads[-4:] == ["cplr[branch]", "cplr[branch]", "550", ""]
+    col = _col(page, "550")
+    cell = ("document.querySelectorAll('#grid tbody tr')[S.row]"
+            f"  .querySelector('td[data-c=\"{col}\"]').textContent")
+    for node, want in ((1, "35.10"), (11, "43.00"), (18, "23.46")):
+        _goto(page, 11, node, "node")
+        assert page.evaluate(cell) == want
     assert not page.errors
 
 

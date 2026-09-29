@@ -45,7 +45,9 @@ spec files); **SN001** = `SN001_MID.ntw` with "SHINN1GHz Mid" (SHINSTON).
 **Not in the pack (ask the user again if needed):**
 * **WVBeck750** spec set (`.par .atv .tap .cpr .cbl`) — 34 tests in
   `test_import.py` / `test_entry.py` need it together with KERMIT750 and skip
-  without it (QUESTIONS 23).
+  without it (QUESTIONS 23). The user uploaded it as `WVBeck750.zip` on
+  29 Sep: on a scratch copy all 34 pass and the regression check keeps its
+  70 and adds 14; not put in `samples/` until the user says so.
 * The spec sets AL002, AL003 and AL005 were designed with (QUESTIONS 24).
 * The vendor manual (22 PDFs, 234 pages, sent in the first sessions) — its
   content is in `lode-data-manual-notes.md`.
@@ -82,7 +84,7 @@ Power screen, the menus) are not in the pack; their numbers are pinned in
 | `2026-09-28T1743_01.png`, `_02.png` | Bridgers and Feedermakers tabs | neither says which active is an LE |
 | `2026-09-28T1746_01.png` | 4.2 with `88` (FML1G7J ALC LE) placed, `/` on | `1-0-0 9-7-0`: LE vs amplifier goes by the place in the Actives table (items 1–12 are LEs), not the name; a placed active stores 0 pads/EQs; an unnamed active has no Amp Name line |
 | `2026-09-28T1801_01.png`, `_02.png` | Delete on 4.14 (two branches), and `0` `0` on the splitter | "Branches 11, 12, begin at this node … these branches …"; `0` takes the splitter off both, leaving `- <11>` `- <12>` |
-| `2026-09-28T1817_01.png` … `_03.png` | older AL004 (WVEXT862) branch 11 and its tap-fed branches | `117+` / `104+` taps feeding branches; 44.1 = 19.90 18.38 36.31 35.43 |
+| `2026-09-28T1817_01.png` … `_03.png` | older AL004 (WVEXT862) branch 11 and its tap-fed branches | `117+` / `104+` taps feeding branches; 44.1 = 19.90 18.38 36.31 35.43; the 550 column after cplr[branch] (44.1 19.55, branch 11's 19 values) — `test_classic_specs.py::test_the_550_column_is_lodes` |
 
 ## 3. Screenshot sets sent as zips (`lodedata-evidence.zip`)
 
@@ -92,8 +94,8 @@ Power screen, the menus) are not in the pack; their numbers are pinned in
 | `2026-09-26_pad-eq/` (5) | Pads/EQs Bank tabs | names of the twelve numbers per bank row; the program's pad/EQ pick reproduced on 27 actives (108 values) |
 | `2026-09-28_9-28-2026/` (3) | `4.png` current AL004 branch 44 (from 20.17: one 0-ft line, 44.1's node box); `5.png` branch 43 (from 9.20: supply C in the cplr column, 43.1's box with EXISTING 90v); `6.png` the user's design drawing of the terminated leg at AL00431 | in the current AL004, 43 and 44 are ordinary coupler branches (44 terminated, 43 carries a supply) |
 | `2026-09-29_SHINSTON/` (9) | labelled by question: `1` branch 1 (Notes ♪, no Enter dialog), `2` branches 1–2, `3` Test list, `4a/4b` amp boxes 1.15/1.27, `5A/5B` expanded 1.15/1.22, `6A/6b` supply 4.1 | SN001 levels on 91 lines; configuration IDs; Notes; supply label 1A in the cplr column |
-| `2026-09-29_SHINSTON2/` (15) | `1a–1e` brackets at 8.3, 15.10, 18.9, 24.7, 28.9; `2` Edit Notes window; `3a/3b` node box 1.2 / 1.29; `4` branch 5; `5a–5f` older AL004 Test list (94 lines) and 43.1 amp box | preview box layout, Q1 = "EQ", `117]`, Fslope/Rslope lines, notes rows end `~0` |
-| `2026-09-29_SHINSTON3/` (10) | `1a–1c` notes in Lode (1c is the older AL004); `2` AL004 branch 9 with 9.2's power stop off → 9.1 `108<10>`; `3a–3c` AL004 branches 14 and 20 + 20.15 tap box; `4a/4b` older AL004 6.9 / 7.6 = EQ; `5` SN001 28.16 node box | the final `<n>` rule (power stop ends the walk); half-up 34.76 / 21.98 / 41.23; the node box on a branch's last line |
+| `2026-09-29_SHINSTON2/` (15) | `1a–1e` brackets at 8.3, 15.10, 18.9, 24.7, 28.9; `2` Edit Notes window; `3a/3b` node box 1.2 / 1.29; `4` branch 5; `5a–5f` older AL004 Test list (94 lines) and 43.1 amp box | preview box layout, Q1 = "EQ", `117]`, Fslope/Rslope lines, notes rows end `~0`; the 14 Tap(550) lines and their colours (`test_the_test_list_is_lodes`), 43.1's 550 = 14.67 |
+| `2026-09-29_SHINSTON3/` (10) | `1a–1c` notes in Lode (1c is the older AL004); `2` AL004 branch 9 with 9.2's power stop off → 9.1 `108<10>`; `3a–3c` AL004 branches 14 and 20 + 20.15 tap box; `4a/4b` older AL004 6.9 / 7.6 = EQ; `5` SN001 28.16 node box | the final `<n>` rule (power stop ends the walk); half-up 34.76 / 21.98 / 41.23; the node box on a branch's last line; the 550 column of branches 4, 6 and 7 (1c, 4a, 4b; an in-line device's fifth loss is F3) |
 
 (The user's text for SHINSTON3 Q2 said "102[34]"; the screenshot shows
 `108<10>` at 9.1 — the screenshot was followed.)

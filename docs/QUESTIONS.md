@@ -30,7 +30,8 @@ Data window, with the info box in the bottom-right corner showing.
    *Send:* every Parameters tab with WVEXT862 attached; the amp box of
    25.3 and of 23.17.
 4. **15.4.** Lode's Test list says "Tap(870) 23.18 below min at 15.4",
-   the replica 23.19 — 0.006 dB apart somewhere on branch 15.
+   the replica 23.19, and "Tap(550) 16.98", the replica 16.99 — both
+   forward ports ~0.006 dB lower here, somewhere on branch 15.
    *Send:* the Design screen of branch 15 (550 column showing), and the
    tap box of 15.3 and of 15.4.
 5. **Brackets no screenshot has shown yet.** The bracket rule now drawn:
@@ -41,8 +42,9 @@ Data window, with the info box in the bottom-right corner showing.
    * older AL004 branch 9, first lines (replica: 9.1 `108<10>`);
    * older AL004 branch 5 around 5.19 (replica: `100<32>`).
 
-(The 550 column itself and its 14 "Tap(550)" lines need nothing from you:
-the values are in the spec files. They come with this set.)
+(The 550 column itself and its 14 "Tap(550)" lines needed nothing from
+you: built from the spec files, and all 57 values on your screenshots and
+13 of the 14 lines match; the 14th is 15.4 above.)
 
 ## B. Couplers and branches
 

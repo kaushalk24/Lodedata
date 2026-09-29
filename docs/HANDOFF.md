@@ -110,8 +110,11 @@ not find them, in `desktop/build.bat`); new files the page loads go under
 4. `python tools/regression.py snapshot /tmp/base.json`, then
    `python tools/regression.py diff samples/regression-baseline.json /tmp/base.json`
    — must print "0 of 70 changed": the new session starts exactly where the
-   last one ended (the baseline was taken on commit d4d2065's engine with
-   the full samples pack). `/tmp/base.json` is then the baseline for the
+   last one ended (the baseline was taken on the engine of the commit that
+   built the 550 column, with the full samples pack; the user was sent it to
+   replace the one in their samples zip. Against the older baseline, from
+   d4d2065, exactly the 9 networks opened with WVEXT862 differ: their
+   Tap(550) Test lines). `/tmp/base.json` is then the baseline for the
    regression check below.
 
 ## Regression check (every change)
@@ -158,7 +161,10 @@ asked about before pushing. Add every new sample the user sends to
   (and the 36-line one with changed settings), expanded display blocks, info
   boxes, Select Tap, pads/EQs (the program's pick on all 27 actives).
 * **Older AL004 + WVEXT862:** opens with nothing unresolved and saves byte
-  for byte; branches 6 and 7 match line for line; 67 of Lode's 94 Test lines.
+  for byte; branches 6 and 7 match line for line; the 550 column matches all
+  57 values on Lode's screens (branches 4, 6, 7, 11, 43, 44); 81 of Lode's 94
+  Test lines, the 14 Tap(550) lines included (15.4's three differ by 0.01:
+  set A question 4).
 * **SN001 + SHINSTON:** 47 branches, 390 lines; branches 1, 2, 5, 8, 15, 18,
   24, 28 match; 15-line Test list; Notes written exactly as Lode writes them.
 * **Coupler brackets:** 64 of 64 seen match (AL004 23, older 13, SN001 28).
@@ -175,27 +181,31 @@ asked about before pushing. Add every new sample the user sends to
 **Question set A** (older AL004) in `docs/QUESTIONS.md` was sent to the user
 and is waiting for their screenshots: cascade position (2/3/4 vs the app's
 1/3/3), the red "64" on 11.18, the "input … to LE" / "output … from LE" /
-"LE 11/5 before/0 after" Test lines, 15.4's 23.18 vs 23.19, and four
-brackets not yet on screen.
+"LE 11/5 before/0 after" Test lines, 15.4 (870 23.18 vs 23.19, 550 16.98
+vs 16.99), and four brackets not yet on screen.
 
-With that set, build the **550 (F3) column** and its **14 Tap(550) Test
-lines** — this needs nothing from the user:
+**Done alongside it: the 550 (F3) column** and its 14 Tap(550) Test lines
+(`tests/test_classic_specs.py::test_the_550_column_is_lodes`,
+`test_the_test_list_is_lodes`). What it rests on (file-formats 3.0, 3.1,
+3.4b, 3.5):
 
-* WVEXT862's Parameters has a third forward frequency, F3 = 550
-  (file-formats 3.0: "870 54 550 / 40 5"; Min F3 per level at 2976 + 24·lv
-  in the current `.par`, file-formats 3.5). Lode shows the column between
-  54 and 40 with WVEXT862 (19.55 at 44.1, 0.00 under it); with WV750 F3 is
-  off and there is no column.
-* Cable, coupler and tap loss blocks carry it: slot 2 of the ten-slot block
-  (0 F-high, 1 F-low, 2–5 F3–F6, 6 Rh, 7 Rl, 8–9 R3–R4; file-formats 3.1).
-* Older `.atv` actives hold F3–F6 inputs at +135 and outputs at +151 (i32
-  ×1e6): 0 inputs; outputs 43.0 on the LEs and FNB99, 41.1 on NC4000, 43.5
-  on HLN 3842 NODE. Checked by hand against Lode's screen: 4.1 = 35.20 and
-  4.2 = 33.28.
-* Then compare every 550 value on the older-AL004 screenshots (sets
-  SHINSTON2 5a–5f, SHINSTON3 1c/4a/4b in the evidence pack) and the Tap(550)
-  lines of its 94-line Test list, and run the regression check (AL004 and
-  SN001 must not change).
+* WVEXT862's Parameters has a third forward frequency, F3 = 550; with it on
+  Lode draws its column **after the two cplr[branch] columns** (every
+  older-AL004 screenshot; an earlier note here said "between 54 and 40" —
+  wrong). The tap box and the port levels under the tap columns stay 870 54
+  / 40 5. With WV750, SHINSTON, KERMIT or WVBeck F3 is off: no column.
+* Cables, couplers and taps: slot 2 of the ten-slot blocks. In-line devices:
+  their **fifth** loss (F1 F2 R1 R2 F3 — LEQ-PEA-8's 3.1 at 6.9 and 7.6).
+  Older actives: In F3 at +135, Out F3 at +151. The F3 figures are kept
+  beside each part, not among the points the other columns interpolate
+  between, so every other level is bit for bit as before.
+* The Test list checks a tap's ports in the Parameters' order, 870 54 550
+  40 5, min/max first, then windows (F3: Min 15 / 18 on levels 0 / 1,
+  window 12), then the crossover. A tap takes its worst port's colour, 550
+  included (no tap on the older AL004 is out at 550 alone).
+* Not built: where a current-layout (Lode 12) `.atv` keeps an active's F3
+  levels — no current spec set has F3 on (values at +171 / +195 look like
+  them); F4–F6 and R3–R4 (no spec set has them on).
 
 After set A: sets B–G of QUESTIONS.md, one at a time.
 

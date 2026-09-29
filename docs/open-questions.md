@@ -348,21 +348,22 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     * the older AL004's red 64 in 11.18's amp column: the line holds no
       active (short record, index 0);
     * the older AL004's 15.4: Lode's "Tap(870) 23.18", the app 23.19 (the
-      port is -4.191 here);
+      port is -4.191 here), and "Tap(550) 16.98", the app 16.99;
     * where the Branch: line sits in the tap box, and which tap feeds the
       branch when a line has more than one;
     * what 0 on a tap feeding a branch does (kept here, fed by nothing);
-    * the older AL004's Test lines not produced yet (27 of its 94): Tap(550),
+    * the older AL004's Test lines not produced yet (13 of its 94):
       "870 input … to LE", "40 output … from LE", "LE 11/5 before/0 after".
       Its five crossovers are there: WVEXT862 holds Max. Crossover 0.00, a
       limit like any other (every positive crossover is listed);
-    * the extra 550 column Lode shows with WVEXT862 (19.55 at 44.1, 0.00
-      under it) — to build, nothing to ask: F3 = 550 is the Parameters'
-      third forward frequency; cables, couplers and taps carry it in slot 2
-      of their loss blocks; the older .atv holds F3–F6 inputs at +135 and
-      outputs at +151 (0 in; 43.0 out on the LEs and FNB99, 41.1 NC4000,
-      43.5 HLN 3842 NODE). Worked by hand this gives Lode's 4.1 = 35.20 and
-      4.2 = 33.28. Then its 14 Tap(550) Test lines;
+    * the 550 column — **built**: F3 = 550 is the Parameters' third forward
+      frequency, drawn after the cplr[branch] columns; cables, couplers and
+      taps carry it in slot 2 of their loss blocks, in-line devices as their
+      fifth loss, the older .atv's actives In at +135 and Out at +151. All
+      57 values on the screenshots of branches 4, 6, 7, 11, 43 and 44 match,
+      and 13 of the 14 Tap(550) lines (15.4 above). Not seen: a tap out at
+      550 alone (its colour is taken to be its worst port's, as at the other
+      frequencies); where a Lode 12 .atv keeps an active's F3 levels;
     * 23481/23483 and the three pairs at 36121;
     * which new lines get their house list filled in;
     * where TSG, Map, Loc and address go (listed as not written);

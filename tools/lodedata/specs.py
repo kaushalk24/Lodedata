@@ -95,6 +95,7 @@ CLASSIC_LAYOUT = {
     "tap": (641, 414, 5),
 }
 CLASSIC_ATV_RECORDS = 51
+CLASSIC_ATV_F3 = (135, 151)     # the older record's In and Out at F3
 CLASSIC_TAP_PORT_SLOTS = {2: 5, 4: 107, 6: 209, 8: 311}
 
 
@@ -214,6 +215,12 @@ class ActiveSpec:
     values: list = field(default_factory=list)
     # Pads/EQs Bank used for forward pad, return pad, forward EQ, return EQ
     banks: list = field(default_factory=lambda: [1, 1, 1, 1])
+    # in and out at the third forward frequency (F3): read from the older
+    # record only, In at +135 and Out at +151 -- WVEXT862's LEs and FNB99 put
+    # out 43.0, NC4000 41.1, HLN 3842 NODE 43.5, the WIFI OMNI 0 (43.1's end
+    # line reads 0.00 at 550).  No current spec set has F3 on, so where the
+    # current record keeps it is not settled
+    f3_levels: list = field(default_factory=lambda: [0.0, 0.0])
 
 
 # The .atv file holds more than the Actives table -- the manual describes
@@ -270,6 +277,8 @@ def read_actives(data: bytes) -> list:
         ids = [_name(seg[o + 5:o + 10]) for o in range(
             config_at, config_at + ATV_CONFIG_STRIDE * ATV_CONFIG_SLOTS,
             ATV_CONFIG_STRIDE)]
+        f3 = [round(_fx(struct.unpack_from("<i", seg, o)[0]), 2) for o in CLASSIC_ATV_F3] \
+            if classic else [0.0, 0.0]
         out.append(ActiveSpec(
             slot=slot,
             name=name,
@@ -285,6 +294,7 @@ def read_actives(data: bytes) -> list:
             values=nums,
             banks=[seg[ATV_PAD_BANKS] + 1, seg[ATV_PAD_BANKS + 1] + 1,
                    seg[ATV_EQ_BANKS] + 1, seg[ATV_EQ_BANKS + 1] + 1],
+            f3_levels=f3,
         ))
     return out
 
@@ -299,6 +309,8 @@ class TapPort:
     part: str
     tap_value: list = field(default_factory=list)   # [High, Low, Rh, Rl] dB
     insertion: list = field(default_factory=list)   # [High, Low, Rh, Rl] dB
+    # the same two at the third forward frequency (slot 2 of each block)
+    f3: list = field(default_factory=lambda: [0.0, 0.0])
 
 
 @dataclass
@@ -324,6 +336,11 @@ def _loss4(seg: bytes, base: int) -> list:
             for i in (0, 1, 6, 7)]
 
 
+def _loss_f3(seg: bytes, base: int) -> float:
+    """Slot 2 of a ten-slot loss block: the third forward frequency."""
+    return round(_fx(struct.unpack_from("<i", seg, base + 8)[0]), 3)
+
+
 def read_taps(data: bytes) -> list:
     out = []
     # the older row: 102-byte part slots, part char[15], the two loss blocks
@@ -336,11 +353,13 @@ def read_taps(data: bytes) -> list:
             part = _name(seg[o:o + min(width, 20)])
             if not part:
                 continue
+            value, insertion = o + TAP_VALUE_BLOCK - 25 + width, o + TAP_INSERTION_BLOCK - 25 + width
             ports[count] = TapPort(
                 ports=count,
                 part=part,
-                tap_value=_loss4(seg, o + TAP_VALUE_BLOCK - 25 + width),
-                insertion=_loss4(seg, o + TAP_INSERTION_BLOCK - 25 + width),
+                tap_value=_loss4(seg, value),
+                insertion=_loss4(seg, insertion),
+                f3=[_loss_f3(seg, value), _loss_f3(seg, insertion)],
             )
         if not ports:
             continue
@@ -419,7 +438,9 @@ def read_frequencies(data: bytes) -> dict:
 # node's amp column.  69-byte records from a fixed offset (the .atv is a
 # fixed-size file); name, then losses at the four design columns
 # [F1, F2, R1, R2].  WV750: Q2 LEQ-PEA-0 = 1.2 / 1.0 / 1.2 / 0.7, exactly what
-# it costs on AL004's Design screen at 6.8.
+# it costs on AL004's Design screen at 6.8.  The fifth is F3, unlike the
+# cable and coupler blocks: WVEXT862's LEQ-PEA-8 (1.8 8.3 1.2 0.7 3.1) takes
+# 3.1 at 550 on the older AL004's 6.9 and 7.6.
 ATV_INLINE, ATV_INLINE_STRIDE, ATV_INLINE_SLOTS = 169372, 69, 40
 ATV_INLINE_LOSS = 29
 
@@ -429,6 +450,7 @@ class InlineSpec:
     number: int          # the n of Qn
     name: str
     losses: list         # dB at F1, F2, R1, R2
+    f3: float = 0.0      # dB at F3
 
 
 # the older .atv: 25 records of 59 bytes from 57464, name char[15], losses at +19
@@ -444,9 +466,9 @@ def read_inline(data: bytes) -> list:
         if o + at + 16 > len(data):
             break
         name = _name(data[o:o + min(at, 20)])
-        losses = [round(_fx(v), 3) for v in struct.unpack_from("<4i", data, o + at)]
+        losses = [round(_fx(v), 3) for v in struct.unpack_from("<5i", data, o + at)]
         if name and all(abs(v) < 60 for v in losses):
-            out.append(InlineSpec(number=k, name=name, losses=losses))
+            out.append(InlineSpec(number=k, name=name, losses=losses[:4], f3=losses[4]))
     return out
 
 

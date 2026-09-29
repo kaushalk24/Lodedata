@@ -164,10 +164,10 @@ tables are smaller. A reader tells them apart by the version at byte 26
 |---|---|---|
 | `.cbl` | 512 + 384·n, 100 records, marker 0x33 (5·10 + 1); name char[15], then resistance +20, loss blocks +24/+64, parts +104/+119 | 394-byte records, fields +30 … |
 | `.cpr` | 616 + 104·n; name char[15]; loss blocks +20/+60, tap legs +100, internal +103 | 626 + 114·n |
-| `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, power steps +79, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, table +214 |
+| `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, power steps +79, In F3 +135, Out F3 +151, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, table +214; F3 levels not placed (+171 / +195 look like them) |
 | `.atv` banks | 4 banks from 17240, same 8816-byte bank and 68-byte row | 8 banks from 93884 |
 | `.atv` 11.1 (SHINSTON, 262 136 bytes) | as the current 12.1 file up to the in-line devices; the 11 064 bytes it lacks are past them, where nothing is read | 273 200 bytes |
-| `.atv` in-line | 25 records of 59 bytes from 57464, name char[15], losses +19 | 40 of 69 from 169372, +29 |
+| `.atv` in-line | 25 records of 59 bytes from 57464, name char[15], losses +19 (F1 F2 R1 R2 F3 …) | 40 of 69 from 169372, +29 |
 | `.tap` | 63 rows of 414 bytes from 641; part slots of 102 at +5/+107/+209/+311, part char[15], loss blocks +15/+55 | 512 rows of 454, slots of 112 |
 | `.par` | 3102 bytes, below | 6515/6516 |
 
@@ -185,6 +185,21 @@ this way WVEXT862 gives 870 54 550 / 40 5, levels 0 – 1 of 19/10/45/45 and
 EXISTING STDBY, EXISTING 90v, and WIFI OMNI (86, index 38) in 0 −5 22 22,
 out 48.5 34 47 47 — what Lode draws on the older AL004's branch fed from
 11.18.
+
+**The third forward frequency (F3).** WVEXT862 has F3 = 550 on (Min F3 15 /
+18 on levels 0 / 1 at 2976 + 24·lv, window 12). Lode then draws a 550
+column after the two cplr[branch] columns — the level at the line's input,
+and on the line under a branch what continues past the last tap — while
+the tap box and the port levels under the tap columns keep 870 54 / 40 5.
+It comes from slot 2 of the cable, coupler and tap blocks (3.1), from an
+in-line device's fifth loss (3.4b) and from an older active's In at +135
+and Out at +151: 0 in on every active; out 43.0 on the LEs and FNB99, 41.1
+on the NC4000, 43.5 on HLN 3842 NODE, 0 on the WIFI OMNIs (43.1 and 44.1's
+end lines read 0.00). All 57 values on the older AL004's screenshots match
+(branches 4, 6, 7, 11, 43, 44). The Test list checks the ports in the
+Parameters' order — "Tap(550) 0.74 below min at 3.1." after 3.1's 54 —
+min/max, then windows ("Tap(550) 1.77 over window at 14.1."), then the
+crossover.
 
 ### 3.1 `.cbl` — cable types (394 bytes)
 
@@ -409,7 +424,8 @@ AN-WIFI 104–124, RMT1 204–235, RMT2 404–426.
 
 The Actives file's Bridgers/Feedermakers/Inline Eqs page: 69-byte records from
 offset 169372 (the file is a fixed 273200 bytes), record n = Qn. Name, then at
-+29 the losses at the four design columns F1, F2, R1, R2. WV750: Q1 LEQ-PEA-8,
++29 the losses at the four design columns F1, F2, R1, R2, then F3 (the
+older AL004's LEQ-PEA-8: 3.1 at 550 on 6.9 and 7.6, as Lode's screens). WV750: Q1 LEQ-PEA-8,
 Q2 LEQ-PEA-0 (1.2 / 1.0 / 1.2 / 0.7), Q3 FFE-8-120-85/RP-R, Q5 EXIST SPLICE,
 Q6 NEW SPLICE, Q10–Q13 REMOVE/MOVE LE/BR markers. Placed in the amp column the
 device's loss applies before the node's taps; on AL004 6.8 that gives exactly

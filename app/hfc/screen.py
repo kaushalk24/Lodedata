@@ -41,6 +41,7 @@ class Row:
     # levels at the input to this node, one per design frequency
     levels: dict = field(default_factory=dict)     # MHz -> dBmV
     freq_order: list = field(default_factory=list)  # the column order
+    extra_order: list = field(default_factory=list)  # F3: its column after cplr[branch]
     ftg: float = 0.0
     hc: int = 0
     cab: int = 0
@@ -108,6 +109,7 @@ class Row:
             # as computed: the preview box prints these (SN001_MID 2.5's
             # 32.055 as 32.05, where the Design screen shows 32.06)
             "raw_levels": [self.levels.get(f, 0.0) for f in self.freq_order],
+            "extra_levels": [as_shown(self.levels.get(f, 0.0)) for f in self.extra_order],
             "inline": self.inline, "node_box": self.node_box,
             "ftg": round(self.ftg, 0), "hc": self.hc, "cab": self.cab,
             "cab_name": self.cab_name, "lv": self.lv, "tsg": self.tsg,
@@ -143,6 +145,7 @@ class Row:
 class Screen:
     rows: list = field(default_factory=list)
     frequencies: list = field(default_factory=list)   # column order
+    extra_frequencies: list = field(default_factory=list)  # F3, drawn after cplr[branch]
     # the level column heads: the frequencies, or with no spec set the
     # program's own "high low Rh Rl"
     labels: list = field(default_factory=list)
@@ -154,6 +157,7 @@ class Screen:
     def as_dict(self) -> dict:
         return {"rows": [r.as_dict() for r in self.rows],
                 "frequencies": self.frequencies,
+                "extra_frequencies": self.extra_frequencies,
                 "labels": self.labels or [f"{f:g}" for f in self.frequencies],
                 "branches": self.branches,
                 "problems": self.problems, "totals": self.totals,
@@ -178,6 +182,20 @@ def _freqs(p) -> list:
             p.return_high_mhz, p.return_low_mhz]
 
 
+def _extra_freqs(p) -> list:
+    """The third forward frequency when the Parameters have it on: Lode draws
+    its column after the two cplr[branch] columns (WVEXT862's 550 on the older
+    AL004: 35.20 at 4.1, 19.55 at 44.1, 0.00 on the line under it)."""
+    return [p.f3_mhz] if getattr(p, "f3_mhz", 0.0) else []
+
+
+def _all_freqs(p) -> list:
+    """Every frequency the levels are carried at, in the Parameters' order --
+    the order the Test list checks a tap's ports in: 870, 54, 550, 40, 5."""
+    return [p.forward_high_mhz, p.forward_low_mhz, *_extra_freqs(p),
+            p.return_high_mhz, p.return_low_mhz]
+
+
 def _is_forward(p, mhz: float) -> bool:
     return mhz >= p.forward_low_mhz
 
@@ -186,7 +204,8 @@ def _is_forward(p, mhz: float) -> bool:
 def build(design: Design) -> Screen:
     p = design.parameters
     freqs = _freqs(p)
-    scr = Screen(frequencies=freqs, problems=design.validate())
+    extra, allf = _extra_freqs(p), _all_freqs(p)
+    scr = Screen(frequencies=freqs, extra_frequencies=extra, problems=design.validate())
     lib = design.library
     if not design.has_specs:
         scr.labels = ["high", "low", "Rh", "Rl"]
@@ -256,7 +275,7 @@ def build(design: Design) -> Screen:
                 # actives table -- AL004's Ripple, index 22, reads 70 and
                 # AL00416, index 13, 61 (the user's screenshots)
                 amp = default_active_id(node.kept_active)
-            row = Row(freq_order=freqs, branch=branch.number, node=node.seq or idx + 1,
+            row = Row(freq_order=freqs, extra_order=extra, branch=branch.number, node=node.seq or idx + 1,
                       depth=depth, ftg=node.ftg, hc=node.hc, cab=node.cab,
                       lv=node.lv, tsg=node.tsg, amp=amp, fixed=node.fixed,
                       power_stop=node.power_stop,
@@ -272,7 +291,7 @@ def build(design: Design) -> Screen:
             row.cumulative_ft = cum_ft
 
             # the span into this node
-            for f in freqs:
+            for f in allf:
                 loss = cable_loss(node, f)
                 if _is_forward(p, f):
                     levels[f] = levels.get(f, 0.0) - loss
@@ -297,7 +316,7 @@ def build(design: Design) -> Screen:
                 if part:
                     if not part.needs_rf_input:
                         # fibre fed: there is no RF input to show on this line
-                        row.levels = {f: 0.0 for f in freqs}
+                        row.levels = {f: 0.0 for f in allf}
                     if part.needs_rf_input:
                         need = part.in_forward_high
                         have = row.levels.get(p.forward_high_mhz, 0.0)
@@ -309,6 +328,8 @@ def build(design: Design) -> Screen:
                     levels[p.forward_low_mhz] = part.out_forward_low
                     levels[p.return_high_mhz] = part.in_return_high
                     levels[p.return_low_mhz] = part.in_return_low
+                    for f in extra:
+                        levels[f] = part.out_f3
 
             # an in-line device in the amp column (Qn) comes before the taps.
             # The first is the in-line equaliser, drawn "EQ": SN001_MID's
@@ -320,7 +341,7 @@ def build(design: Design) -> Screen:
                 row.inline = node.inline
                 if q:
                     row.amp_name = q.name
-                    for f in freqs:
+                    for f in allf:
                         loss = q.loss_db(f)
                         levels[f] = levels[f] - loss if _is_forward(p, f) else levels[f] + loss
 
@@ -333,7 +354,7 @@ def build(design: Design) -> Screen:
                         row.taps.append(bracket(f"{0:>2}", TAP_BRACKETS.get(slot.file_ports, "[]")))
                         row.tap_ports.append(slot.file_ports)
                         row.tap_branches.append(slot.branch)
-                        last_tap = ("file", {f: 0.0 for f in freqs}, [""] * len(freqs))
+                        last_tap = ("file", {f: 0.0 for f in allf}, [""] * len(freqs))
 
             # taps: the through loss applies to everything downstream
             for slot in node.taps:
@@ -355,9 +376,12 @@ def build(design: Design) -> Screen:
                 row.tap_branches.append(slot.branch)
                 # a tap sees the level after whatever precedes it on the line:
                 # the amplifier, an in-line Q device, an earlier tap
-                ports = _tap_ports(p, freqs, levels, tap)
-                per_port, errors = _tap_checks(p, node.lv, freqs, ports)
-                sev = _worst(per_port)
+                ports = _tap_ports(p, allf, levels, tap)
+                per_all, errors = _tap_checks(p, node.lv, allf, ports)
+                # a tap is drawn in its worst colour, 550 included; each port
+                # value under the four level columns in its own
+                sev = _worst(per_all)
+                per_port = [per_all[allf.index(f)] for f in freqs]
                 row.tap_severity.append(sev)
                 row.tap_levels.append([ports[f] for f in freqs])
                 row.tap_port_severity.append(per_port)
@@ -367,9 +391,9 @@ def build(design: Design) -> Screen:
                 if slot.branch and design.branch(slot.branch):
                     fed_from_taps.append((tap, design.branch(slot.branch), dict(ports)))
                 if tap.self_terminating:
-                    levels = {f: 0.0 for f in freqs}
+                    levels = {f: 0.0 for f in allf}
                     continue
-                for f in freqs:
+                for f in allf:
                     thru = tap.through_db(f, reverse=not _is_forward(p, f))
                     levels[f] = levels[f] - thru if _is_forward(p, f) else levels[f] + thru
 
@@ -382,7 +406,7 @@ def build(design: Design) -> Screen:
             for slot in node.taps:
                 child = design.branch(slot.branch) if slot.branch else None
                 if child is not None and child.number not in walked:
-                    fed_from_taps.append((None, child, {f: 0.0 for f in freqs}))
+                    fed_from_taps.append((None, child, {f: 0.0 for f in allf}))
             for tap, child, ports in fed_from_taps:
                 feeders[child.number] = tap.name if tap else ""
                 walk(child, ports, depth + 1, cum_ft, True)
@@ -434,16 +458,16 @@ def build(design: Design) -> Screen:
                     if not child:
                         continue
                     down = {f: (levels[f] - leg(i, f) if _is_forward(p, f)
-                                else levels[f] + leg(i, f)) for f in freqs}
+                                else levels[f] + leg(i, f)) for f in allf}
                     if cp.removed:
                         # nothing feeds it: it starts at 0.00 (AL002 55.1,
                         # the user's recording: 112 ft of cable 0 below it
                         # reads -2.42 -0.60 0.52 0.18)
-                        down = {f: 0.0 for f in freqs}
+                        down = {f: 0.0 for f in allf}
                     own = lib.passives.get(cp.part_id) or passive
                     feeders[child.number] = own.name if own else ""
                     walk(child, down, depth + 1, cum_ft, True)
-                for f in freqs:
+                for f in allf:
                     loss = leg(THROUGH_DOWNSTREAM, f)
                     levels[f] = (levels[f] - loss if _is_forward(p, f)
                                  else levels[f] + loss)
@@ -451,7 +475,7 @@ def build(design: Design) -> Screen:
 
         # the line under the last node: what continues through the last tap,
         # and under the tap columns that tap's port output
-        end = Row(freq_order=freqs, branch=branch.number, node=len(branch.nodes) + 1,
+        end = Row(freq_order=freqs, extra_order=extra, branch=branch.number, node=len(branch.nodes) + 1,
                   depth=depth, end=True)
         end.levels = dict(levels)
         if last_tap:
@@ -762,9 +786,19 @@ def _tap_ports(p, freqs, levels: dict, tap) -> dict:
             for f in freqs}
 
 
-def _level_row(p, lv: int) -> list:
+def _limits(p, lv: int) -> tuple:
+    """System Levels for the node's lv and the tap windows, by frequency.
+    F3's Min is a column of its own on the System Levels tab (WVEXT862: 15
+    on level 0, 18 on level 1), its window in the frequency table (12)."""
     rows = p.levels or [[0.0, 0.0, 99.0, 99.0]]
-    return rows[lv] if 0 <= lv < len(rows) and any(rows[lv]) else rows[0]
+    k = lv if 0 <= lv < len(rows) and any(rows[lv]) else 0
+    four = _freqs(p)
+    lim = dict(zip(four, rows[k]))
+    windows = dict(zip(four, getattr(p, "tap_windows", None) or []))
+    for f in _extra_freqs(p):
+        lim[f] = p.f3_levels[k] if k < len(p.f3_levels) else 0.0
+        windows[f] = p.f3_tap_window
+    return lim, windows
 
 
 def _worst(severities) -> str:
@@ -793,7 +827,7 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
     crossovers: both are the Parameters settings.  Returns the
     colour of each column's port value and the messages, in the list's order.
     """
-    lim = _level_row(p, lv)
+    lim, windows = _limits(p, lv)
     seen = {f: as_shown(ports[f]) for f in freqs}
     per = [""] * len(freqs)
     errors = []
@@ -803,21 +837,20 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
             per[i] = sev
 
     for i, f in enumerate(freqs):
-        limit = lim[i] if i < len(lim) else 0.0
+        limit = lim.get(f, 0.0)
         out = limit - seen[f] if _is_forward(p, f) else seen[f] - limit
         if out > 0.005:
             sev = "red" if out > p.tap_margin_db + 0.005 else "yellow"
             mark(i, sev)
             side = "below min" if _is_forward(p, f) else "above max"
             errors.append((sev, f"Tap({f:g}) {out:5.2f} {side}"))
-    windows = getattr(p, "tap_windows", None) or []
     for i, f in enumerate(freqs):
-        if i >= len(windows) or not windows[i]:
+        if not windows.get(f):
             continue
         if _is_forward(p, f):
-            out, side = seen[f] - (lim[i] + windows[i]), "over window"
+            out, side = seen[f] - (lim[f] + windows[f]), "over window"
         else:
-            out, side = (lim[i] - windows[i]) - seen[f], "below window"
+            out, side = (lim[f] - windows[f]) - seen[f], "below window"
         if out > 0.005:
             mark(i, "yellow")
             errors.append(("yellow", f"Tap({f:g}) {out:5.2f} {side}"))
@@ -992,7 +1025,8 @@ def tap_candidates(design: Design, branch: int, node: int, slot: int) -> dict:
     precedes it on the line.  The window colours by the level checks only:
     [11] and / 8/ are crossed over there (3.08, 3.18) yet shown green."""
     scr = build(design)
-    p, freqs = design.parameters, scr.frequencies
+    p = design.parameters
+    freqs = _all_freqs(p)
     row = next((r for r in scr.rows if (r.branch, r.node) == (branch, node) and not r.end), None)
     if row is None:
         return {"candidates": [], "current": None}

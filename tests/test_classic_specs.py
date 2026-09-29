@@ -3,9 +3,9 @@
 WVEXT862 was saved by Lode 4 (.cbl/.cpr 5.1, .atv 6.0, .tap 3.0, .par 2.10,
 "Design 4.22"), and the older AL004 design was saved against it.  Lode 12
 opens the pair; the user's screenshots of it are what these check:
-columns 870 54 40 5, 11.16 drawn "117+" and 11.18 "104+", and the WIFI OMNI
-(86) fed from 11.18's tap port reading 19.90 18.38 36.31 35.43 in, 48.50
-34.00 22.00 22.00 out.
+columns 870 54 40 5 and 550 after cplr[branch], 11.16 drawn "117+" and 11.18
+"104+", and the WIFI OMNI (86) fed from 11.18's tap port reading 19.90 18.38
+36.31 35.43 (550: 19.55) in, 48.50 34.00 22.00 22.00 (0.00) out.
 
 Skipped unless samples/AL004-WVEXT862 holds AL004.ntw and WVEXT862.*.
 """
@@ -37,6 +37,9 @@ def test_the_older_spec_files_read_as_lode_shows_them():
     s = load_spec_set(SPEC)
     assert s.frequencies == {"F1": "870", "F2": "54", "F3": "550", "R1": "40", "R2": "5"}
     assert s.levels[:2] == [[19.0, 10.0, 45.0, 45.0], [22.0, 13.0, 45.0, 45.0]]
+    # F3 = 550: Min 15 / 18 on levels 0 / 1, tap window 12
+    assert [lv[0] for lv in s.parameters["extra_levels"][:2]] == [15.0, 18.0]
+    assert s.parameters["tap_windows"]["F3"] == 12.0
     assert [x.name for x in s.supplies] == ["NEW STANDBY", "EXISTING STDBY", "EXISTING  90v"]
 
     cable = next(c for c in s.cables if c.name == "EX P3 500 A")
@@ -55,6 +58,11 @@ def test_the_older_spec_files_read_as_lode_shows_them():
     assert omni.input_levels == [0.0, -5.0, 22.0, 22.0]
     assert omni.output_levels == [48.5, 34.0, 47.0, 47.0]
     assert omni.banks == [3, 3, 3, 3]
+    # In and Out at F3 (+135, +151): 0 in on every active; out 43.0 on the
+    # LEs and bridgers, 41.1 on the NC4000, 0 on the WIFI OMNI
+    assert omni.f3_levels == [0.0, 0.0]
+    assert by_id["61"].f3_levels == by_id["11"].f3_levels == [0.0, 43.0]
+    assert by_id["64"].f3_levels == [0.0, 41.1]
     assert (by_id["88"].name, by_id["88"].index) == ("FML1G7J ALC LE", 40)
     assert (by_id["41"].name, by_id["41"].index) == ("FNB99DJxx6x6x1", 42)
 
@@ -63,6 +71,8 @@ def test_the_older_spec_files_read_as_lode_shows_them():
     assert (taps[41].tap_id, taps[41].ports[2].part) == (104, "AN-WIFI-204")
     assert taps[41].ports[2].tap_value == [4.2, 3.3, 3.3, 3.2]
     assert [q.name for q in s.inline] == ["LEQ-PEA-8", "LEQ-PEA-0", "EXIST SPLICE", "NEW SPLICE"]
+    # an in-line device's fifth loss is F3: LEQ-PEA-8 takes 3.1 at 550
+    assert (s.inline[0].losses, s.inline[0].f3) == ([1.8, 8.3, 1.2, 0.7], 3.1)
     assert len(s.banks) == 4 and s.banks[3].prefixes[0].strip() == "NODE-"
 
     p = s.parameters
@@ -86,7 +96,7 @@ def _from_tap(d, branch, node):
 def test_a_branch_fed_from_a_tap_port():
     d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
     scr = build(d)
-    assert scr.frequencies[:4] == [870.0, 54.0, 40.0, 5.0]
+    assert scr.frequencies == [870.0, 54.0, 40.0, 5.0] and scr.extra_frequencies == [550.0]
     rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
     assert rows[(11, 16)].taps == ["117+"] and rows[(11, 16)].couplers == []
     assert rows[(11, 18)].taps == ["104+"] and rows[(11, 18)].couplers == []
@@ -95,9 +105,11 @@ def test_a_branch_fed_from_a_tap_port():
     assert rows[(11, 18)].tap_branches == [wifi.number]
     first = rows[(wifi.number, 1)]
     assert first.amp == "86" and first.amp_label == "AL004.2"
-    assert tuple(round(v, 2) for v in first.levels.values()) == (19.90, 18.38, 36.31, 35.43)
+    assert first.as_dict()["levels"] == [19.90, 18.38, 36.31, 35.43]
+    assert first.as_dict()["extra_levels"] == [19.55]
     end = next(r for r in scr.rows if r.end and r.branch == wifi.number)
-    assert tuple(round(v, 2) for v in end.levels.values()) == (48.50, 34.00, 22.00, 22.00)
+    assert end.as_dict()["levels"] == [48.50, 34.00, 22.00, 22.00]
+    assert end.as_dict()["extra_levels"] == [0.00]
     info = first.amp_info
     assert (info["fwd_eq"], info["ret_eq"]) == ("VOID", "VOID")
     assert [info[k] for k in ("aerial_prev", "aerial_start", "total_split",
@@ -115,37 +127,48 @@ def test_the_older_design_saves_back_as_it_came():
 
 
 # Lode's Test Results for the older AL004 (94 errors), the lines of the kinds
-# worked out so far -- the tap checks at 870, 54, 40 and 5 MHz, the
+# worked out so far -- the tap checks at 870, 54, 550, 40 and 5 MHz, the
 # crossovers (WVEXT862's Max. Crossover is 0.00) and the EQ slope -- in the
-# window's order.  Still to come: the 550 MHz column, the amplifier
-# input/output and LE cascade lines.
+# window's order (the user's screenshots, SHINSTON2 5a-5c).  Still to come:
+# the amplifier input/output and LE cascade lines.
 LODE_TESTS = [
-    "Tap(54)  1.24 below min at 3.1.", "Tap(870)  2.18 below min at 3.3.",
-    "Tap(870) 10.72 below min at 3.5.", "Crossover of  3.85 at 3.5.",
-    "Tap(870) 12.74 below min at 3.6.",
-    "Tap(5)  2.79 below window at 3.6.", "Crossover of 11.22 at 3.6.", "Tap(870)  4.12 below min at 5.29.",
+    "Tap(54)  1.24 below min at 3.1.", "Tap(550)  0.74 below min at 3.1.",
+    "Tap(870)  2.18 below min at 3.3.", "Tap(550)  0.32 below min at 3.3.",
+    "Tap(870) 10.72 below min at 3.5.", "Tap(550)  6.52 below min at 3.5.", "Crossover of  3.85 at 3.5.",
+    "Tap(870) 12.74 below min at 3.6.", "Tap(550)  5.64 below min at 3.6.",
+    "Tap(5)  2.79 below window at 3.6.", "Crossover of 11.22 at 3.6.",
+    "Tap(870)  4.12 below min at 5.29.", "Tap(550)  0.50 below min at 5.29.",
     "Tap(5)  1.23 below window at 5.29.", "Crossover of  2.01 at 5.29.", "Tap(5)  0.53 below window at 6.7.",
     "Tap(40)  1.73 above max at 6.10.", "Tap(40)  2.04 above max at 7.7.",
     "Tap(5)  0.62 above max at 7.7.", "Tap(870)  8.05 below min at 9.16.",
-    "Tap(54)  8.09 below min at 9.16.", "Tap(40)  7.94 above max at 9.16.",
+    "Tap(54)  8.09 below min at 9.16.", "Tap(550)  6.52 below min at 9.16.",
+    "Tap(40)  7.94 above max at 9.16.",
     "Tap(5)  5.18 above max at 9.16.", "Tap(870) 10.30 below min at 9.17.",
-    "Tap(54)  6.55 below min at 9.17.", "Tap(40)  6.26 above max at 9.17.",
+    "Tap(54)  6.55 below min at 9.17.", "Tap(550)  7.67 below min at 9.17.",
+    "Tap(40)  6.26 above max at 9.17.",
     "Tap(5)  3.05 above max at 9.17.", "Tap(870) 11.12 below min at 9.18.",
-    "Tap(54)  5.21 below min at 9.18.", "Tap(40)  4.83 above max at 9.18.",
+    "Tap(54)  5.21 below min at 9.18.", "Tap(550)  7.97 below min at 9.18.",
+    "Tap(40)  4.83 above max at 9.18.",
     "Tap(5)  1.21 above max at 9.18.", "Tap(870)  5.03 below min at 10.2.",
-    "Tap(54)  1.54 below min at 10.2.", "Tap(40)  1.19 above max at 10.2.",
+    "Tap(54)  1.54 below min at 10.2.", "Tap(550)  3.48 below min at 10.2.",
+    "Tap(40)  1.19 above max at 10.2.",
     "Tap(5)  1.04 below window at 10.7.", "Tap(870)  1.16 below min at 11.16.",
-    "Tap(54)  0.27 below min at 11.16.", "Tap(40)  0.12 above max at 11.16.",
+    "Tap(54)  0.27 below min at 11.16.", "Tap(550)  0.22 below min at 11.16.",
+    "Tap(40)  0.12 above max at 11.16.",
     "Tap(5)  0.58 below window at 11.18.", "Tap(54)  0.04 below min at 12.3.",
     "Tap(5)  0.50 below window at 13.3.", "Tap(870)  5.32 over window at 14.1.",
+    "Tap(550)  1.77 over window at 14.1.",
     "Tap(40)  3.12 below window at 14.1.", "Tap(5)  3.61 below window at 14.1.",
     "Tap(870) 17.67 below min at 15.3.", "Tap(54)  6.00 below min at 15.3.",
+    "Tap(550) 13.13 below min at 15.3.",
     "Tap(40)  5.35 above max at 15.3.", "Tap(5)  0.70 above max at 15.3.",
     "Crossover of  2.67 at 15.3.",
     "Tap(870) 23.18 below min at 15.4.", "Tap(54)  6.12 below min at 15.4.",
+    "Tap(550) 16.98 below min at 15.4.",
     "Tap(40)  5.23 above max at 15.4.", "Tap(5)  0.08 above max at 15.4.",
     "Crossover of  8.06 at 15.4.",
     "Tap(870)  6.12 below min at 16.1.", "Tap(54)  4.92 below min at 16.1.",
+    "Tap(550)  4.96 below min at 16.1.",
     "Tap(40)  4.68 above max at 16.1.", "Tap(5)  2.18 above max at 16.1.",
     "Tap(40)  2.42 below window at 16.7.", "Tap(5)  2.92 below window at 16.7.",
     "Tap(5)  0.36 below window at 19.10.", "Tap(5)  1.20 below window at 23.5.",
@@ -158,16 +181,24 @@ LODE_TESTS = [
 
 def test_the_test_list_is_lodes():
     d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
-    got = [m for _, m in build(d).tests]
+    tests = build(d).tests
+    got = [m for _, m in tests]
     assert len(got) == len(LODE_TESTS)
-    # 15.4's 870 MHz port is 0.006 dB lower here than in Lode (23.19 against
-    # its 23.18, and so its crossover 8.07 against 8.06): open, to be checked
-    # against Lode's levels on branch 15
+    # 15.4's forward ports are ~0.006 dB lower here than in Lode (870: 23.19
+    # against its 23.18, 550: 16.99 against 16.98, and so its crossover 8.07
+    # against 8.06): open, to be checked against Lode's levels on branch 15
     open_ = {LODE_TESTS.index("Tap(870) 23.18 below min at 15.4."): "Tap(870) 23.19 below min at 15.4.",
+             LODE_TESTS.index("Tap(550) 16.98 below min at 15.4."): "Tap(550) 16.99 below min at 15.4.",
              LODE_TESTS.index("Crossover of  8.06 at 15.4."): "Crossover of  8.07 at 15.4."}
     assert [got[i] for i in open_] == list(open_.values())
     assert [m for i, m in enumerate(got) if i not in open_] == \
         [m for i, m in enumerate(LODE_TESTS) if i not in open_]
+    # the Tap(550) lines' colours, as Lode's list shows them: yellow within
+    # the 0.50 tap margin (5.29's 0.50 too) and for the window, red beyond
+    # (3.1, 3.3, 3.5, 3.6, 5.29, 9.16, 9.17, 9.18, 10.2, 11.16, 14.1, 15.3, 15.4, 16.1)
+    assert [v for v, m in tests if m.startswith("Tap(550)")] == [
+        "red", "yellow", "red", "red", "yellow", "red", "red", "red", "red", "yellow", "yellow",
+        "red", "red", "red"]
 
 
 def test_branches_6_and_7_as_lode_shows_them():
@@ -208,3 +239,25 @@ def test_the_couplers_are_drawn_as_lode_draws_them():
     assert cpl(4) == ["12<6>", "100[9]", "3[11]<12>"]
     assert cpl(11) == ["2[19]", "1<21>", "16<22>", "100[23]", "3[24]<27>", "8[25]"]
     assert cpl(6) == ["100[7]"] and cpl(7) == ["112<8>"]
+
+
+def test_the_550_column_is_lodes():
+    # WVEXT862's third forward frequency, F3 = 550, drawn after the two
+    # cplr[branch] columns: every value on the user's screenshots of branches
+    # 4 (SHINSTON3 1c), 6 and 7 (4a, 4b), 11 (28 Sep, SHINSTON2 5e/5f) and the
+    # two tap-fed branches (43.1, 44.1), end lines included.  Cables, couplers
+    # and taps carry it in slot 2 of their loss blocks, an in-line device in
+    # its fifth loss (6.9 and 7.6's EQ), an active its Out at F3
+    d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
+    scr = build(d)
+    lode = {
+        4: [35.20, 33.28, 31.61, 30.11, 26.58, 24.79, 23.12, 21.88, 20.02, 18.21, 16.29, 15.59,
+            14.37, 43.00, 38.40],
+        6: [18.11, 43.00, 41.11, 39.44, 37.50, 36.09, 33.19, 31.24, 28.84, 25.73, 22.33],
+        7: [43.00, 42.00, 39.57, 36.05, 32.59, 29.67, 26.56, 23.16],
+        11: [35.10, 29.40, 27.71, 27.46, 24.87, 22.98, 21.75, 20.64, 19.09, 18.18, 43.00, 38.40,
+             37.05, 34.85, 32.58, 32.58, 29.56, 23.46, 0.00],
+        43: [14.67, 0.00], 44: [19.55, 0.00]}
+    for b, want in lode.items():
+        rows = [r.as_dict() for r in scr.rows if r.branch == b][:len(want)]
+        assert [r["extra_levels"][0] for r in rows] == want, b

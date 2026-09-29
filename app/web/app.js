@@ -38,6 +38,10 @@ function columns() {
   const f = (S.scr && (S.scr.labels || S.scr.frequencies)) || [];
   const lvl = f.map((mhz, i) => ({ key: 'lvl:' + i, head: String(mhz).replace('.0', ''),
                                    cls: '', edit: false }));
+  // the Parameters' third forward frequency (WVEXT862's 550): Lode draws its
+  // column after the two cplr[branch] columns (the older AL004's screens)
+  const xlv = ((S.scr && S.scr.extra_frequencies) || []).map((mhz, i) => (
+    { key: 'xlv:' + i, head: String(mhz).replace('.0', ''), cls: '', edit: false }));
   const common = [
     { key: 'ftg', head: 'ftg', edit: true },
     { key: 'hc', head: 'hc', edit: true },
@@ -90,10 +94,15 @@ function columns() {
     { key: 'tap2', head: 'tap3', edit: true }, { key: 'tap3', head: 'tap4', edit: true },
     { key: 'cplr0', head: 'cplr[branch]', cls: 'l', edit: true },
     { key: 'cplr1', head: 'cplr[branch]', cls: 'l', edit: true },
+    ...xlv,
   ];
 }
 
 function cellText(r, c) {
+  if (c.key.startsWith('xlv:')) {
+    const v = (r.extra_levels || [])[+c.key.slice(4)];
+    return v === undefined ? '' : v.toFixed(2);
+  }
   if (r.end) {
     // the end line: levels, and the last tap's port output under the taps
     if (c.key.startsWith('lvl:')) return r.levels[+c.key.slice(4)].toFixed(2);
@@ -271,7 +280,7 @@ function renderGrid() {
         extra += r.end ? ' port' : ' tap';
         if (sev) extra += ' ' + sev;
       }
-      if (r.end && c.key.startsWith('lvl:')) extra += ' endlv';
+      if (r.end && /^(lvl|xlv):/.test(c.key)) extra += ' endlv';
       return `<td class="${c.cls || ''}${cur}${extra}" data-r="${i}" data-c="${j}">${esc(text)}</td>`;
     }).join('');
     const main = `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;

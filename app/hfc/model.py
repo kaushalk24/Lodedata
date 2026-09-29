@@ -61,8 +61,13 @@ class CableType:
     notes: str = ""
     source: str = "manual"
     cable_index: int = -1                      # 0-99 in the spec file; the screen shows series*100 + this
+    # [MHz, dB per 100 ft] at the third forward frequency, when there is one:
+    # the spec's own figure, kept apart from the points interpolated above
+    f3: list = field(default_factory=list)
 
     def loss_db(self, mhz: float, feet: float) -> float:
+        if self.f3 and mhz == self.f3[0]:
+            return self.f3[1] * feet / 100.0
         return interpolate_sqrt([tuple(p) for p in self.attenuation], mhz) * feet / 100.0
 
     def resistance_ohms(self, feet: float) -> float:
@@ -91,12 +96,17 @@ class TapType:
     power_passing: bool = True
     self_terminating: bool = False
     source: str = "manual"
+    f3: list = field(default_factory=list)                # [MHz, tap value, insertion] at F3
 
     def through_db(self, mhz: float, reverse: bool = False) -> float:
+        if self.f3 and mhz == self.f3[0]:
+            return self.f3[2]
         pts = self.return_through_loss if (reverse and self.return_through_loss) else self.through_loss
         return interpolate_sqrt([tuple(p) for p in pts], mhz)
 
     def tap_db(self, mhz: float) -> float:
+        if self.f3 and mhz == self.f3[0]:
+            return self.f3[1]
         if self.tap_value:
             return interpolate_sqrt([tuple(p) for p in self.tap_value], mhz)
         return self.tap_value_db
@@ -118,12 +128,16 @@ class PassiveType:
     leg_losses: list = field(default_factory=list)
     record: int = -1                           # coupler file record, as a design refers to it
     internal: bool = False                     # an amplifier's own output split
+    f3_legs: list = field(default_factory=list)  # [MHz, [dB per leg, as leg_losses]] at F3
 
     @property
     def ports(self) -> int:
         return len(self.port_losses)
 
     def port_db(self, port: int, mhz: float | None = None) -> float:
+        if mhz is not None and self.f3_legs and mhz == self.f3_legs[0]:
+            legs = self.f3_legs[1]
+            return legs[min(port, len(legs) - 1)] if port > 0 else legs[0]
         if mhz is not None and self.leg_losses:
             legs = self.leg_losses
             table = legs[min(port, len(legs) - 1)] if port > 0 else legs[0]
@@ -173,6 +187,9 @@ class ActiveType:
     out_forward_low: float = 39.0
     out_return_high: float = 40.0
     out_return_low: float = 40.0
+    # in and out at the third forward frequency, when the Parameters have one
+    in_f3: float = 0.0
+    out_f3: float = 0.0
     noise_figure_db: float = 7.0
     # powering: current draw against applied voltage, [[volts, amps], ...].
     # Actives are constant-power, so draw rises as the voltage sags -- which is
@@ -350,6 +367,13 @@ class DesignParameters:
     # a "Crossover".  Both marginal (yellow).
     tap_windows: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
     max_crossover_db: float = 0.0
+    # the third forward frequency (F3), 0 when the Parameters have it off
+    # (WVEXT862: 550): its Min per lv (System Levels) and its tap window.
+    # Lode draws its column after the cplr columns and tests its tap ports
+    # between F2's and R1's
+    f3_mhz: float = 0.0
+    f3_levels: list = field(default_factory=list)
+    f3_tap_window: float = 0.0
     # Underground Housings: [housing number, Minimum Size in points], and the
     # points each kind of equipment takes (Parameters, General tab)
     housings: list = field(default_factory=list)
