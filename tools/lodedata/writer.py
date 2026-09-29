@@ -130,13 +130,12 @@ def split(plain: bytes) -> RawNetwork:
     raw = RawNetwork(header=plain[:PAYLOAD_START], preamble=plain[PAYLOAD_START:first])
     end = first
     for br in order:
-        p = br.offset + N.BRANCH_RECORD
+        p = br.offset + br.head_size
         nodes = []
         for nd in br.nodes:
-            size = N.ACTIVE_NODE_RECORD if plain[nd.offset + N.N_HAS_ACTIVE] else N.NODE_RECORD
-            nodes.append((nd.id, plain[p:p + size]))
-            p += size
-        raw.branches.append(RawBranch(head=plain[br.offset:br.offset + N.BRANCH_RECORD],
+            nodes.append((nd.id, plain[p:p + nd.size]))
+            p += nd.size
+        raw.branches.append(RawBranch(head=plain[br.offset:br.offset + br.head_size],
                                       nodes=nodes, end=plain[p:p + END_SIZE]))
         end = p + END_SIZE
     if end != len(plain):
@@ -184,6 +183,7 @@ class NodeOut:
     supply_type: int = 0         # -1 = as in the file
     pad_banks: list | None = None  # the active's Pads/EQs banks less one (fwd pad,
                                    # ret pad, fwd EQ, ret EQ); None = leave them
+    text: bytes | None = None    # the line's text at N_TEXT; None = leave it
 
 
 @dataclass
@@ -404,6 +404,12 @@ def _stored_name(plain, at: int = P_NAME) -> str:
 def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
                  take) -> bytes:
     rec = bytearray(src) if src is not None else _new_node()
+    # the line's text moves every field after it (SN001_MID's 1.1): work on
+    # the record without it, and put it back last
+    t = N.text_len(rec, N.N_TEXT)
+    text = bytes(rec[N.N_TEXT:N.N_TEXT + t]) if nd.text is None else nd.text.replace(b"\0", b"")
+    del rec[N.N_TEXT:N.N_TEXT + t]
+    old_hc = rec[N.N_HC] if src is not None else None
     extended = bool(rec[N.N_HAS_ACTIVE])
     keep_active = nd.active_index == -1 and src is not None
     has_active = bool(rec[N.N_AMP_INDEX]) and not rec[N_INLINE_FLAG] if keep_active else nd.active_index > 0
@@ -484,9 +490,9 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
         if not rec[N.N_PS_NAME]:
             raise WriteError(f"line id {own}: a power supply placed here is not "
                              "written yet -- its record layout is still being checked")
-        if nd.supply != chr(rec[N.N_PS_NAME]):
-            # the program shows one letter; the old AL004 still holds
-            # "AL004A" behind its "A", so an unchanged label is left alone
+        if nd.supply != bytes(rec[N.N_PS_NAME:N.N_PS_NAME + 16]).split(b"\0", 1)[0].decode("latin-1"):
+            # written C-style, the rest left: AL004's 18.1 holds "A\0004A",
+            # the "A" written over "AL004A"; an unchanged label is left alone
             _text_into(rec, N.N_PS_NAME, nd.supply)
         if nd.supply_type >= 0:
             rec[N.N_PS_TYPE] = nd.supply_type & 0xFF
@@ -497,10 +503,13 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
     tail = _tail(extended)
     rec[TAIL_HC + tail] = nd.hc & 0xFF
     homes = TAIL_HOMES + tail
-    if any(rec[homes:homes + 128]):
-        # filled in: a 1 for each home, 4 for the rest
+    # filled in: a 1 for each home, 4 for the rest -- rewritten when the house
+    # count changes to some homes; SN001_MID's 8.3 holds 0 homes over a list
+    # still reading 1 1 1, so a line left alone keeps its list
+    if any(rec[homes:homes + 128]) and nd.hc and nd.hc != old_hc:
         for k in range(32):
             struct.pack_into("<I", rec, homes + 4 * k, 1 if k < nd.hc else 4)
+    rec[N.N_TEXT:N.N_TEXT] = text
     return bytes(rec)
 
 

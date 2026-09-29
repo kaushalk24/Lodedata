@@ -43,6 +43,9 @@ The user is a Lode Data designer. What they want:
   * optionally `samples/AL004-WVEXT862/AL004.ntw` (the August AL004) with
     `WVEXT862.{par,atv,tap,cpr,cbl}`, the older Lode 4 spec set it was saved
     with (`tests/test_classic_specs.py`)
+  * optionally `samples/SN001-SHINSTON/SN001_MID.ntw` with
+    `SHINN1GHz Mid.{par,atv,tap,cpr,cbl}` (`tests/test_sn001.py`): a line
+    with text, and an 11.1 .atv
 * `samples/` is gitignored; a new session needs these files uploaded again.
 
 ## Where things are

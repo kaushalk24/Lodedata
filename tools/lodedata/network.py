@@ -56,6 +56,19 @@ N_HC, N_CABLE, N_LV = 129, 130, 132
 N_HAS_ACTIVE = 701
 N_PS_NAME = 726
 N_LABEL = 981
+# A line's text: C-style at +698, empty (one NUL) in every design but
+# SN001_MID, whose 1.1 holds 63 characters (SHIN1 - 4953 - P-003938~0POWERED
+# BY PS "PS1A"~0DATE :02/20/26~0).  The record grows by the text's length and
+# every field after it moves with it -- 1.1's active flag is at +764 and its
+# own id at +781, and 1.2 starts 2504 + 63 bytes on.  The offsets above
+# 698 are as in an empty-text record; add text_len(...) to them.
+N_TEXT = 698
+B_TEXT = N_TEXT - 4          # the same field in a branch head (empty in every file)
+
+
+def text_len(data: bytes, at: int) -> int:
+    """Length of the C string at ``at`` (the NUL not counted)."""
+    return data.index(b"\0", at) - at
 
 # branch record fields, relative to its id
 B_HEAD, B_COUNT = 4, 8
@@ -90,7 +103,9 @@ class NtwNode:
     supply: str = ""          # power supply label, "" = none
     supply_type: int = 0
     power_stop: bool = False
+    text: bytes = b""         # the line's text (N_TEXT), as stored
     offset: int = 0           # file offset of the id field, for diagnostics
+    size: int = NODE_RECORD   # the record's length in the file
 
 
 @dataclass
@@ -103,6 +118,7 @@ class NtwBranch:
     offset: int = 0
     end_id: int = 0           # the id of its end line (the last node's next)
     tap_port: bool = False    # hangs from a line no coupler of which starts it
+    head_size: int = BRANCH_RECORD
 
 
 # The files it was saved with, as the program's "Spec File Mismatch" box
@@ -141,8 +157,10 @@ class _Reader:
 
 
 def _looks_like_branch(r: _Reader, b: int, number: int | None = None) -> bool:
-    head = b + BRANCH_RECORD
-    if head + NODE_RECORD > len(r.d) or b < 0:
+    if b < 0 or b + BRANCH_RECORD + NODE_RECORD > len(r.d):
+        return False
+    head = b + BRANCH_RECORD + text_len(r.d, b + B_TEXT)
+    if head + NODE_RECORD > len(r.d):
         return False
     count = r.u16(b + B_COUNT)
     if not 0 < count < 5000:
@@ -156,13 +174,15 @@ def _looks_like_branch(r: _Reader, b: int, number: int | None = None) -> bool:
 
 def _first_branch(r: _Reader) -> int:
     for b in range(PAYLOAD_START, len(r.d) - BRANCH_RECORD - NODE_RECORD):
-        if r.u32(b + BRANCH_RECORD + N_PREV) == 1 and _looks_like_branch(r, b, 1):
+        first = b + BRANCH_RECORD + (text_len(r.d, b + B_TEXT) if r.d[b + B_TEXT] else 0)
+        if r.u32(first + N_PREV) == 1 and _looks_like_branch(r, b, 1):
             return b
     raise ValueError("no branch 1 found: not a design file this reader knows")
 
 
 def _node(r: _Reader, p: int) -> NtwNode:
-    n = NtwNode(id=r.u32(p), offset=p)
+    t = text_len(r.d, p + N_TEXT)
+    n = NtwNode(id=r.u32(p), offset=p, text=bytes(r.d[p + N_TEXT:p + N_TEXT + t]))
     n.ftg = r.u16(p + N_FTG)
     n.hc = r.u8(p + N_HC)
     n.cable = r.u16(p + N_CABLE)
@@ -181,11 +201,16 @@ def _node(r: _Reader, p: int) -> NtwNode:
     elif idx:
         n.active_index = idx
         n.pads = [r.u8(p + N_PADS + 3 * k + 1) for k in range(4)]
-    if r.u8(p + N_HAS_ACTIVE):
-        n.label = _text(r.d[p + N_LABEL:p + N_LABEL + 16])
-        if r.u8(p + N_PS_NAME):
-            n.supply = _text(r.d[p + N_PS_NAME:p + N_PS_NAME + 1]) or "PS"
+    if r.u8(p + t + N_HAS_ACTIVE):
+        n.label = _text(r.d[p + t + N_LABEL:p + t + N_LABEL + 16])
+        if r.u8(p + t + N_PS_NAME):
+            # char[16], C-style: SN001_MID's read 1A, 1B, 1C (its 1.1 notes
+            # "POWERED BY PS "PS1A"")
+            n.supply = _text(r.d[p + t + N_PS_NAME:p + t + N_PS_NAME + 16]) or "PS"
             n.supply_type = r.u8(p + N_PS_TYPE)
+        n.size = ACTIVE_NODE_RECORD + t
+    else:
+        n.size = NODE_RECORD + t
     return n
 
 
@@ -203,18 +228,26 @@ def read_network(plain: bytes) -> NtwNetwork:
     number = 1
     while _looks_like_branch(r, b):
         count = r.u16(b + B_COUNT)
-        branch = NtwBranch(number=r.u32(b + BRANCH_RECORD + N_PREV), offset=b,
+        head_size = BRANCH_RECORD + text_len(plain, b + B_TEXT)
+        branch = NtwBranch(number=r.u32(b + head_size + N_PREV), offset=b,
                            coupler_record=r.u8(b + B_COUPLER),
-                           through=bool(r.u8(b + B_THROUGH)))
-        p = b + BRANCH_RECORD
+                           through=bool(r.u8(b + B_THROUGH)), head_size=head_size)
+        p = b + head_size
         for _ in range(count):
             node = _node(r, p)
             branch.nodes.append(node)
-            p += ACTIVE_NODE_RECORD if r.u8(p + N_HAS_ACTIVE) else NODE_RECORD
+            p += node.size
         branch.end_id = r.u32(p + END_GAP)
         net.branches[branch.number] = branch
         number += 1
         b = p + END_GAP + END_RECORD
+    if b != len(plain):
+        # every design ends with its last branch's end record: stopping short
+        # means a record was misread (SN001_MID's text did this, as 1 branch
+        # of garbage), so say so rather than show part of a network
+        raise ValueError(f"the network could not be read past branch {number - 1}: "
+                         f"{len(plain) - b} of {len(plain)} bytes left over, "
+                         "a record layout this reader does not know yet")
 
     for br in net.branches.values():
         for i, node in enumerate(br.nodes, start=1):

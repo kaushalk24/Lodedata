@@ -294,7 +294,19 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       `117+` and `104+`, and 44.1 reads Lode's 19.90 18.38 36.31 35.43.
       Done (file-formats 3.0 and 3.8).
 
+    * SN001_MID with SHINSTON (SHINN1GHz Mid): its 1.1 holds text at +698
+      that moves the rest of the record, so the file was misread and Set All
+      Files failed. Read with it: 47 branches, 390 lines, all resolved, and
+      it comes back byte for byte; every count table rebuilds from nothing.
+      Power supply labels are the whole C string (1A 1B 1C). SHINSTON's .atv
+      (11.1) is the current layout up to the in-line devices. Done.
+
     Still to confirm:
+    * what the text on SN001's 1.1 is in Lode (address, notes, map/location?),
+      how it is shown, and what "~0" means; whether a line can hold more
+      than one such text;
+    * the older AL004's 21.1 supply label: the file holds "AL004A";
+    * SN001's screens against Lode (none seen yet);
     * Lode's info boxes call the older AL004's tap-fed branches 42 and 43;
       the file stores 43 and 44 (its 42 hangs from 40.4);
     * where the Branch: line sits in the tap box, and which tap feeds the

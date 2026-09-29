@@ -905,3 +905,33 @@ def test_the_older_al004_with_its_older_spec_set(page):
     info = page.evaluate("document.getElementById('info').textContent")
     assert "AN-WIFI-204" in info and f"Branch:              {fed['number']}" in info
     assert not page.errors
+
+
+def test_sn001_opened_alone_then_its_spec_set_attached(page):
+    """The user could not load SHINSTON: SN001_MID's 1.1 holds text that
+    moves the rest of its record, so the file was misread and Set All Files
+    failed.  Opened alone it now shows all 47 branches, and Project
+    Settings > Set All Files > OK loads the set."""
+    pair = SAMPLES / "SN001-SHINSTON"
+    if not (pair / "SN001_MID.ntw").exists():
+        pytest.skip("SN001_MID not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "SN001_MID.ntw"))
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    if page.query_selector("#mbOk"):                 # the Spec File Mismatch box
+        page.click("#mbOk")
+        page.wait_for_timeout(300)
+    assert page.evaluate("S.scr.branches.length") == 47
+    page.evaluate("projectSettings()")
+    page.wait_for_timeout(300)
+    page.set_input_files("#psFiles", [str(f) for f in sorted(pair.glob("SHINN1GHz Mid.*"))])
+    page.click("#psOk")
+    page.wait_for_selector(".msgbox", timeout=30000)
+    assert "Parameters file [SHINN1GHz Mid] Loaded.." in page.inner_text(".msgbox")
+    page.click("#mbOk")
+    page.wait_for_timeout(500)
+    assert page.evaluate("S.scr.frequencies.slice(0, 4)") == [1002, 102, 85, 5]
+    assert _row(page, 1, 2)["levels"] == [53, 37, 9, 9]
+    assert not page.errors

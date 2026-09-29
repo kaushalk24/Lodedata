@@ -248,6 +248,10 @@ def read_actives(data: bytes) -> list:
     for slot, off, seg in _records(data, "atv"):
         if classic and slot >= CLASSIC_ATV_RECORDS:
             break
+        if (slot if classic else slot - ATV_INDEX_BASE) < 1:
+            # a design stores 0 for no active, so record 0 is never placed
+            # (SHINSTON's holds "BRIDGER" with every level 0)
+            continue
         name = _name(seg[5:20] if classic else seg[5:30])
         if not name:
             continue

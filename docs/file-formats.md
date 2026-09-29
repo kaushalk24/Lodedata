@@ -166,6 +166,7 @@ tables are smaller. A reader tells them apart by the version at byte 26
 | `.cpr` | 616 + 104·n; name char[15]; loss blocks +20/+60, tap legs +100, internal +103 | 626 + 114·n |
 | `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, power steps +79, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, table +214 |
 | `.atv` banks | 4 banks from 17240, same 8816-byte bank and 68-byte row | 8 banks from 93884 |
+| `.atv` 11.1 (SHINSTON, 262 136 bytes) | as the current 12.1 file up to the in-line devices; the 11 064 bytes it lacks are past them, where nothing is read | 273 200 bytes |
 | `.atv` in-line | 25 records of 59 bytes from 57464, name char[15], losses +19 | 40 of 69 from 169372, +29 |
 | `.tap` | 63 rows of 414 bytes from 641; part slots of 102 at +5/+107/+209/+311, part char[15], loss blocks +15/+55 | 512 rows of 454, slots of 112 |
 | `.par` | 3102 bytes, below | 6515/6516 |
@@ -628,16 +629,34 @@ numbers are the file order, 1…n; no number is stored.
 | 108 | u8 1 on a node carrying an in-line device Qn |
 | 112 + 3·k | (flag, value, 0): the pads/EQs. A node whose amplifier was taken away keeps them (9.20 holds 9.21's) |
 | 137 | u32 id of the active or supply placed here; 0 once it is taken away |
+| 698 | the line's text, C-style — see below |
 | 718 | u32 the node's own id, in an extended record |
 | 726 | char[16] power supply label, NUL-terminated; the rest is left (18.1: `A\0004A`, once `AL004A`) |
 | 981 | char[16] amplifier name, the same way |
 | 1706 | u8 the house count again |
 | 1714 | 32 × u32: all 4 on every record that holds or has held an active |
-| 1842 | 32 × u32: 1 for each home, then 4 — on the lines where it is filled in (125 of 275), all 0 on the rest |
+| 1842 | 32 × u32: 1 for each home, then 4 — on the lines where it is filled in (125 of 275), all 0 on the rest. It is not rewritten when the house count goes to 0: SN001_MID's 8.3 holds 0 homes over 1 1 1 |
 
 An extended record (2504 bytes) is the same record with 534 zero bytes put in
 at +1706: the three tail fields move to 2240, 2248 and 2376. Taking the
 active away takes the block out again.
+
+**The line's text.** At +698 every line holds a C string. It is empty (one
+NUL) in every design but SN001_MID, whose 1.1 holds 63 characters:
+`SHIN1 - 4953 - P-003938~0POWERED BY PS "PS1A"~0DATE :02/20/26~0`. The record
+grows by the text's length and every field after it moves with it: 1.1's
+extended flag is at 764 and its own id at 781, and 1.2 starts 2504 + 63
+bytes on. The offsets in these tables past 698 are those of an empty text.
+Read without it, SN001 came out as one branch of garbage with 826 305 bytes
+left over, which is why the app could not attach its spec set. After the
+text come two zero bytes, then the flag (701 in an empty-text record): one
+text and two fixed bytes, or three texts of which only the first was ever
+filled — every file fits both. What Lode calls this text, and what `~0`
+stands for, is still to confirm. A branch head (a line's record less its
+first 4 bytes) would hold the same field at +694; it is empty in every file.
+
+The power supply label at 726 is the whole C string: SN001's supplies are
+`1A`, `1B`, `1C` (1.1's text: POWERED BY PS "PS1A").
 
 **Preamble.** Parts are counted by where the part is. A part on an
 underground node counts as underground: the node's cable file index is odd.
@@ -698,9 +717,10 @@ was (41425). What they showed:
   Prices, Performance and Map Grid then keep Untitled over it, leaving the
   name's tail: `Untitled\0` then `6` of WV750-2026.
 * 23483 counts 1, 2, 3 over S1 – S3 (one per tap keyed) and 23481 stays 0;
-  36129 is the taps ending a branch there (1, 1, 2), as on AL004 (28/4) —
-  but on AL002, AL003 and AL005 neither rule holds, so both stay as the
-  file has them.
+  36129 is the taps ending a branch there (1, 1, 2), as on both AL004s
+  (28/4, 27/4) — but on AL002, AL003, AL005 and SN001 (25/0 against 42/1
+  such taps, 19 of them terminating) neither rule holds, so both stay as
+  the file has them.
 
 **Actives on the short record.** AL002 holds 22 of its 39 actives on 1970-byte
 records with no name and no object id. Both kinds are kept as they are.
