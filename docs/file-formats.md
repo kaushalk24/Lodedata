@@ -388,7 +388,19 @@ paired each 8-port part with the row before it. Corrected here.
 
 On the Design screen a 6-port-slot part (WV750's LEQ\RC pads) is drawn `<43>`;
 the branch preview in the info box draws 2-port `(n)`, 4-port `[n]`, 8-port
-`{n}`.
+`{n}`. The Design screen's tap column is four characters wide, so a 3-digit
+tap loses its opening bracket: SN001's `117]` and `111]` (5.11, 5.12, 18.12,
+28.11); the preview box, five wide, draws it whole, `[114]`.
+
+**The preview box** (a coupler's info box), measured on SN001's 1.2, 15.10,
+18.9, 24.7 and 28.9: the branch's first ten lines (the line under the last
+node counts as one), each field a fixed width — node 4, each level 7, ftg 5,
+hc 4, cab 4, lv 3, two spaces and the active left-aligned in 3, each tap 5,
+each coupler 12. `Start` and `Levels` are padded to 7. The levels are printed
+as computed, not as the Design screen rounds them (2.5's 32.055 is 32.05
+here, 32.06 on the screen); hc and lv print 0; every branch is `[n]`
+(the screen's `108<19>` is `108[19]`); an in-line device is not shown (20.9's
+EQ).
 
 WV750's six tap families (Tap IDs): MGT 4–24, LEQ\RC pads 30–45 (6-port slot),
 AN-WIFI 104–124, RMT1 204–235, RMT2 404–426.
@@ -402,6 +414,12 @@ Q2 LEQ-PEA-0 (1.2 / 1.0 / 1.2 / 0.7), Q3 FFE-8-120-85/RP-R, Q5 EXIST SPLICE,
 Q6 NEW SPLICE, Q10–Q13 REMOVE/MOVE LE/BR markers. Placed in the amp column the
 device's loss applies before the node's taps; on AL004 6.8 that gives exactly
 the screen's 30.73 / 32.31 / 39.23 / 36.85 on 6.9.
+
+The amp column shows Q1 as `EQ`: SN001's 5.12, 8.7 and 15.26 (Q1,
+FFE-8-120-85/RP) read EQ while 5.5 reads Q8, 5.6 Q6 and AL004's 6.8 Q2. The
+manual's amp column holds "in-line equalisers and Q numbers"; both spec sets
+keep an equaliser in record 1. Nothing in the device record or the line
+record marks it otherwise.
 
 ### 3.4c `.atv` Pads/EQs Banks 1–8
 
@@ -654,9 +672,14 @@ Read without it, SN001 came out as one branch of garbage with 826 305 bytes
 left over, which is why the app could not attach its spec set. After the
 text come two zero bytes, then the flag (701 in an empty-text record): one
 text and two fixed bytes, or three texts of which only the first was ever
-filled — every file fits both. What `~0` stands for, and so how an edited
-note is written, is still to confirm; notes read from a file are written
-back as they are. A branch head (a line's record less its
+filled — every file fits both. `~0` ends each row: Lode's Edit Notes window
+shows 1.1's note as three rows (SHIN1 - 4953 - P-003938 / POWERED BY PS
+"PS1A" / DATE :02/20/26). An edited note is written the same way, each row
+followed by `~0`; a note left alone goes back as it was. Nothing else in the
+record counts the note: the only bytes of 1.1 unlike every other extended
+record are its ids, active, pads and two fields (137, 718 of an empty-text
+record) that vary on every active and read 255 at 718 on every file's fibre
+node, note or none. A branch head (a line's record less its
 first 4 bytes) would hold the same field at +694; it is empty in every file.
 
 The power supply label at 726 is the whole C string: SN001's supplies are
@@ -752,12 +775,18 @@ plus 3.3 3.2), then 6 ft of cable 0, gives 44.1's 19.90 18.38 36.31 35.43,
 Lode's screen to the hundredth. Nothing in the head or the tap slot says
 which tap feeds it; with one tap on the line it is that one. The amp box
 counts the line as a split: 44.1 is 6 ft from its previous act-split.
-Lode's info boxes number these two 42 and 43, not the 43 and 44 the file
-stores (still to settle).
+Lode numbers them as the file does: the tap boxes at 11.16 and 11.18 read
+Branch: 43 and Branch: 44, and the Test list has 43.1 and 44.1.
 
 **A pad or EQ of 255.** A design stores a bank row minus one, so 255 is row 0,
 VOID in every bank seen: the WIFI OMNIs on 43.1 and 44.1 hold 255 for both
 EQs and Lode's box shows Forward Eq VOID, Return Eq VOID.
+
+**Fslope / Rslope.** An active whose Pads/EQs bank has no forward EQ gets
+"Fslope too low to equalize at b.n." in the Test list (yellow), no return EQ
+"Rslope …", the pair ahead of the line's tap checks: SN001's Ripple-2 on 1.1
+(bank 4, empty) and the older AL004's WIFI OMNIs on 43.1 and 44.1 (bank 3,
+forward pads only). AL004's Ripple (bank 4, a row in each column) has none.
 
 **No spec set.** Opened with none, the program shows levels 0.00, the level
 columns as high low Rh Rl, every coupler's ID as 0 (0<2> 0[3] …) and AL004's

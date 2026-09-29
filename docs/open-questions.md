@@ -308,29 +308,43 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       the cable), a supply's label in the cplr column, blank pads where the
       bank has none, the node box on a supply's line. Done.
 
+    * SN001's second set (branches 5, 8, 15, 18, 24, 28; three preview
+      boxes; 1.2's node box; 5.8's amp box; the Notes window) and the older
+      AL004's Test list: every level, port and box matches. From them: the
+      preview box's layout (file-formats 3.4), Q1 drawn EQ, 3-digit taps
+      `117]`, Fslope/Rslope, `~0` ending each row of a note (now written),
+      the node box's distances on a coupler line, and a half that the
+      arithmetic leaves a hair under rounding up (9.17's 3.445, "Tap(54)
+      6.55"). Lode numbers the tap-fed branches 43 and 44, as stored. Done.
+
     Still to confirm:
-    * SN001's `63<15>` and `63<5>`: the <n> rule (no mileage and a matching
-      span) gives [15] and [5]; dropping "no mileage" would break AL004's
-      108[10]. The branches where candidate rules differ: 9 (8.3), 18
-      (15.10), 20 (18.9), 28 (24.7), 35 (28.9);
-    * "Fslope/Rslope too low to equalize at 1.1": SN001's Ripple-2 has no EQ
-      rows in its bank; does the older AL004's WIFI OMNI (bank 3, no EQ
-      rows either) get the same lines?
-    * the Notes window, and "~0"; the node box on a coupler line and on a
-      branch's last line with no active or supply;
+    * the `<n>` rule. SN001 draws `<` on 3 4 5 9 14 15 16 18 19 20 27 28 29
+      35 40 41 and `[` on 2 7 8 13 21 24 25 31 33 34 36 39. "The first span
+      matches the nearest span behind or ahead of the coupler on the parent
+      branch, and is on 1xx cable (or the branch has no footage)" fits all of
+      them and 16 of AL004's 17, but not AL004's 108[10] (300 ft on 100
+      alongside 9.3's 300 on 410). The app still uses the AL004 rule, so
+      SN001's 5, 9, 15, 18, 20, 28 and 35 show `[` where Lode has `<`;
+    * Q1 as EQ on the older AL004 (6.9, 7.6 …) and AL002 – AL005, which
+      place Q1 where the newer AL004 has Q2;
+    * the three AL004 values the half-up rounding moved: 14.2 at 5 MHz
+      (34.755: 34.76), 20.13 at 40 MHz (21.975: 21.98), 20.15's tap;
+    * the older AL004's 15.4: Lode's "Tap(870) 23.18", the app 23.19 (the
+      port is -4.191 here);
+    * the node box on a branch's last line with no active or supply;
     * the older AL004's 21.1 supply label: the file holds "AL004A";
-    * Lode's info boxes call the older AL004's tap-fed branches 42 and 43;
-      the file stores 43 and 44 (its 42 hangs from 40.4);
     * where the Branch: line sits in the tap box, and which tap feeds the
       branch when a line has more than one;
     * what 0 on a tap feeding a branch does (kept here, fed by nothing);
-    * the cascade position: Lode reads 4 on the WIFI OMNI at the older
-      AL004's 44.1 (NC4000 node, AL00416, AL00419, then it) and 1 on
-      AL00416; counting the actives upstream gives 1 and 3;
+    * the cascade position on the older AL004's 44.1 (4 in an earlier
+      screenshot; the app gives 3, as Lode's box does on 43.1);
+    * the older AL004's Test lines not produced yet: Tap(550), Crossover,
+      "870 input … to LE", "40 output … from LE", "LE 11/5 before/0 after";
     * the extra 550 column Lode shows with WVEXT862 (19.55 at 44.1, 0.00
       under it): how F3 is carried from the node and through an active;
     * 23481/23483 and the three pairs at 36121;
     * what Lode Data writes when it saves one of these files itself;
     * which new lines get their house list filled in;
-    * where TSG, Map, Loc, address and notes go (listed as not written);
+    * where TSG, Map, Loc and address go (listed as not written);
+    * that Lode reads a note the app wrote (AL004_NOTES / SN001_NOTES);
     * a new power supply's record;

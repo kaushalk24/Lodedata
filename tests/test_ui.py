@@ -965,3 +965,43 @@ def test_sn001_screen_marks_as_lode_draws_them(page):
     assert "Aerial Dist to Start of Network: 7740" in info
     assert "Power Supply Information" in info and "NEW ALPHA XM2 90V" in info
     assert not page.errors
+
+
+def test_sn001_preview_box_and_node_box_as_lode_prints_them(page):
+    """The coupler preview box, column for column as the user's screenshots
+    of SN001 show it (15.10 feeding 18, 18.9 feeding 20): the first ten
+    lines, every branch [n], the levels as computed, no in-line EQ; and 1.2's
+    node box with its distances, a coupler line."""
+    pair = SAMPLES / "SN001-SHINSTON"
+    if not (pair / "SN001_MID.ntw").exists():
+        pytest.skip("SN001_MID not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(pair / "SN001_MID.ntw"))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(pair.glob("SHINN1GHz Mid.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    box = lambda b, n: page.evaluate(
+        f"infoBranch(S.scr.rows.find(x => x.branch === {b} && x.node === {n} && !x.end), 0)").split("\n")
+    lines = box(15, 10)
+    assert lines[:5] == ["15.10", "FMB Split", "Feeds Branch: 18",
+                         "Start     1002    102     85      5",
+                         "Levels   53.00  37.00   9.00   9.00"]
+    assert lines[6] == ("Node   1002    102     85      5  ftg  hc cab lv amp  tap1 tap2 tap3 tap4"
+                        "    cplr[Br]    cplr[Br]")
+    assert lines[7] == "   1  53.00  37.00   9.00   9.00    0   0 442  0" + " " * 30 + "108[19]"
+    assert lines[15] == "   9  15.53  25.76  19.55  12.38  213   0 442  0  63U" + " " * 26 + "63[20]"
+    assert lines[16] == "  10  50.36  36.24   9.70   9.16  125   1  40  0      [23]"
+    assert lines[17].startswith("<double-click") and len(lines) == 18
+    lines = box(18, 9)
+    assert lines[11] == "   5  53.00  37.00   9.00   9.00    0   0 140  0" + " " * 31 + "12[22]"
+    assert lines[15] == "   9  29.50  28.49  16.97  14.67  155   1  40  0       [7]"
+    assert lines[16] == "       0.00   0.00   0.00   0.00"
+    lines = box(1, 2)
+    assert lines[11] == "   5  35.41  32.05  13.60  10.04  181   0 442  0"
+    _goto(page, 1, 2, "ftg")
+    page.wait_for_timeout(300)
+    info = page.evaluate("document.getElementById('info').textContent")
+    assert "Aerial Dist to Previous Active:" in info and "Housecounts downstream:" in info
+    assert info.split("Housecounts downstream:")[1].split("\n")[0].strip() == "227"
+    assert not page.errors

@@ -158,6 +158,9 @@ LODE_B2 = [
     (29.82, 30.49, 15.06, 10.36), (27.46, 29.82, 15.68, 10.50), (25.69, 29.32, 16.14, 10.61),
     (24.08, 28.87, 16.56, 10.70)]
 LODE_TESTS = [
+    # Lode's Test Results window, all 15 (SN001_MID's 1.1 Ripple-2 has no EQ
+    # in its bank, forward or return)
+    "Fslope too low to equalize at 1.1.", "Rslope too low to equalize at 1.1.",
     "Tap(1002)  1.90 over window at 5.2.", "Tap(102)  0.03 below min at 5.10.",
     "Tap(5)  0.29 below window at 13.3.", "Tap(5)  0.39 below window at 18.20.",
     "Tap(1002)  2.90 over window at 23.1.", "Tap(1002)  1.00 over window at 24.23.",
@@ -198,7 +201,7 @@ def test_the_design_screen_is_lodes(sn001):
     assert [round(v + 1e-9, 2) for v in end.port_levels] == [23.87, 14.43, 31.39, 29.54]
     # the line with Notes, and the supply on 4.1
     assert rows[(1, 1)].note.startswith("SHIN1 - 4953") and rows[(4, 1)].supply_label == "1A"
-    assert [t[1] for t in scr.tests] == LODE_TESTS[:len(scr.tests)] and len(scr.tests) == 13
+    assert [t[1] for t in scr.tests] == LODE_TESTS
 
 
 def test_the_info_boxes_are_lodes(sn001):
@@ -234,3 +237,113 @@ def test_a_configuration_id_is_typed_and_kept():
     nd = N.read_network(p).branches[1].nodes[26]
     assert nd.config == 3 and p[nd.offset + N.N_CONFIG] == 3
     assert design_from_ntw(data, SPEC)[0].branch(1).nodes[26].amp == "11M"
+
+
+# The user's second set of SN001 screenshots (Design screen, branches 5, 8,
+# 15, 18, 24, 28): every line, the line under the last node, its port levels.
+LODE_SHOTS = {
+    5: [(53.00, 37.00, 9.00, 9.00), (50.90, 35.70, 10.30, 10.30), (43.75, 33.23, 12.56, 11.69),
+        (34.57, 29.84, 15.79, 13.82), (30.94, 28.79, 16.75, 14.04), (30.94, 28.79, 16.75, 14.04),
+        (27.40, 27.76, 17.69, 14.26), (19.51, 25.48, 19.78, 14.74), (45.99, 34.97, 10.86, 9.43),
+        (45.99, 34.97, 10.86, 9.43), (37.23, 32.45, 13.13, 10.44), (31.94, 30.31, 15.20, 11.92),
+        (25.64, 17.81, 27.10, 24.32)],
+    8: [(24.01, 19.49, 26.13, 24.33), (21.90, 18.88, 26.69, 24.46), (53.00, 37.00, 9.00, 9.00),
+        (47.26, 34.55, 11.39, 10.94), (43.06, 33.17, 12.63, 11.86), (37.45, 31.15, 14.48, 13.16),
+        (32.22, 29.63, 15.87, 13.48), (24.82, 18.47, 26.38, 24.12), (0.0, 0.0, 0.0, 0.0)],
+    15: [(53.00, 37.00, 9.00, 9.00), (42.49, 33.34, 12.50, 10.80), (38.66, 32.26, 13.50, 11.02),
+         (35.97, 31.50, 14.20, 11.18), (32.14, 30.43, 15.20, 11.40), (28.35, 29.36, 16.20, 11.63),
+         (25.79, 28.64, 16.86, 11.78), (23.48, 27.99, 17.47, 11.91), (20.34, 26.78, 18.63, 12.56),
+         (16.87, 25.80, 19.54, 12.77), (53.00, 37.00, 9.00, 9.00), (50.81, 36.39, 9.57, 9.13),
+         (48.06, 35.61, 10.29, 9.29), (44.83, 34.70, 11.14, 9.48), (42.69, 34.10, 11.70, 9.61),
+         (40.99, 33.62, 12.14, 9.71), (38.24, 32.85, 12.86, 9.87), (30.61, 27.94, 17.74, 14.38),
+         (28.82, 27.44, 18.20, 14.48), (25.92, 26.62, 18.96, 14.65), (23.18, 25.85, 19.68, 14.81),
+         (19.23, 24.74, 20.71, 15.05), (15.16, 23.60, 21.78, 15.28), (47.39, 35.38, 10.49, 9.35),
+         (41.94, 33.80, 11.93, 9.68), (35.37, 31.41, 14.14, 11.31), (25.26, 17.75, 27.00, 23.66),
+         (53.00, 37.00, 9.00, 9.00), (48.16, 35.61, 10.23, 9.77), (43.15, 34.00, 11.67, 10.74),
+         (36.32, 31.61, 13.85, 12.11), (27.14, 28.37, 16.86, 14.36), (53.00, 37.00, 9.00, 9.00),
+         (45.60, 34.87, 10.91, 9.93), (43.20, 33.77, 11.91, 11.03)],
+    18: [(53.00, 37.00, 9.00, 9.00), (47.43, 34.72, 11.21, 10.50), (42.65, 33.38, 12.46, 10.79),
+         (38.02, 32.08, 13.67, 11.06), (33.15, 30.71, 14.94, 11.34), (28.99, 29.54, 16.03, 11.59),
+         (23.77, 28.08, 17.39, 11.90), (18.79, 26.67, 18.70, 12.19), (15.53, 25.76, 19.55, 12.38),
+         (50.36, 36.24, 9.70, 9.16), (41.94, 33.64, 12.05, 10.35), (36.47, 32.06, 13.50, 10.68),
+         (29.66, 29.48, 15.97, 12.25), (53.00, 37.00, 9.00, 9.00), (46.10, 32.28, 13.69, 13.47),
+         (43.36, 31.49, 14.42, 13.64), (36.89, 29.21, 16.50, 14.99), (33.49, 28.23, 17.40, 15.20),
+         (53.00, 37.00, 9.00, 9.00), (42.65, 34.01, 11.69, 10.11), (39.55, 32.61, 12.99, 11.71)],
+    24: [(28.29, 27.29, 18.34, 14.51), (25.72, 26.56, 19.02, 14.66), (23.49, 25.94, 19.60, 14.80),
+         (20.91, 25.21, 20.27, 14.95), (17.07, 24.13, 21.28, 15.17), (13.33, 23.08, 22.26, 15.39),
+         (12.73, 22.58, 22.76, 15.89), (50.28, 36.23, 9.71, 9.16), (47.95, 35.58, 10.32, 9.30),
+         (45.27, 34.83, 11.02, 9.45), (40.58, 33.51, 12.25, 9.73), (36.67, 32.41, 13.27, 9.96),
+         (33.43, 31.50, 14.12, 10.15), (31.95, 31.08, 14.50, 10.24), (28.76, 30.19, 15.34, 10.43),
+         (21.37, 28.11, 17.27, 10.86), (15.71, 26.52, 18.75, 11.19), (45.64, 34.87, 10.95, 9.45),
+         (41.88, 33.79, 11.95, 9.69), (33.02, 31.22, 14.30, 10.23), (24.35, 28.72, 16.60, 10.77),
+         (19.79, 27.40, 17.81, 11.05), (53.00, 37.00, 9.00, 9.00), (41.59, 33.30, 12.39, 10.66),
+         (29.00, 29.15, 16.21, 12.84), (53.00, 37.00, 9.00, 9.00), (38.77, 30.17, 15.58, 14.39),
+         (35.67, 28.77, 16.88, 15.99)],
+    28: [(53.00, 37.00, 9.00, 9.00), (45.14, 32.41, 13.50, 12.73), (41.94, 31.49, 14.35, 12.93),
+         (38.24, 30.42, 15.33, 13.16), (34.36, 29.30, 16.36, 13.40), (31.37, 28.43, 17.15, 13.58),
+         (25.67, 26.78, 18.67, 13.93), (22.25, 25.80, 19.57, 14.14), (16.03, 24.00, 21.22, 14.53),
+         (47.66, 35.46, 10.42, 9.33), (35.95, 31.91, 13.64, 10.72), (26.08, 28.45, 16.92, 12.48),
+         (53.00, 37.00, 9.00, 9.00), (42.27, 33.91, 11.79, 10.13), (39.78, 33.19, 12.45, 10.29),
+         (35.31, 31.89, 13.64, 10.56), (32.91, 30.59, 14.94, 11.86)],
+}
+LODE_PORTS = {5: [18.84, 9.91, 35.00, 31.92], 8: [20.52, 14.17, 30.68, 28.42],
+              15: [25.60, 14.87, 30.91, 29.93], 18: [27.15, 18.51, 27.19, 25.61],
+              24: [23.27, 14.67, 31.08, 29.89], 28: [18.31, 14.89, 30.64, 27.56]}
+
+
+@pytest.mark.parametrize("branch", sorted(LODE_SHOTS))
+def test_more_branches_are_lodes(sn001, branch):
+    from hfc.screen import as_shown
+    d, scr = sn001
+    assert _levels(scr, branch) == LODE_SHOTS[branch]
+    end = next(r for r in scr.rows if r.branch == branch and r.end)
+    assert [as_shown(v) for v in end.port_levels] == LODE_PORTS[branch]
+
+
+def test_the_amp_and_tap_columns_are_lodes(sn001):
+    d, scr = sn001
+    rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+    # the in-line equaliser (Q1) reads EQ; the other in-line devices Qn
+    assert [rows[k].amp for k in ((5, 5), (5, 6), (5, 8), (5, 9), (5, 12), (8, 7), (15, 26))] == \
+        ["Q8", "Q6", "11M", "Q8", "EQ", "EQ", "EQ"]
+    # a 3-digit tap in the 4-wide column loses its opening bracket
+    assert [rows[k].taps for k in ((5, 11), (5, 12), (18, 12), (28, 11), (28, 16))] == \
+        [["117]"], ["111]"], ["117]"], ["117]"], ["117]"]]
+    assert [rows[k].taps for k in ((8, 7), (8, 8), (18, 20))] == [["/10/"], ["/ 4/"], ["[15]"]]
+
+
+def test_the_node_box_lists_distances_where_lode_does(sn001):
+    d, scr = sn001
+    rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+    # 1.2, a coupler line: all 0 and 227 homes; 4.1 starts a branch at 0 ft;
+    # 8.1 (334 ft, nothing on it) has the short box
+    assert rows[(1, 2)].node_box and rows[(1, 2)].block["distances"] == [0, 0, 0, 0, 0]
+    assert rows[(1, 2)].block["homes"] == 227
+    assert rows[(4, 1)].node_box and not rows[(8, 1)].node_box
+    keys = ("fwd_pad", "fwd_eq", "ret_pad", "ret_eq", "aerial_prev", "aerial_start",
+            "total_split", "total_prev", "total_start", "cascade", "supply", "homes_down")
+    assert tuple(rows[(5, 8)].amp_info[x] for x in keys) == \
+        ("000", "17", "160", "6", 1265, 11294, 1040, 1265, 11294, 5, "1A", 3)
+
+
+def test_the_preview_box_gets_the_levels_as_computed(sn001):
+    # 2.5 at 102 MHz is 32.055: the Design screen shows 32.06, the preview
+    # box (printing the value as computed) 32.05
+    d, scr = sn001
+    r = next(r for r in scr.rows if (r.branch, r.node) == (2, 5)).as_dict()
+    assert r["levels"][1] == 32.06 and f"{r['raw_levels'][1]:.2f}" == "32.05"
+
+
+def test_notes_are_written_a_row_to_each_tilde_0():
+    src = NTW.read_bytes()
+    d, _ = design_from_ntw(src, SPEC)
+    d.branch(1).nodes[0].note = "EDITED~0SECOND ROW~0"      # 1.1 had three rows
+    d.branch(1).nodes[1].note = "NEW~0"                     # 1.2 had none
+    data, report = export_ntw(d, src)
+    assert not report["not_written"]
+    net = N.read_network(plain(data))
+    assert [nd.text for nd in net.branches[1].nodes[:3]] == [b"EDITED~0SECOND ROW~0", b"NEW~0", b""]
+    assert len(data) == len(src) - len(TEXT) + 20 + 5
+    again, _ = design_from_ntw(data, SPEC)
+    assert again.branch(1).nodes[1].note == "NEW~0"
+    assert export_ntw(again, data)[0] == data

@@ -24,9 +24,12 @@ def as_shown(v: float) -> float:
     """A level as the screen prints it: to the hundredth, halves up.
 
     AL004 34.7 shows 21.115 as 21.12 and 37.865 as 37.87 -- round-half-even
-    would give 37.86, and the binary 21.115 sits just below the half.
+    would give 37.86, and the binary 21.115 sits just below the half.  A
+    half the arithmetic leaves a hair under goes up too: the older AL004's
+    9.17 port at 54 MHz, 3.445 computed as 3.4449999999999985, is 3.45 to
+    Lode ("Tap(54) 6.55 below min").
     """
-    return float(Decimal(repr(v)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    return float(Decimal(repr(round(v, 9))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 @dataclass
@@ -60,6 +63,7 @@ class Row:
     port_levels: list = field(default_factory=list)   # that line: last tap's port output
     port_severity: list = field(default_factory=list)
     tap_notes: list = field(default_factory=list)  # (severity, message) about taps
+    slope_notes: list = field(default_factory=list)  # the active's, listed ahead of its taps
     tap_port_severity: list = field(default_factory=list)  # per tap, per column
     tap_inputs: list = field(default_factory=list)  # level entering each tap slot (not sent)
     after_taps: dict = field(default_factory=dict)  # level after the last tap (not sent)
@@ -83,6 +87,8 @@ class Row:
     block: dict = field(default_factory=dict)      # the expanded display's cyan block
     housing: int = 0            # underground housing number, 0 = none
     note: str = ""              # the line's Notes; Lode marks the line with a yellow ♪
+    inline: int = 0             # the in-line device in the amp column, 0 = none
+    node_box: bool = False      # a line with no active whose node box has the distances
     # checks
     flags: list = field(default_factory=list)      # (severity, message)
 
@@ -99,6 +105,10 @@ class Row:
             "branch": self.branch, "node": self.node, "depth": self.depth,
             "gutter": self.gutter,
             "levels": [as_shown(self.levels.get(f, 0.0)) for f in self.freq_order],
+            # as computed: the preview box prints these (SN001_MID 2.5's
+            # 32.055 as 32.05, where the Design screen shows 32.06)
+            "raw_levels": [self.levels.get(f, 0.0) for f in self.freq_order],
+            "inline": self.inline, "node_box": self.node_box,
             "ftg": round(self.ftg, 0), "hc": self.hc, "cab": self.cab,
             "cab_name": self.cab_name, "lv": self.lv, "tsg": self.tsg,
             "amp": self.amp, "amp_name": self.amp_name, "fixed": self.fixed,
@@ -266,6 +276,16 @@ def build(design: Design) -> Screen:
             if node.amp:
                 part = lib.actives.get(node.amp_part)
                 row.amp_name = part.name if part else str(node.amp)
+                if part and len(part.pad_eq) == 4:
+                    # its Pads/EQs bank has no forward (return) EQ to pick:
+                    # SN001_MID's Ripple-2 on 1.1 (bank 4, empty) and the
+                    # older AL004's WIFI OMNIs on 43.1 and 44.1 (bank 3, pads
+                    # only); AL004's Ripple (bank 4, a row in each) has none
+                    at = f"{branch.number}.{row.node}."
+                    if not part.pad_eq[2][1]:
+                        row.slope_notes.append(("yellow", f"Fslope too low to equalize at {at}"))
+                    if not part.pad_eq[3][1]:
+                        row.slope_notes.append(("yellow", f"Rslope too low to equalize at {at}"))
                 if part:
                     if not part.needs_rf_input:
                         # fibre fed: there is no RF input to show on this line
@@ -282,10 +302,14 @@ def build(design: Design) -> Screen:
                     levels[p.return_high_mhz] = part.in_return_high
                     levels[p.return_low_mhz] = part.in_return_low
 
-            # an in-line device in the amp column (Qn) comes before the taps
+            # an in-line device in the amp column (Qn) comes before the taps.
+            # The first is the in-line equaliser, drawn "EQ": SN001_MID's
+            # Q1 at 5.12, 8.7 and 15.26, while 5.5 reads Q8, 5.6 Q6 and
+            # AL004 6.8 Q2 (the manual: "in-line equalisers and Q numbers")
             if node.inline:
                 q = lib.inline.get(node.inline_part)
-                row.amp = f"Q{node.inline}"
+                row.amp = "EQ" if node.inline == 1 else f"Q{node.inline}"
+                row.inline = node.inline
                 if q:
                     row.amp_name = q.name
                     for f in freqs:
@@ -314,7 +338,9 @@ def build(design: Design) -> Screen:
                 shown = tap.tap_id or int(round(tap.tap_value_db))
                 # a tap feeding a branch from its port: "117+" (the old
                 # AL004's 11.16; "104+" at 11.18, a 2-port)
-                row.taps.append(f"{shown}+" if slot.branch else bracket(f"{shown:>2}", style))
+                # The column is four wide: a 3-digit tap loses its opening
+                # bracket, "117]" (SN001_MID 5.11, 18.12, 28.11)
+                row.taps.append(f"{shown}+" if slot.branch else bracket(f"{shown:>2}", style)[-4:])
                 row.tap_ports.append(tap.ports)
                 row.tap_parts.append(
                     f"{tap.name} ({tap.ports} port, {tap.tap_value_db:g} dB)")
@@ -442,7 +468,7 @@ def build(design: Design) -> Screen:
     _gutter(scr)
     # the Test Results list runs in branch, then node order
     for r in sorted((r for r in scr.rows if not r.end), key=lambda r: (r.branch, r.node)):
-        scr.tests.extend(r.tap_notes)
+        scr.tests.extend(r.slope_notes + r.tap_notes)
     _powering(design, scr)
     _totals(design, scr)
     order = []
@@ -620,6 +646,10 @@ def _amp_info(design: Design, scr: Screen) -> None:
             first = False
         below = downstream(b, n)
         homes = sum(x.hc for x in below)
+        # the node box lists the distances and homes on a coupler line
+        # (SN001_MID's 1.2: all 0, 227 homes) and a branch's 0-ft first line
+        # (4.1; 44.1 of the user's test file), not on 8.1 (334 ft, bare)
+        r.node_box = bool(splits(nd) or (n == 1 and not nd.ftg))
         if block:
             r.block = {
                 "distances": [d[k] for k in ("aerial_prev", "aerial_start", "total_split",

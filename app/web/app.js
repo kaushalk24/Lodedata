@@ -322,6 +322,13 @@ function infoTap(r, k) {
 
 // One branch, the first in the cell: on 4.14's 3-[11]<12> the program's box
 // reads "Feeds Branch: 11" only.
+// The preview box as Lode prints it (SN001_MID 1.2, 15.10, 18.9, 24.7,
+// 28.9, measured glyph by glyph): the branch's first ten lines, each field
+// a fixed width -- node 4, levels 7 each, ftg 5, hc 4, cab 4, lv 3, the
+// active from the 51st column, taps 5 each, couplers 12 each.  Levels are
+// printed as computed (2.5's 32.055 reads 32.05 here, 32.06 on the screen),
+// every branch is [n], hc and lv read 0, and an in-line device is left out
+// (20.9's EQ).
 function infoBranch(r, k) {
   const text = (r.couplers || [])[k] || '';
   const found = /[\[<({](\d+)[\]>)}]/.exec(text);
@@ -329,22 +336,27 @@ function infoBranch(r, k) {
   const fq = (S.scr && S.scr.frequencies) || [];
   const b = +found[1];
   const m = branchMeta(b) || {};
-  const rows = S.scr.rows.filter(x => x.branch === b);
+  const rows = S.scr.rows.filter(x => x.branch === b).slice(0, 10);
+  const square = t => (t || '').replace(/[<({](\d+)[>)}]/g, '[$1]');
+  const levels = x => (x.raw_levels || x.levels).map(v => pad(f2(v), 7)).join('');
   return `${r.branch}.${r.node}\n${m.coupler || ''}\nFeeds Branch: ${b}\n` +
-    `Start   ${fq.map(f => pad(f, 7)).join(' ')}\n` +
-    `Levels  ${(m.start || []).map(v => pad(f2(v), 7)).join(' ')}\n` + '-'.repeat(96) + '\n' +
-    `Node ${fq.map(f => pad(f, 7)).join(' ')}   ftg  hc cab lv amp  tap1 tap2 tap3 tap4   cplr[Br]   cplr[Br]\n` +
+    `${'Start'.padEnd(7)}${fq.map(f => pad(f, 7)).join('')}\n` +
+    `${'Levels'.padEnd(7)}${(m.start || []).map(v => pad(f2(v), 7)).join('')}\n` + '-'.repeat(105) + '\n' +
+    `Node${fq.map(f => pad(f, 7)).join('')}${pad('ftg', 5)}${pad('hc', 4)}${pad('cab', 4)}${pad('lv', 3)}` +
+    `${pad('amp', 4)}${pad('tap1', 6)}${pad('tap2', 5)}${pad('tap3', 5)}${pad('tap4', 5)}` +
+    `${pad('cplr[Br]', 12)}${pad('cplr[Br]', 12)}\n` +
     rows.map(x => {
-      const lv = x.levels.map(v => pad(f2(v), 7)).join(' ');
-      if (x.end) return `     ${lv}`;
+      if (x.end) return `    ${levels(x)}`;
       const taps = [0, 1, 2, 3].map(i => {
         const t = (x.taps || [])[i];
         if (!t) return '     ';
         const br = PREVIEW_TAP[(x.tap_ports || [])[i]] || '[]';
         return pad(br[0] + t.replace(/[\/\[\]<>{}()]/g, '').trim() + br[1], 5);
       }).join('');
-      return `${pad(x.node, 4)} ${lv} ${pad(x.ftg, 5)} ${pad(x.hc, 3)} ${pad(x.cab, 3)} ${pad(x.lv, 2)} ` +
-        `${pad(x.amp || '', 4)} ${taps} ${pad((x.couplers || [])[0] || '', 10)} ${pad((x.couplers || [])[1] || '', 10)}`;
+      const amp = x.inline ? '' : (x.amp || '');
+      return (`${pad(x.node, 4)}${levels(x)}${pad(x.ftg, 5)}${pad(x.hc || 0, 4)}${pad(x.cab, 4)}` +
+        `${pad(x.lv || 0, 3)}  ${amp.padEnd(3)}${taps}` +
+        `${pad(square((x.couplers || [])[0]), 12)}${pad(square((x.couplers || [])[1]), 12)}`).trimEnd();
     }).join('\n') + '\n<double-click or [.][LT] or [.][RT] to enter branch>';
 }
 
@@ -382,15 +394,16 @@ function infoAmp(r) {
 function infoNode(r) {
   let a = r.amp_info || {};
   const line = (label, v) => `${label.padEnd(33)}${v === undefined || v === null ? '' : v}\n`;
-  // a supply's line with no active has them too, from its block, and then
-  // the supply's own lines (SN001_MID 4.1: 0 7740 0 0 7740, 0 homes, 1A)
-  const supplyLine = !!r.supply_label && !r.amp && !!(r.block && r.block.distances);
-  if (supplyLine) {
+  // a line with no active has them too, from its block, where it splits
+  // (SN001_MID 1.2: all 0, 227 homes), starts a branch at 0 ft or carries a
+  // supply -- then the supply's own lines (4.1: 0 7740 0 0 7740, 0 homes, 1A)
+  const blockLine = (r.node_box || !!r.supply_label) && !r.amp && !!(r.block && r.block.distances);
+  if (blockLine) {
     const [ap, as, ts, tp, tt] = r.block.distances;
     a = { aerial_prev: ap, aerial_start: as, total_split: ts, total_prev: tp, total_start: tt,
           homes_down: r.block.homes };
   }
-  const amp = (a.cascade || supplyLine) ?
+  const amp = (a.cascade || blockLine) ?
     line('Aerial Dist to Previous Active:', a.aerial_prev) +
     line('Aerial Dist to Start of Network:', a.aerial_start) +
     line('Tot Dist to Previous Act-split:', a.total_split) +
@@ -411,7 +424,7 @@ function renderInfo() {
     let text = null;
     if (/^tap\d$/.test(c.key) && (r.taps || [])[+c.key.slice(3)]) text = infoTap(r, +c.key.slice(3));
     else if (/^cplr\d$/.test(c.key)) text = r.supply ? infoSupply(r) : infoBranch(r, +c.key.slice(4));
-    else if (c.key === 'amp' && /^Q\d/.test(r.amp || '')) text = infoInline(r);
+    else if (c.key === 'amp' && r.inline) text = infoInline(r);
     else if ((c.key === 'amp' || c.key === 'ampname' || c.key === 'tsg') && r.amp_info && r.amp_info.type) text = infoAmp(r);
     else if (c.key === 'supply' && r.supply) text = infoSupply(r);
     box.textContent = text || infoNode(r);
@@ -1121,14 +1134,29 @@ async function nameAmp() {
     body: JSON.stringify({ amp_label: v }) });
   await refresh();
 }
+// Lode's Edit Notes window: the line's note, a line per row.  The file
+// keeps each row followed by "~0" (SN001_MID 1.1: SHIN1 - 4953 - P-003938~0
+// POWERED BY PS "PS1A"~0DATE :02/20/26~0, three rows in the window).
 async function notes() {
   const r = curRow(); if (!r) return;
-  const v = prompt('Note at this node', r.note || '');
-  if (v === null) return;
-  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ note: v }) });
-  await refresh(); msg('note saved');
+  const rows = (r.note || '').split('~0');
+  if (rows.length && rows[rows.length - 1] === '') rows.pop();
+  modal(`<h2>Edit Notes</h2>
+    <textarea id="noteText" rows="10" style="width:100%;font-family:inherit"
+      spellcheck="false">${esc(rows.join('\n'))}</textarea>
+    <p class="hint">Branch: ${r.branch} &nbsp; Node: ${r.node}</p>
+    <div class="row"><button class="primary" id="noteOk">OK</button>
+      <button id="mClose">Cancel</button></div>`);
+  $('#noteText').focus();
+  $('#noteOk').onclick = async () => {
+    const lines = $('#noteText').value.replace(/\r/g, '').replace(/\n+$/, '');
+    const note = lines ? lines.split('\n').map(l => l + '~0').join('') : '';
+    closeModal();
+    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note }) });
+    await refresh(); msg('note saved');
+  };
 }
 function netInit() {
   const n = S.net;

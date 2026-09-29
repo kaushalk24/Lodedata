@@ -101,11 +101,9 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
             for field, text in (("map", n.map), ("loc", n.loc), ("address", n.address)):
                 if text:
                     note(f"{where}: {field} is not written (where the file keeps it is not known yet)")
-            # Notes the file had are kept as they are; one typed here waits
-            # on how Lode writes them ("~0" between lines, SN001's 1.1)
-            if n.note != n.note_file:
-                note(f"{where}: the note is not written (how Lode keeps an edited note "
-                     "is still to be confirmed)")
+            # the line's Notes, C-style at +698 with each row followed by
+            # "~0" (SN001's 1.1); a note left as the file had it is not touched
+            text = n.note.encode("latin-1", "replace") if n.note != n.note_file else None
             nodes.append(W.NodeOut(
                 rec=n.rec, ftg=int(round(n.ftg)), hc=n.hc, cable=n.cab, lv=n.lv,
                 # a branch whose coupler was taken off is listed on no line
@@ -113,7 +111,8 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
                                      if c.branch in number and not c.removed],
                 active_index=active, inline=n.inline, pads=pads, fixed=n.fixed,
                 power_stop=n.power_stop, label=n.amp_label if (n.amp or n.rec) else None,
-                supply=supply, supply_type=supply_type, pad_banks=pad_banks, config=config))
+                supply=supply, supply_type=supply_type, pad_banks=pad_banks, config=config,
+                text=text))
 
         coupler, through = 0, False
         if br.parent_branch in design.branches:
