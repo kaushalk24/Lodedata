@@ -211,8 +211,9 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 11. **Saving as .ntw — opens in Lode Data.** File → Save Network writes the
     network back into the `.ntw` it was opened from; Chrome/Edge ask once for
     leave to write it. Save Network As… asks for a file, and the network then
-    takes that name and saves there. The file used for each network is
-    remembered across reloads. Without file access (Firefox) the file
+    takes that name and saves there. Nothing about a network is kept once
+    the program (or page) closes — the user: no network list, no file,
+    no last-opened; each start is empty. Without file access (Firefox) the file
     downloads. The file is built over the one opened (file-formats 3.8), and
     AL004 comes back byte for byte.
 

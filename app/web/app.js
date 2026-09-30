@@ -1492,12 +1492,13 @@ function showHelp() {
 }
 
 // ---------------------------------------------------------------- files
-// The last network this browser opened from a .ntw: one keyed in from
-// scratch here is written with that file's licence and user fields, as the
-// program on the person's own PC would -- not someone else's on the server.
-function lastOpened() {
-  try { return localStorage.getItem('ntw.lastOpened') || null; } catch (_) { return null; }
-}
+// The last network this page opened from a .ntw: one keyed in from scratch
+// here is written with that file's licence and user fields, as the program
+// on the person's own PC would -- not someone else's on the server.  Held
+// only while the page is open: nothing about a network is kept after it
+// (the user).
+let openedLast = null;
+function lastOpened() { return openedLast; }
 async function newNetwork() {
   const name = prompt('Name for the new network', 'lode-1'); if (!name) return;
   const d = await api('/api/networks', { method: 'POST',
@@ -1601,7 +1602,7 @@ function importNtw() {
       return;
     }
     const r = out.report;
-    try { localStorage.setItem('ntw.lastOpened', out.id); } catch (_) {}
+    openedLast = out.id;
     if (picked && picked.name === f.name) await keepFile(out.id, picked);
     closeModal();
     await loadList(out.id);
@@ -1630,39 +1631,18 @@ function specMismatch(lines) {
 // (the browser asks once for leave to save to it).  Save Network As... asks
 // for a file, and the network then carries that file's name and saves there.
 // A network with no file yet asks too; a browser with no file access
-// (Firefox) downloads the file instead.  The file held for each network is
-// kept in the browser (IndexedDB), so it lasts past a reload.
+// (Firefox) downloads the file instead.  The file is held only while the
+// page is open: nothing about a network is kept after it (the user).
 const NTW_TYPES = [{ description: 'Lode Data network', accept: { 'application/octet-stream': ['.ntw'] } }];
 const saveTo = {};                       // network id -> the file it saves to
 
-function handleStore(mode, work) {
-  return new Promise(done => {
-    try {
-      const open = indexedDB.open('design-assistant', 1);
-      open.onupgradeneeded = () => open.result.createObjectStore('ntw-files');
-      open.onerror = () => done(null);
-      open.onsuccess = () => {
-        try {
-          const tx = open.result.transaction('ntw-files', mode);
-          const req = work(tx.objectStore('ntw-files'));
-          tx.oncomplete = () => done(req ? req.result : null);
-          tx.onerror = () => done(null);
-        } catch (_) { done(null); }
-      };
-    } catch (_) { done(null); }
-  });
-}
-async function keepFile(nid, handle) {
-  saveTo[nid] = handle;
-  await handleStore('readwrite', st => st.put(handle.path || handle, nid));
-}
-async function fileFor(nid) {
-  if (!saveTo[nid]) {
-    const kept = await handleStore('readonly', st => st.get(nid));
-    saveTo[nid] = typeof kept === 'string' ? desktopFile(kept) : kept;
-  }
-  return saveTo[nid] || null;
-}
+async function keepFile(nid, handle) { saveTo[nid] = handle; }
+async function fileFor(nid) { return saveTo[nid] || null; }
+
+// earlier versions kept the last network opened and each network's file in
+// the browser (the Windows program's window too): take them away
+try { localStorage.removeItem('ntw.lastOpened'); } catch (_) {}
+try { indexedDB.deleteDatabase('design-assistant'); } catch (_) {}
 
 // The Windows program (LodeData.exe, desktop/lodedata_desktop.py) shows this
 // page in its own window. There Open and Save go through Windows' own

@@ -128,10 +128,9 @@ CHROMIUM_PATH=$(ls -d ~/.cache/ms-playwright/chromium-*/chrome-linux*/chrome | h
 
 ## Back up and update
 
-* Back up `data/` — `designs.db` holds every network on the server. While
-  the server runs, copy it with
-  `sqlite3 data/designs.db ".backup /backups/designs.db"`
-  (or stop the service and copy the folder).
+* Nothing to back up: `data/designs.db` holds the networks only while the
+  server runs, and each start clears it (the user). Each person saves their
+  work into their `.ntw`.
 * To update: stop the service, unzip the new version over the old one
   (`data/` is kept), run `./install.sh` again, start the service.
 

@@ -7,8 +7,8 @@
 #   WORKERS=2 ./start-server.sh        server processes (default: one per
 #                                      CPU core, at most 4)
 #
-# The networks people open are kept in data/designs.db (LODEDATA_DB to put
-# it elsewhere).
+# The networks people open are held in data/designs.db (LODEDATA_DB to put
+# it elsewhere) while the server runs; each start clears it.
 set -e
 cd "$(dirname "$0")"
 if [ ! -x .venv/bin/python ]; then
@@ -20,5 +20,7 @@ if [ -z "$WORKERS" ]; then
   if [ "$WORKERS" -gt 4 ]; then WORKERS=4; fi
 fi
 export LODEDATA_DB="${LODEDATA_DB:-$(pwd)/data/designs.db}"
+# networks are held only while the server runs: none from an earlier run
+rm -f "$LODEDATA_DB" "$LODEDATA_DB-wal" "$LODEDATA_DB-shm"
 exec .venv/bin/python -m uvicorn api:app --app-dir app \
   --host "${HOST:-0.0.0.0}" --port "${PORT:-8000}" --workers "$WORKERS" --proxy-headers

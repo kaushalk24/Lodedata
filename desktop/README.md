@@ -34,11 +34,13 @@ already has.
 
 * **File → Open / Save Network** use Windows' own dialogs; Save writes
   straight back into the `.ntw` it was opened from, as Lode Data does.
-* The networks opened are kept for each Windows user in
-  `%LOCALAPPDATA%\LodeData` (`designs.db`), so they are there next time.
-  Nothing is shared with other PCs.
-* A new version: replace the `LodeData` folder with the new one. The
-  networks in `%LOCALAPPDATA%\LodeData` stay.
+* Nothing about a network is kept once the program closes: the networks
+  opened are held only while it runs (in a folder of its own in `%TEMP%`,
+  taken away when it closes), and it always starts empty. Save your work
+  into the `.ntw` before closing, as with Lode Data. Earlier versions kept
+  every network opened in `%LOCALAPPDATA%\LodeData\designs.db`; this one
+  deletes that file.
+* A new version: replace the `LodeData` folder with the new one.
 * If it does not start: `%LOCALAPPDATA%\LodeData\lodedata.log` says why.
 
 ## Build it yourself (optional)

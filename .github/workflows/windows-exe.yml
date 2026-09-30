@@ -36,9 +36,17 @@ jobs:
             if ($ok) {
               try { $ok = (Invoke-WebRequest http://127.0.0.1:17170/ -UseBasicParsing).Content -match "app.js" } catch { $ok = $false }
             }
-            Stop-Process $p -Force -ErrorAction SilentlyContinue
+            # closed as a user closes it, so it takes its networks away
+            $p.CloseMainWindow() | Out-Null
+            if (-not $p.WaitForExit(20000)) { Stop-Process $p -Force -ErrorAction SilentlyContinue; Write-Host "had to be stopped" }
             Start-Sleep 2
             return $ok
+          }
+          # nothing about a network may be left on the PC once it has closed
+          function Assert-NothingKept {
+            if (Test-Path "$env:LOCALAPPDATA/LodeData/designs.db") { throw "LodeData.exe kept the networks in LOCALAPPDATA" }
+            $left = @(Get-ChildItem ([IO.Path]::GetTempPath()) -Directory -Filter "LodeData-*")
+            if ($left.Count) { throw "LodeData.exe left its networks in TEMP: $($left.Name)" }
           }
           # what Windows does to files unzipped from an internet download; the
           # .exe itself the user lets run ("More info - Run anyway")
@@ -49,6 +57,8 @@ jobs:
           }
           if (-not (Start-Check "dist/LodeData")) { throw "LodeData.exe did not open its window" }
           "as built: the window opened and the page loaded"
+          Assert-NothingKept
+          "closed: no network left on the PC"
 
           # Without LodeData.exe.config such a copy cannot open its window:
           # "Failed to resolve Python.Runtime.Loader.Initialize" (run 3 of this
@@ -57,6 +67,7 @@ jobs:
           Mark-Downloaded "$env:RUNNER_TEMP/downloaded"
           if (-not (Start-Check "$env:RUNNER_TEMP/downloaded")) { throw "unzipped from a download, LodeData.exe did not open its window" }
           "downloaded, with LodeData.exe.config: the window opened and the page loaded"
+          Assert-NothingKept
       - name: Zip
         shell: pwsh
         run: Compress-Archive -Path dist/LodeData -DestinationPath LodeData-windows.zip

@@ -4,9 +4,10 @@ The same app, in a window of its own instead of a browser: the engine runs
 inside the program, on this PC only (127.0.0.1, never on the network), and
 the page talks to it there. Nothing is needed from a server or the internet.
 
-* The networks opened are kept for this Windows user in
-  %LOCALAPPDATA%\\LodeData (designs.db), as the server keeps them in
-  data/designs.db.
+* The networks opened are held only while the program runs, in a folder of
+  its own in %TEMP% that goes when it closes: nothing about a network is kept
+  from one start to the next (the user). %LOCALAPPDATA%\\LodeData keeps only
+  the window's own settings and the log.
 * File > Open and Save Network use Windows' own dialogs, and Save writes
   straight back into the .ntw, as Lode Data does (the page reaches them
   through ``Files`` below).
@@ -18,6 +19,7 @@ the page talks to it there. Nothing is needed from a server or the internet.
 """
 import base64
 import os
+import shutil
 import socket
 import sys
 import tempfile
@@ -37,7 +39,30 @@ PORT = 17170          # a fixed port keeps the page's own settings from one star
 def data_dir() -> Path:
     d = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "LodeData"
     d.mkdir(parents=True, exist_ok=True)
+    # earlier versions kept every network opened here: take them away
+    for old in ("designs.db", "designs.db-wal", "designs.db-shm"):
+        (d / old).unlink(missing_ok=True)
     return d
+
+
+RUN_PREFIX = "LodeData-"
+
+
+def run_dir() -> Path:
+    """The folder the networks opened live in while the program runs,
+    taken away when it closes.  A run that ended without closing (a crash,
+    a power cut) left its folder behind: it goes at the next start, unless
+    that run is still going -- Windows will not delete the "in-use" file a
+    running program holds open."""
+    tmp = Path(tempfile.gettempdir())
+    if sys.platform == "win32":
+        for old in tmp.glob(RUN_PREFIX + "*"):
+            try:
+                (old / "in-use").unlink(missing_ok=True)
+            except OSError:
+                continue
+            shutil.rmtree(old, ignore_errors=True)
+    return Path(tempfile.mkdtemp(prefix=RUN_PREFIX))
 
 
 def free_port() -> int:
@@ -57,7 +82,8 @@ def start_engine(port: int):
     from api import app
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port,
                                            log_config=None, log_level="warning"))
-    threading.Thread(target=server.run, daemon=True).start()
+    server.thread = threading.Thread(target=server.run, daemon=True)
+    server.thread.start()
     for _ in range(200):
         if server.started:
             return server
@@ -129,7 +155,17 @@ def main() -> int:
     if sys.stdout is None:                       # no console: keep what it says
         log = Path("lodedata-check.log") if checking else data / "lodedata.log"
         sys.stdout = sys.stderr = open(log, "a", encoding="utf-8")
-    os.environ.setdefault("LODEDATA_DB", str(data / "designs.db"))
+    run = run_dir()
+    in_use = open(run / "in-use", "w")
+    os.environ.setdefault("LODEDATA_DB", str(run / "designs.db"))
+    try:
+        return run_program(checking, data)
+    finally:
+        in_use.close()
+        shutil.rmtree(run, ignore_errors=True)
+
+
+def run_program(checking: bool, data: Path) -> int:
     port = free_port()
     server = start_engine(port)
     if checking:
@@ -142,7 +178,7 @@ def main() -> int:
             print("check failed:\n" + traceback.format_exc())
             return 1
         finally:
-            server.should_exit = True
+            stop_engine(server)
 
     try:
         import webview
@@ -164,8 +200,13 @@ def main() -> int:
                 "Design Assistant", 0x10)
         return 1
     finally:
-        server.should_exit = True
+        stop_engine(server)
     return 0
+
+
+def stop_engine(server) -> None:
+    server.should_exit = True
+    server.thread.join(timeout=10)      # let go of the networks' folder
 
 
 if __name__ == "__main__":

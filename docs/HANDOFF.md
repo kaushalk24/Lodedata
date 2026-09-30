@@ -48,7 +48,11 @@ new Python dependencies go in `requirements.txt` (and, if PyInstaller does
 not find them, in `desktop/build.bat`); new files the page loads go under
 `app/web/`; Open/Save in the page go through `showOpenFilePicker` /
 `showSaveFilePicker`, which the program replaces with Windows' dialogs
-(`desktopFile` in `app/web/app.js`). Keep `desktop/LodeData.exe.config`
+(`desktopFile` in `app/web/app.js`). **Nothing about a network is kept once
+the program closes** (the user, 30 Sep): the networks live in a folder of
+its own in `%TEMP%` for the run only; the page keeps no network, file or
+last-opened in its own storage; the server launchers clear
+`data/designs.db` at each start. The build checks nothing is left. Keep `desktop/LodeData.exe.config`
 beside the exe (build.bat copies it): without it a copy unzipped from a
 download cannot open its window — the user's laptop showed this, and the
 build's "as if downloaded" start checks it every time.
@@ -113,11 +117,11 @@ build's "as if downloaded" start checks it every time.
 4. `python tools/regression.py snapshot /tmp/base.json`, then
    `python tools/regression.py diff samples/regression-baseline.json /tmp/base.json`
    — must print "0 of 70 changed": the new session starts exactly where the
-   last one ended (the baseline was taken on the engine of the commit that
-   built the 550 column, with the full samples pack; the user was sent it to
-   replace the one in their samples zip. Against the older baseline, from
-   d4d2065, exactly the 9 networks opened with WVEXT862 differ: their
-   Tap(550) Test lines). `/tmp/base.json` is then the baseline for the
+   last one ended (the baseline in the pack was taken on commit 5e55e0d,
+   the 550 column, and the user was sent the rebuilt `lodedata-samples.zip`
+   with it on 30 Sep. If the pack still holds the older baseline, from
+   d4d2065, exactly the 9 networks opened with WVEXT862 differ — their
+   Tap(550) Test lines — and nothing else). `/tmp/base.json` is then the baseline for the
    regression check below.
 
 ## Regression check (every change)
@@ -146,7 +150,7 @@ asked about before pushing. Add every new sample the user sends to
 | `app/hfc/exporter.py` | design → writer input |
 | `app/hfc/entry.py` | typed codes: taps `4.23`, couplers `-8` / `3=`, Active IDs |
 | `app/hfc/model.py`, `plant.py` | parts library; Design / Branch / Node |
-| `app/api.py` | FastAPI; networks in SQLite (`data/designs.db`) |
+| `app/api.py` | FastAPI; networks in SQLite (`data/designs.db`) while it runs only |
 | `app/web/` | the UI: 12.11's menus, screen menus, grid, tip box, dialogs, keys, mouse |
 | `tests/test_ntw.py` | AL004 against the user's screenshots, Parameters chains, Test list |
 | `tests/test_ntw_writer.py` | byte-for-byte saves, totals, new networks |

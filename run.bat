@@ -56,7 +56,10 @@ echo.
 REM give the server a moment to bind the port, then open the browser
 start "" /b cmd /c "timeout /t 3 /nobreak >nul & start """" http://127.0.0.1:%PORT%"
 
+REM networks are held only while it runs: none from an earlier run
+del /q data\designs.db data\designs.db-wal data\designs.db-shm 2>nul
 python -m uvicorn api:app --app-dir app --port %PORT%
+del /q data\designs.db data\designs.db-wal data\designs.db-shm 2>nul
 
 echo.
 echo   The program has stopped.
