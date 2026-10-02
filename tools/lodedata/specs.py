@@ -95,7 +95,7 @@ CLASSIC_LAYOUT = {
     "tap": (641, 414, 5),
 }
 CLASSIC_ATV_RECORDS = 51
-CLASSIC_ATV_F3 = (135, 151)     # the older record's In and Out at F3
+CLASSIC_ATV_F3 = (127, 151)     # the older record's In and Out at F3
 CLASSIC_TAP_PORT_SLOTS = {2: 5, 4: 107, 6: 209, 8: 311}
 
 
@@ -216,11 +216,21 @@ class ActiveSpec:
     # Pads/EQs Bank used for forward pad, return pad, forward EQ, return EQ
     banks: list = field(default_factory=lambda: [1, 1, 1, 1])
     # in and out at the third forward frequency (F3): read from the older
-    # record only, In at +135 and Out at +151 -- WVEXT862's LEs and FNB99 put
-    # out 43.0, NC4000 41.1, HLN 3842 NODE 43.5, the WIFI OMNI 0 (43.1's end
-    # line reads 0.00 at 550).  No current spec set has F3 on, so where the
-    # current record keeps it is not settled
+    # record only, In at +127 (after the six power steps) and Out at +151 --
+    # WVEXT862's LEs need 14.1 in and put out 43.0, the FNB99s 10.1 and 43.0,
+    # NC4000 0 and 41.1, HLN 3842 NODE 0 and 43.5, the WIFI OMNI 0 and 0
+    # (43.1's end line reads 0.00 at 550; Lode's "550 input 20.98 to LE at
+    # 25.3." is 20.98 less its 10 pad under 14.1).  No current spec set has F3
+    # on, so where the current record keeps it is not settled
     f3_levels: list = field(default_factory=lambda: [0.0, 0.0])
+    # the Actives window's Custom Cascading: bit k + 1 set = the active may sit
+    # at cascade position k (bit 0 is something else).  WV750's and SHINSTON's
+    # Ripple nodes allow 0 and 1, so they are position 0 and the first
+    # amplifier after one is 1; WVEXT862's HLN 3842 NODE allows 1 only and its
+    # NC4000 nothing, so either counts as 1 and AL00416 is 2 (Lode's boxes).
+    # Its "11" line extenders allow 1-5: at 23.17, position 6, Lode's Test
+    # list says "LE  11/5 before/0 after".  u16 at +55, +35 in the older record
+    cascading: int = 0
 
 
 # The .atv file holds more than the Actives table -- the manual describes
@@ -279,6 +289,7 @@ def read_actives(data: bytes) -> list:
             ATV_CONFIG_STRIDE)]
         f3 = [round(_fx(struct.unpack_from("<i", seg, o)[0]), 2) for o in CLASSIC_ATV_F3] \
             if classic else [0.0, 0.0]
+        cascading = struct.unpack_from("<H", seg, 35 if classic else 55)[0]
         out.append(ActiveSpec(
             slot=slot,
             name=name,
@@ -295,6 +306,7 @@ def read_actives(data: bytes) -> list:
             banks=[seg[ATV_PAD_BANKS] + 1, seg[ATV_PAD_BANKS + 1] + 1,
                    seg[ATV_EQ_BANKS] + 1, seg[ATV_EQ_BANKS + 1] + 1],
             f3_levels=f3,
+            cascading=cascading,
         ))
     return out
 

@@ -548,6 +548,10 @@ def test_amplifier_info_box(screen):
     assert (a["aerial_prev"], a["aerial_start"], a["total_split"],
             a["total_prev"], a["total_start"]) == (2027, 2027, 1141, 2027, 2027)
     assert (a["cascade"], a["supply"], a["homes_down"]) == (1, "A", 120)
+    # 1: the Ripple at 1.1 is position 0 -- its Custom Cascading (0x0007)
+    # allows 0; WVEXT862's nodes do not, and there AL00416 reads 2
+    ripple = next(n for n in screen.rows if (n.branch, n.node) == (1, 1))
+    assert ripple.amp_info["cascade"] == 0
 
 
 # The expanded display's cyan block, read off the screen with "/" on:
@@ -725,6 +729,10 @@ def test_coupler_column_matches_the_screen(screen):
     # 7 runs along 4's 156 from the bridger at 4.4, but only its parent
     # branch 6 counts, whose span there is 121
     assert _rows(screen, 6)[0].couplers == ["100[7]"]
+    # branch 5 (set A 5d): 1<45> on 406 cable, as long as 5.9's span ahead;
+    # 5.19 100<29> as predicted
+    assert [c for r in _rows(screen, 5) for c in r.couplers] == \
+        ["12[25]", "1<45>", "100<36>", "100<29>", "2[34]", "12<35>"]
 
 
 def test_branch_1_matches_the_screen(screen):

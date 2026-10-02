@@ -96,6 +96,7 @@ Power screen, the menus) are not in the pack; their numbers are pinned in
 | `2026-09-29_SHINSTON/` (9) | labelled by question: `1` branch 1 (Notes ♪, no Enter dialog), `2` branches 1–2, `3` Test list, `4a/4b` amp boxes 1.15/1.27, `5A/5B` expanded 1.15/1.22, `6A/6b` supply 4.1 | SN001 levels on 91 lines; configuration IDs; Notes; supply label 1A in the cplr column |
 | `2026-09-29_SHINSTON2/` (15) | `1a–1e` brackets at 8.3, 15.10, 18.9, 24.7, 28.9; `2` Edit Notes window; `3a/3b` node box 1.2 / 1.29; `4` branch 5; `5a–5f` older AL004 Test list (94 lines) and 43.1 amp box | preview box layout, Q1 = "EQ", `117]`, Fslope/Rslope lines, notes rows end `~0`; the 14 Tap(550) lines and their colours (`test_the_test_list_is_lodes`), 43.1's 550 = 14.67 |
 | `2026-09-29_SHINSTON3/` (10) | `1a–1c` notes in Lode (1c is the older AL004); `2` AL004 branch 9 with 9.2's power stop off → 9.1 `108<10>`; `3a–3c` AL004 branches 14 and 20 + 20.15 tap box; `4a/4b` older AL004 6.9 / 7.6 = EQ; `5` SN001 28.16 node box | the final `<n>` rule (power stop ends the walk); half-up 34.76 / 21.98 / 41.23; the node box on a branch's last line; the 550 column of branches 4, 6 and 7 (1c, 4a, 4b; an in-line device's fifth loss is F3) |
+| `2026-10-02_setA/` (18; sent as `wxext862.zip`) | set A: `1a–1c` amp boxes 1.1 (HLN 3842 NODE), 6.1, 11.10; `2` 11.18 with no active, its tap box; `3a–3f` every WVEXT862 Parameters tab; `3g/3h` branches 25 and 23 with the 25.3 / 23.17 amp boxes; `4a/4b` branch 15 with the 15.3 / 15.4 tap boxes; `5a–5c` older AL004 branches 16, 9, 5; `5d` AL004 branch 5 | Cascade Position from Custom Cascading (`test_classic_specs.py::test_the_actives_as_lode_shows_them`, `test_ntw.py::test_amplifier_info_box`); the input/output check, its red cells and Lode's full 94-line list (`test_the_test_list_is_lodes`); brackets 16.4 `8<17>`, 9.14 `2<14>`, 5.19 `100<29>`/`100<32>`, 9.1 `108<10>`, 5.9 `1<45>` (`test_the_couplers_are_drawn_as_lode_draws_them`, `test_coupler_column_matches_the_screen`); every Parameters field as read; 15.4's screen equal to the app's. Not explained yet: the red 505/438/515 cable numbers (set A2). The user's copy of the older AL004 has changed (branch 1: five lines, HLN at 1.1) |
 
 (The user's text for SHINSTON3 Q2 said "102[34]"; the screenshot shows
 `108<10>` at 9.1 — the screenshot was followed.)
@@ -140,3 +141,7 @@ Recorded as rules in the docs; listed here so their source is known.
   returns to the coupler line it was entered from (29 Sep).
 * Later topics, not started: the design engine itself (Recalc, AutoCpl …),
   and connecting two networks (PCD connect, shared power supply).
+* The app must keep nothing about a network once it closes (30 Sep).
+* Set A (2 Oct): with WVEXT862 the node counts as cascade 1, "not the case
+  every time and rare"; 11.18 holds no active, the WiFi tap in its tap
+  column (the red 64 seen on 29 Sep was not in the file).

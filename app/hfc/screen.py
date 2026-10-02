@@ -65,6 +65,8 @@ class Row:
     port_severity: list = field(default_factory=list)
     tap_notes: list = field(default_factory=list)  # (severity, message) about taps
     slope_notes: list = field(default_factory=list)  # the active's, listed ahead of its taps
+    active_notes: list = field(default_factory=list)  # its inputs, outputs and cascade, ahead of those
+    level_severity: dict = field(default_factory=dict)  # MHz -> "red": an input or output the active misses
     tap_port_severity: list = field(default_factory=list)  # per tap, per column
     tap_inputs: list = field(default_factory=list)  # level entering each tap slot (not sent)
     after_taps: dict = field(default_factory=dict)  # level after the last tap (not sent)
@@ -110,6 +112,10 @@ class Row:
             # 32.055 as 32.05, where the Design screen shows 32.06)
             "raw_levels": [self.levels.get(f, 0.0) for f in self.freq_order],
             "extra_levels": [as_shown(self.levels.get(f, 0.0)) for f in self.extra_order],
+            "level_severity": [self.level_severity.get(f, "") for f in self.freq_order],
+            "extra_severity": [self.level_severity.get(f, "") for f in self.extra_order],
+            # an input or output it misses; not its cascade (23.17's 11 stays green)
+            "amp_severity": "red" if self.level_severity else "",
             "inline": self.inline, "node_box": self.node_box,
             "ftg": round(self.ftg, 0), "hc": self.hc, "cab": self.cab,
             "cab_name": self.cab_name, "lv": self.lv, "tsg": self.tsg,
@@ -220,12 +226,15 @@ def build(design: Design) -> Screen:
 
     # Nothing in the file marks a branch <n> or [n]; the program works it out
     # from the spans.  A branch is drawn <n> when it has no footage, or when
-    # its first span is on non-mileage (1xx) cable and as long as the parent
-    # branch's nearest span behind or ahead of the coupler -- the span BkFeed
-    # (.2) or FwdFd (..2) copies.  The walk to that span takes each line's
-    # own span, the coupler's line first going back, and ends at the first
-    # line that has one or at a line with a power stop.  All 64 seen fit
-    # (AL004, the older AL004, SN001_MID):
+    # its first span is as long as the parent branch's nearest span behind or
+    # ahead of the coupler -- the span BkFeed (.2) or FwdFd (..2) copies.
+    # The walk to that span takes each line's own span, the coupler's line
+    # first going back, and ends at the first line that has one or at a line
+    # with a power stop -- but not at the coupler's own line's stop going
+    # back: the older AL004's 16.4 is 8<17> (17 runs 169 ft, 16.3's span,
+    # past 16.4's stop; set A 5a).  The cable does not matter: its 9.14 is
+    # 2<14> on 404, mileage (5b).  All 85 seen fit (AL004, the older AL004,
+    # SN001_MID):
     #   AL004 4.4 12<6> starts on 4's 121 behind, 4.14 3-<11><12> on the 99
     #   behind and the 105 ahead, past 4.15's coupler (0 ft); 11.1 made 106
     #   ft turns it 3-[11]<12> (the user, in Lode Data);
@@ -240,18 +249,20 @@ def build(design: Design) -> Screen:
         if first is None:
             return True
         parent = design.branch(b.parent_branch)
-        if parent is None or first.cab // 100 not in p.non_mileage_series:
+        if parent is None:
             return False
 
-        def nearest(lines) -> float:
+        def nearest(lines, own=None) -> float:
             for n in lines:
                 if n.ftg:
                     return n.ftg
-                if n.power_stop:
+                if n.power_stop and n is not own:
                     return 0.0
             return 0.0
         k = b.parent_node               # parent.nodes[:k] runs up to the coupler's line
-        return first.ftg in (nearest(reversed(parent.nodes[:k])), nearest(parent.nodes[k:]))
+        behind = list(reversed(parent.nodes[:k]))
+        return first.ftg in (nearest(behind, behind[0] if behind else None),
+                             nearest(parent.nodes[k:]))
 
     def branch_style(cp) -> str:
         if cp.style != BRANCH_NORMAL:
@@ -317,13 +328,8 @@ def build(design: Design) -> Screen:
                     if not part.needs_rf_input:
                         # fibre fed: there is no RF input to show on this line
                         row.levels = {f: 0.0 for f in allf}
-                    if part.needs_rf_input:
-                        need = part.in_forward_high
-                        have = row.levels.get(p.forward_high_mhz, 0.0)
-                        if have < need:
-                            row.flags.append(("red",
-                                f"input {have:.2f} below the {need:.2f} dBmV "
-                                f"module input for {part.name}"))
+                    else:
+                        _active_checks(p, part, node.pads, row, f"{branch.number}.{row.node}.")
                     levels[p.forward_high_mhz] = part.out_forward_high
                     levels[p.forward_low_mhz] = part.out_forward_low
                     levels[p.return_high_mhz] = part.in_return_high
@@ -498,9 +504,6 @@ def build(design: Design) -> Screen:
         walk(feeder, start, 0, 0.0, False)
 
     _gutter(scr)
-    # the Test Results list runs in branch, then node order
-    for r in sorted((r for r in scr.rows if not r.end), key=lambda r: (r.branch, r.node)):
-        scr.tests.extend(r.slope_notes + r.tap_notes)
     _powering(design, scr)
     _totals(design, scr)
     order = []
@@ -517,7 +520,47 @@ def build(design: Design) -> Screen:
     } for b in sorted(design.branches.values(), key=lambda x: x.number)]
     _amp_info(design, scr)
     _housings(design, scr)
+    # the Test Results list runs in branch, then node order
+    for r in sorted((r for r in scr.rows if not r.end), key=lambda r: (r.branch, r.node)):
+        scr.tests.extend(r.active_notes + r.slope_notes + r.tap_notes)
     return scr
+
+
+def _active_checks(p, part, pads, row: Row, at: str) -> None:
+    """Lode's Test of an active's levels, with the pads and EQs it holds.
+
+    Forward, the line's input less the forward pad and the EQ's loss must
+    reach the active's In at each frequency ("870 input 10.97 to LE at
+    4.13.": AL00416 holds pad 0, EQ 15 -- 0.00 at 870, 13.50 at 54 -- and
+    In is 11.50 / 11.70).  Return, its Out less the return pad and EQ must
+    reach the level the line needs there ("40 output 36.64 from LE at
+    25.3.": 39 less pad 8 is 31.00).  All 12 such lines of the older AL004
+    and none on AL004 or SN001_MID; the levels are compared as shown, the
+    failing ones drawn red.  "LE" is Lode's word for any active here (4.13
+    is a bridger).
+    """
+    def loss(c: int, i: int) -> float:
+        column = part.pad_eq[c] if len(part.pad_eq) == 4 else None
+        v = pads[c] if c < len(pads) else 0
+        if not column or v == 255 or v >= len(column[2]):
+            return 0.0
+        values = column[2][v]
+        return values[i] if i < len(values) else 0.0
+
+    forward = [(p.forward_high_mhz, part.in_forward_high, 0),
+               (p.forward_low_mhz, part.in_forward_low, 1)]
+    forward += [(f, part.in_f3, 2) for f in _extra_freqs(p)]
+    for f, need, i in forward:
+        have = as_shown(row.levels.get(f, 0.0))
+        if need - (have - loss(0, 0) - loss(2, i)) > 0.005:
+            row.level_severity[f] = "red"
+            row.active_notes.append(("red", f"{f:g} input {have:7.2f} to LE at {at}"))
+    for f, out, i in ((p.return_high_mhz, part.out_return_high, 0),
+                      (p.return_low_mhz, part.out_return_low, 1)):
+        needed = as_shown(row.levels.get(f, 0.0))
+        if needed - (out - loss(1, 0) - loss(3, i)) > 0.005:
+            row.level_severity[f] = "red"
+            row.active_notes.append(("red", f"{f:g} output {needed:7.2f} from LE at {at}"))
 
 
 def _active_kind(part) -> str:
@@ -639,6 +682,28 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # 44.1 is 6 ft from its split, the tap at 11.18 (Lode's info box)
         return bool(nd.couplers or any(t.branch for t in nd.taps))
 
+    def allows(nd, position: int) -> bool:
+        part = lib.actives.get(nd.amp_part)
+        return bool(part and part.cascading >> (position + 1) & 1)
+
+    def children(nd) -> list:
+        return [c.branch for c in nd.couplers + nd.taps
+                if c.branch and not getattr(c, "removed", False) and design.branch(c.branch)]
+
+    def chain_from(bb: int, first: int) -> int:
+        """the most actives one after another from line `first` of a branch on"""
+        nodes = design.branch(bb).nodes
+        best = run = 0
+        for k in range(first, len(nodes) + 1):
+            here = nodes[k - 1]
+            run += 1 if has_amp(here) else 0
+            best = max([best] + [run + chain_from(c, 1) for c in children(here)])
+        return max(best, run)
+
+    def chain_below(bb: int, k: int) -> int:
+        # branches off the active's own line leave after it
+        return max([chain_from(bb, k + 1)] + [chain_from(c, 1) for c in children(node(bb, k))])
+
     for (b, n), r in rows.items():
         nd = node(b, n)
         last = n == len(design.branch(b).nodes)
@@ -652,14 +717,12 @@ def _amp_info(design: Design, scr: Screen) -> None:
         lost = dict.fromkeys(("split", "prev", "start"), 0.0)
         same_cable = 0
         found_active = found_split = False
-        cascade = 0
         first = True
         for bb, k in upstream(b, n):
             here = node(bb, k)
             if not first:
                 if has_amp(here):
                     found_active = True
-                    cascade += 1
                 if has_amp(here) or splits(here):
                     found_split = True
             ft, db = here.ftg, loss(here)
@@ -717,18 +780,31 @@ def _amp_info(design: Design, scr: Screen) -> None:
                 label = labels[v].strip() if 0 <= v < len(labels) else str(v)
             shown_as.append((label, prefix + label))
         (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as
+        # Cascade Position: the actives from the network's start down to this
+        # one, itself included; the first is 0 when its Custom Cascading
+        # allows position 0 (WV750's and SHINSTON's Ripple nodes), else 1
+        # (WVEXT862's NC4000 and HLN 3842 NODE: AL00416 reads 2 there, 1 on
+        # AL004).  A fibre-fed node allowed position 0 reads 0 wherever it is
+        chain = [node(bb, k) for bb, k in upstream(b, n) if has_amp(node(bb, k))][::-1]
+        position = (0 if allows(chain[0], 0) else 1) + len(chain) - 1
+        if fibre and allows(nd, 0):
+            position = 0
+        if part and part.cascading >> 1 and not allows(nd, position):
+            # its Custom Cascading does not allow it here: 23.17's "11"
+            # (positions 1-5) at 6, "LE  11/5 before/0 after at 23.17."
+            r.active_notes.append(("red", f"LE {r.amp:>3}/{len(chain) - 1} before/"
+                                          f"{chain_below(b, n)} after at {b}.{n}."))
         if not design.has_specs:
             # no spec set: no type, no pads or EQs, cascade position 0
             # (AL004's AL00416, the user's screenshot)
             fp = rp = fe = re_ = ""
-            cascade, fibre = 0, True
+            position = 0
         r.amp_info = {
             "name": nd.amp_label, "type": part.name if part else "",
             "fwd_pad": fp, "ret_pad": rp, "fwd_eq": fe, "ret_eq": re_,
             "parts": [fp_part, rp_part, fe_part, re_part],
             **d,
-            # the node itself is position 0; each active upstream adds one
-            "cascade": 0 if fibre else max(cascade, 1),
+            "cascade": position,
             "supply": r.powered_by, "homes_down": homes,
         }
 

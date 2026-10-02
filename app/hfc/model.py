@@ -190,6 +190,8 @@ class ActiveType:
     # in and out at the third forward frequency, when the Parameters have one
     in_f3: float = 0.0
     out_f3: float = 0.0
+    # Custom Cascading: bit k + 1 set = allowed at cascade position k (0 = none)
+    cascading: int = 0
     noise_figure_db: float = 7.0
     # powering: current draw against applied voltage, [[volts, amps], ...].
     # Actives are constant-power, so draw rises as the voltage sags -- which is

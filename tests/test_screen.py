@@ -113,9 +113,14 @@ def test_a_starved_amplifier_is_flagged_red():
                amp="11", amp_part=le.id)
     d.branches[1].nodes.append(far)
     d.renumber(d.branches[1])
-    row = [r for r in build(d).rows if not r.end][-1]
-    assert row.severity == "red"
-    assert any("module input" in m for _, m in row.flags)
+    scr = build(d)
+    row = [r for r in scr.rows if not r.end][-1]
+    # as Lode marks it: the inputs it misses and its ID red, and "870 input
+    # ... to LE" in the Test list (the older AL004's 4.13)
+    x = row.as_dict()
+    assert x["level_severity"] == ["red", "", "", ""] and x["amp_severity"] == "red"
+    at = f"to LE at {row.branch}.{row.node}."
+    assert [m.split()[0] for v, m in scr.tests if m.endswith(at) and v == "red"] == ["750"]
 
 
 def test_deleting_a_branch_takes_its_children_with_it():

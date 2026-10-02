@@ -130,7 +130,8 @@ def parameters_from_spec_set(base: str | Path,
 
 # where each column's losses sit among a bank row's twelve values: a pad's dB
 # Loss, an EQ's Loss at the high and low design frequency of its direction
-_BANK_LOSSES = ((0,), (7,), (1, 2), (8, 9))
+# (and a forward EQ's at F3)
+_BANK_LOSSES = ((0,), (7,), (1, 2, 3), (8, 9))
 
 
 def _pad_eq(bank, column: int) -> list:
@@ -249,7 +250,7 @@ def library_from_spec_set(base: str | Path,
             in_return_high=ins[2], in_return_low=ins[3],
             out_forward_high=outs[0], out_forward_low=outs[1],
             out_return_high=outs[2], out_return_low=outs[3],
-            in_f3=a.f3_levels[0], out_f3=a.f3_levels[1],
+            in_f3=a.f3_levels[0], out_f3=a.f3_levels[1], cascading=a.cascading,
             power_draw=a.power_draw,
             current_draw_a=next((amps for v, amps in a.power_draw
                                  if abs(v - 60.0) < 6), 0.0),

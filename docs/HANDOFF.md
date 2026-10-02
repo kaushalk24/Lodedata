@@ -168,13 +168,16 @@ asked about before pushing. Add every new sample the user sends to
   (and the 36-line one with changed settings), expanded display blocks, info
   boxes, Select Tap, pads/EQs (the program's pick on all 27 actives).
 * **Older AL004 + WVEXT862:** opens with nothing unresolved and saves byte
-  for byte; branches 6 and 7 match line for line; the 550 column matches all
-  57 values on Lode's screens (branches 4, 6, 7, 11, 43, 44); 81 of Lode's 94
-  Test lines, the 14 Tap(550) lines included (15.4's three differ by 0.01:
-  set A question 4).
+  for byte; branches 5 (from 5.13), 6, 7, 9, 11, 15, 16, 23 and 25 match
+  line for line, with the 550 column (57 values) and the amp boxes of 6.1,
+  11.10, 25.3 and 23.17 field for field; all 94 of Lode's Test lines in its
+  order (15.4's three a cent apart: Lode's list against its own screen, set
+  A2). The user's own copy now differs from the pack's (set A2 A6).
 * **SN001 + SHINSTON:** 47 branches, 390 lines; branches 1, 2, 5, 8, 15, 18,
   24, 28 match; 15-line Test list; Notes written exactly as Lode writes them.
-* **Coupler brackets:** 64 of 64 seen match (AL004 23, older 13, SN001 28).
+* **Coupler brackets:** 85 of 85 seen match (AL004 29, older 28, SN001 28).
+* **Cascade Position:** from the actives' Custom Cascading (file-formats
+  3.3): every box seen on all three networks.
 * **Saving:** byte-for-byte round trips; Lode opened every file the app
   saved (seven edit tests, NEW_T1 keyed from scratch, Notes).
 * **Keys and mouse:** Design screen menu digits, `0` Alter, `.`-moves,
@@ -185,13 +188,20 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-**Question set A** (older AL004) in `docs/QUESTIONS.md` was sent to the user
-and is waiting for their screenshots: cascade position (2/3/4 vs the app's
-1/3/3), the red "64" on 11.18, the "input … to LE" / "output … from LE" /
-"LE 11/5 before/0 after" Test lines, 15.4 (870 23.18 vs 23.19, 550 16.98
-vs 16.99), and four brackets not yet on screen.
+**Question set A2** in `docs/QUESTIONS.md` (what set A raised) goes to the
+user next: their current older AL004 file and a fresh Test list of it, the
+WIFI OMNIs' cascade, the red cable numbers, S3's 1.2 bracket, the
+crossover spacing (yes/no), and optionally the Custom Cascading tab.
 
-**Done alongside it: the 550 (F3) column** and its 14 Tap(550) Test lines
+**Set A (answered 1–2 Oct, `EVIDENCE.md` 3):** cascade position from the
+Custom Cascading bytes; Lode's input/output Test lines and red cells in
+place of the app's old stand-in ("input below the module input", the whole
+line red); the bracket rule corrected twice (16.4 `8<17>`, 9.14 `2<14>`);
+In at 550 at +127. The regression check changed only the older AL004 among
+the real networks, plus S3's 1.2 bracket (asked, A10), and networks opened
+with others' spec sets.
+
+**Done before set A: the 550 (F3) column** and its 14 Tap(550) Test lines
 (`tests/test_classic_specs.py::test_the_550_column_is_lodes`,
 `test_the_test_list_is_lodes`). What it rests on (file-formats 3.0, 3.1,
 3.4b, 3.5):
@@ -203,7 +213,7 @@ vs 16.99), and four brackets not yet on screen.
   / 40 5. With WV750, SHINSTON, KERMIT or WVBeck F3 is off: no column.
 * Cables, couplers and taps: slot 2 of the ten-slot blocks. In-line devices:
   their **fifth** loss (F1 F2 R1 R2 F3 — LEQ-PEA-8's 3.1 at 6.9 and 7.6).
-  Older actives: In F3 at +135, Out F3 at +151. The F3 figures are kept
+  Older actives: In F3 at +127, Out F3 at +151. The F3 figures are kept
   beside each part, not among the points the other columns interpolate
   between, so every other level is bit for bit as before.
 * The Test list checks a tap's ports in the Parameters' order, 870 54 550
@@ -214,7 +224,7 @@ vs 16.99), and four brackets not yet on screen.
   levels — no current spec set has F3 on (values at +171 / +195 look like
   them); F4–F6 and R3–R4 (no spec set has them on).
 
-After set A: sets B–G of QUESTIONS.md, one at a time.
+After set A2: sets B–G of QUESTIONS.md, one at a time.
 
 **Later topics the user named, not started:** the design engine itself
 (what Recalc, AutoCpl and the other screen-menu commands do — "the main

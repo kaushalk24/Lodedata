@@ -1033,6 +1033,12 @@ def test_the_older_al004_with_its_older_spec_set(page):
     for node, want in ((1, "35.10"), (11, "43.00"), (18, "23.46")):
         _goto(page, 11, node, "node")
         assert page.evaluate(cell) == want
+    # 25.3's LE misses its inputs and outputs: the levels, 550 and its ID red
+    _goto(page, 25, 3, "node")
+    reds = page.evaluate("Array.from(document.querySelectorAll('#grid tbody tr')[S.row]"
+                         "  .querySelectorAll('td[data-c]')).filter(td => td.classList.contains('red'))"
+                         "  .map(td => td.textContent)")
+    assert reds == ["22.64", "18.03", "36.64", "35.32", "11", "20.98"]
     assert not page.errors
 
 

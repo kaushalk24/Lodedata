@@ -164,7 +164,7 @@ tables are smaller. A reader tells them apart by the version at byte 26
 |---|---|---|
 | `.cbl` | 512 + 384·n, 100 records, marker 0x33 (5·10 + 1); name char[15], then resistance +20, loss blocks +24/+64, parts +104/+119 | 394-byte records, fields +30 … |
 | `.cpr` | 616 + 104·n; name char[15]; loss blocks +20/+60, tap legs +100, internal +103 | 626 + 114·n |
-| `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, power steps +79, In F3 +135, Out F3 +151, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, table +214; F3 levels not placed (+171 / +195 look like them) |
+| `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, Custom Cascading u16 +35, power steps +79 (six), In F3 +127, Out F3 +151, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, Custom Cascading u16 +55, table +214; F3 levels not placed (+171 / +195 look like them) |
 | `.atv` banks | 4 banks from 17240, same 8816-byte bank and 68-byte row | 8 banks from 93884 |
 | `.atv` 11.1 (SHINSTON, 262 136 bytes) | as the current 12.1 file up to the in-line devices; the 11 064 bytes it lacks are past them, where nothing is read | 273 200 bytes |
 | `.atv` in-line | 25 records of 59 bytes from 57464, name char[15], losses +19 (F1 F2 R1 R2 F3 …) | 40 of 69 from 169372, +29 |
@@ -192,10 +192,11 @@ column after the two cplr[branch] columns — the level at the line's input,
 and on the line under a branch what continues past the last tap — while
 the tap box and the port levels under the tap columns keep 870 54 / 40 5.
 It comes from slot 2 of the cable, coupler and tap blocks (3.1), from an
-in-line device's fifth loss (3.4b) and from an older active's In at +135
-and Out at +151: 0 in on every active; out 43.0 on the LEs and FNB99, 41.1
-on the NC4000, 43.5 on HLN 3842 NODE, 0 on the WIFI OMNIs (43.1 and 44.1's
-end lines read 0.00). All 57 values on the older AL004's screenshots match
+in-line device's fifth loss (3.4b) and from an older active's In at +127
+(right after its six power steps) and Out at +151: in 14.1 on the LEs, 10.1
+on the FNB99s, 0 on the nodes and WIFI OMNIs; out 43.0 on the LEs and
+FNB99, 41.1 on the NC4000, 43.5 on HLN 3842 NODE, 0 on the WIFI OMNIs (43.1
+and 44.1's end lines read 0.00). All 57 values on the older AL004's screenshots match
 (branches 4, 6, 7, 11, 43, 44). The Test list checks the ports in the
 Parameters' order — "Tap(550) 0.74 below min at 3.1." after 3.1's 54 —
 min/max, then windows ("Tap(550) 1.77 over window at 14.1."), then the
@@ -371,6 +372,17 @@ ID 5 bytes into each. Slot 0 is the base unit, the others plug-in variants
 
 An In level of 0 on both forward columns (WV750's `Ripple`, `NC4000`) marks a
 fibre-fed node, like the 99 sentinel.
+
+**Custom Cascading** (the Actives window's tab): a u16 at +55 (+35 in the
+older record), bit k + 1 set = the active may sit at cascade position k;
+bit 0 is not known. WV750: the LEs `11` 0x3FFD (positions 1–12), `22`
+0x7FF9 (2–13), `33` 0xFFF1 (3–14); `Ripple` 0x0007 (0–1); NC4000 0.
+WVEXT862: `11` 0x007D (1–5), `22` 0x00F9 (2–6), `33` 0x01F1 (3–7), the
+FNB99 bridger 0x003D (1–4), HLN 3842 NODE 0x0005 (1 only), NC4000 0.
+Cascade Position counts the actives from the node down, itself included,
+the node 0 when it may sit at 0 and 1 otherwise — so AL00416 reads 1 on
+AL004 and 2 on the older AL004 (Lode's boxes); an active outside its
+positions is Lode's "LE  11/5 before/0 after at 23.17." (open-questions).
 
 ### 3.4 `.tap` — taps: 454-byte rows — solved
 

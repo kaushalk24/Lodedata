@@ -58,11 +58,14 @@ def test_the_older_spec_files_read_as_lode_shows_them():
     assert omni.input_levels == [0.0, -5.0, 22.0, 22.0]
     assert omni.output_levels == [48.5, 34.0, 47.0, 47.0]
     assert omni.banks == [3, 3, 3, 3]
-    # In and Out at F3 (+135, +151): 0 in on every active; out 43.0 on the
-    # LEs and bridgers, 41.1 on the NC4000, 0 on the WIFI OMNI
+    # In and Out at F3 (+127, +151): the LEs 14.1 in, 43.0 out; the bridgers
+    # 10.1, 43.0; the NC4000 0, 41.1; the WIFI OMNI 0, 0
     assert omni.f3_levels == [0.0, 0.0]
-    assert by_id["61"].f3_levels == by_id["11"].f3_levels == [0.0, 43.0]
+    assert by_id["11"].f3_levels == [14.1, 43.0] and by_id["61"].f3_levels == [10.1, 43.0]
     assert by_id["64"].f3_levels == [0.0, 41.1]
+    # Custom Cascading, bit k + 1 = position k: "11" 1-5, the bridger 1-4,
+    # HLN 3842 NODE 1 only, NC4000 none
+    assert [by_id[i].cascading for i in ("11", "61", "70", "64")] == [0x7D, 0x3D, 0x05, 0]
     assert (by_id["88"].name, by_id["88"].index) == ("FML1G7J ALC LE", 40)
     assert (by_id["41"].name, by_id["41"].index) == ("FNB99DJxx6x6x1", 42)
 
@@ -114,9 +117,10 @@ def test_a_branch_fed_from_a_tap_port():
     assert (info["fwd_eq"], info["ret_eq"]) == ("VOID", "VOID")
     assert [info[k] for k in ("aerial_prev", "aerial_start", "total_split",
                               "total_prev", "total_start")] == [393, 3313, 6, 393, 3313]
-    # Lode's box also reads Cascade Position 4 here; the rule that gives
-    # both that and AL00416's 1 is not known yet (this reads 3)
-    assert info["homes_down"] == 0
+    # Cascade Position 4, as Lode's box (28 Sep): the node 1, AL00416 2,
+    # AL00419 3.  (The 29 Sep box of the WIFI OMNI from 11.16 read 3 --
+    # asked again)
+    assert info["cascade"] == 4 and info["homes_down"] == 0
 
 
 def test_the_older_design_saves_back_as_it_came():
@@ -126,17 +130,20 @@ def test_the_older_design_saves_back_as_it_came():
     assert data == src and report["not_written"] == []
 
 
-# Lode's Test Results for the older AL004 (94 errors), the lines of the kinds
-# worked out so far -- the tap checks at 870, 54, 550, 40 and 5 MHz, the
-# crossovers (WVEXT862's Max. Crossover is 0.00) and the EQ slope -- in the
-# window's order (the user's screenshots, SHINSTON2 5a-5c).  Still to come:
-# the amplifier input/output and LE cascade lines.
+# Lode's Test Results for the older AL004, all 94 errors in the window's
+# order (the user's screenshots, SHINSTON2 5a-5c): the tap checks at 870,
+# 54, 550, 40 and 5 MHz, the crossovers (WVEXT862's Max. Crossover is 0.00),
+# the actives' inputs and outputs with their pads and EQs, the Custom
+# Cascading line and the EQ slope.  Lode prints a crossover seven wide
+# ("Crossover of    3.85", its pixels), the app five: asked of the user
 LODE_TESTS = [
     "Tap(54)  1.24 below min at 3.1.", "Tap(550)  0.74 below min at 3.1.",
     "Tap(870)  2.18 below min at 3.3.", "Tap(550)  0.32 below min at 3.3.",
     "Tap(870) 10.72 below min at 3.5.", "Tap(550)  6.52 below min at 3.5.", "Crossover of  3.85 at 3.5.",
     "Tap(870) 12.74 below min at 3.6.", "Tap(550)  5.64 below min at 3.6.",
     "Tap(5)  2.79 below window at 3.6.", "Crossover of 11.22 at 3.6.",
+    "870 input   10.97 to LE at 4.13.", "54 input   24.90 to LE at 4.13.",
+    "870 input    9.17 to LE at 5.12.", "54 input   24.50 to LE at 5.12.",
     "Tap(870)  4.12 below min at 5.29.", "Tap(550)  0.50 below min at 5.29.",
     "Tap(5)  1.23 below window at 5.29.", "Crossover of  2.01 at 5.29.", "Tap(5)  0.53 below window at 6.7.",
     "Tap(40)  1.73 above max at 6.10.", "Tap(40)  2.04 above max at 7.7.",
@@ -171,8 +178,14 @@ LODE_TESTS = [
     "Tap(550)  4.96 below min at 16.1.",
     "Tap(40)  4.68 above max at 16.1.", "Tap(5)  2.18 above max at 16.1.",
     "Tap(40)  2.42 below window at 16.7.", "Tap(5)  2.92 below window at 16.7.",
-    "Tap(5)  0.36 below window at 19.10.", "Tap(5)  1.20 below window at 23.5.",
+    "Tap(5)  0.36 below window at 19.10.", "870 input   30.41 to LE at 19.11.",
+    "Tap(5)  1.20 below window at 23.5.",
     "Tap(5)  1.36 below window at 23.10.", "Tap(5)  1.31 below window at 23.16.",
+    "LE  11/5 before/0 after at 23.17.",
+    "870 input   22.64 to LE at 25.3.", "54 input   18.03 to LE at 25.3.",
+    "550 input   20.98 to LE at 25.3.", "40 output   36.64 from LE at 25.3.",
+    "5 output   35.32 from LE at 25.3.",
+    "870 input   11.12 to LE at 28.1.", "54 input   16.24 to LE at 28.1.",
     "Tap(870)  1.20 over window at 28.2.", "Tap(870)  3.38 over window at 29.3.",
     "Tap(870)  0.54 over window at 39.5.", "Tap(870)  2.00 over window at 40.6.",
     "Fslope too low to equalize at 43.1.", "Rslope too low to equalize at 43.1.",
@@ -199,6 +212,43 @@ def test_the_test_list_is_lodes():
     assert [v for v, m in tests if m.startswith("Tap(550)")] == [
         "red", "yellow", "red", "red", "yellow", "red", "red", "red", "red", "yellow", "yellow",
         "red", "red", "red"]
+    # the actives' lines are all red in Lode's list
+    assert {v for v, m in tests if " LE " in m or m.startswith("LE ")} == {"red"}
+
+
+def test_the_actives_as_lode_shows_them():
+    # Cascade Position: WVEXT862's node (NC4000 here, HLN 3842 NODE in the
+    # user's copy) is position 1 -- its Custom Cascading has no position 0 --
+    # so every active reads one more than on AL004 (the user's set A boxes,
+    # 1 Oct, every figure)
+    d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
+    scr = build(d)
+    rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
+    keys = ("name", "type", "fwd_pad", "fwd_eq", "ret_pad", "ret_eq", "aerial_prev",
+            "aerial_start", "total_split", "total_prev", "total_start", "cascade", "supply",
+            "homes_down")
+    lode = {(6, 1): ["AL00415", "FNB99DJxx6x6x1", "6", "SCS3", "3", "2", 886, 886, 0, 886, 886, 2,
+                     "AL004A", 7],
+            (11, 10): ["AL00419", "FNB99DJxx6x6x1", "6", "0", "2", "2", 893, 2920, 652, 893, 2920,
+                       3, "AL004A", 45],
+            (25, 3): ["AL00429", "NL15DDJL THM", "10", "5", "8", "2", 74, 2994, 385, 459, 3379, 4,
+                      "AL004A", 16],
+            (23, 17): ["AL00431", "NL15DDJL THM", "10", "8", "11", "2", 591, 4786, 591, 591, 4786,
+                       6, "AL004A", 3]}
+    for k, want in lode.items():
+        assert [rows[k].amp_info[x] for x in keys] == want, k
+    assert [rows[(1, 1)].amp_info[x] for x in ("fwd_pad", "cascade", "supply", "homes_down")] \
+        == [".", 1, "AL004A", 181]
+    assert rows[(4, 13)].amp_info["cascade"] == 2          # SHINSTON3 1c
+    # an input or output the active misses is drawn red, with its ID: 4.13's
+    # 10.97 and 24.90 (SHINSTON3 1c), all of 25.3 (set A 3g)
+    a, b = rows[(4, 13)].as_dict(), rows[(25, 3)].as_dict()
+    assert (a["level_severity"], a["extra_severity"], a["amp_severity"]) == \
+        (["red", "red", "", ""], [""], "red")
+    assert (b["level_severity"], b["extra_severity"], b["amp_severity"]) == \
+        (["red"] * 4, ["red"], "red")
+    # the cascade line leaves 23.17's ID green (set A 3h)
+    assert rows[(23, 17)].as_dict()["amp_severity"] == ""
 
 
 def test_branches_6_and_7_as_lode_shows_them():
@@ -239,6 +289,12 @@ def test_the_couplers_are_drawn_as_lode_draws_them():
     assert cpl(4) == ["12<6>", "100[9]", "3[11]<12>"]
     assert cpl(11) == ["2[19]", "1<21>", "16<22>", "100[23]", "3[24]<27>", "8[25]"]
     assert cpl(6) == ["100[7]"] and cpl(7) == ["112<8>"]
+    # set A (5a-5c, 3g): 16.4 8<17> -- 17 runs 169 ft along 16.3's span,
+    # past the power stop on the coupler's own line; 9.14 2<14> on 404
+    # cable, mileage, as long as 9.14's own span
+    assert cpl(16) == ["8<17>"] and cpl(25) == ["2[26]"]
+    assert cpl(9) == ["108<10>", "100<13>", "2<14>", "2[15]"]
+    assert cpl(5) == ["12[28]", "100<39>", "100<32>", "2[37]", "12<38>"]
 
 
 def test_the_550_column_is_lodes():

@@ -41,12 +41,13 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 
 1. **`<n>` versus `[n]` on couplers — closed.** Nothing in the file marks it
    (file-formats 3.7); the program derives it from the spans. `<n>` when the
-   branch has no footage, or when its first span is on non-mileage (1xx)
-   cable and as long as the **parent branch's** nearest span behind or ahead
-   of the coupler — the span `BkFeed` (`.2`) / `FwdFd` (`..2`) copy. The walk
-   to that span takes each line's own span (the coupler's line first, going
-   back) and ends at the first line that has one or at a line with a power
-   stop. All 64 seen fit (AL004 23, the older AL004 13, SN001 28). Evidence:
+   branch has no footage, or when its first span is as long as the **parent
+   branch's** nearest span behind or ahead of the coupler — the span
+   `BkFeed` (`.2`) / `FwdFd` (`..2`) copy. The walk to that span takes each
+   line's own span (the coupler's line first, going back) and ends at the
+   first line that has one or at a line with a power stop — but not at a
+   stop on the coupler's own line going back. The cable does not matter.
+   All 85 seen fit (AL004 29, the older AL004 28, SN001 28). Evidence:
    * branch 1: `570<2> 570[3] 570[4] 570[5]` — 3 is all 1xx but branch 1 has
      no spans;
    * 11.1 changed 105 → 106 in Lode Data turned 4.14 into `3-[11]<12>`;
@@ -58,13 +59,18 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
      span it is does not end the walk;
    * branch 6: `100[7]`. 6.1 is bridger AL00415 at 4.4's pole and 100 its
      internal DC-12; 7 runs as a second cable along branch 4's 156 (the user's
-     map confirms it), but only branch 6's own span, 121, is compared.
+     map confirms it), but only branch 6's own span, 121, is compared;
+   * set A: the older AL004's 16.4 `8<17>` — 17 runs 169 ft, 16.3's span,
+     behind 16.4 (0 ft) whose own power stop does not end the walk (the
+     rule before drew `8[17]`; AL002's 16.10 and AL003's 29.5 are the same
+     case); its 9.14 `2<14>` — 14 runs 149 ft on 404, mileage, as long as
+     9.14's own span (the first rule, from day one, wanted non-mileage
+     cable; nothing seen needed it); 9.1 `108<10>`, 5.19 `100<32>` and
+     AL004's 5.19 `100<29>` as predicted, and AL004's 5.9 `1<45>`.
 
-   Not seen yet: a power stop on the coupler's own line (0 ft) with the
-   span behind matching: the older AL004's 16.4 (`8[17]` by the rule),
-   AL002's 16.10 and AL003's 29.5. Nor `{n}` (backfeed) — 6 and 12 run
-   backward and are drawn `<` — or `(n)`, the manual's "no footage": Lode
-   draws AL004's no-footage branches 2, 18, 19 and 24 as `<n>`.
+   Not seen: `{n}` (backfeed) — 6 and 12 run backward and are drawn `<` —
+   or `(n)`, the manual's "no footage": Lode draws AL004's no-footage
+   branches 2, 18, 19 and 24 as `<n>`.
 2. **8-port tap brackets — closed.** The Design screen draws an 8-port tap
    `<n>` (11.2: `<15>`), like the 6-port-slot pad `<43>`; the preview box
    draws 2/4/8-port as `(17)` `[8]` `{15}`. Both already reproduced.
@@ -338,29 +344,50 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       Done.
 
     Still to confirm:
-    * the couplers the power-stop rule changed where no screenshot shows
-      them: AL004's 5.19 `100<29>` (was `[29]`: its branch has mileage), the
-      older AL004's 16.4 `8[17]` (a power stop on the coupler's own line),
-      9.1 `108<10>` and 5.19 `100<32>`;
-    * the cascade position on the older AL004: Lode reads 2 on AL00416
-      (4.13), 3 on 43.1 and 4 on 44.1; the app 1, 3 and 3. Its 1.1 is an
-      NC4000 where the newer AL004 has a Ripple, and there Lode reads 1 on
-      AL00416, as the app does;
-    * the older AL004's red 64 in 11.18's amp column: the line holds no
-      active (short record, index 0);
-    * the older AL004's 15.4: Lode's "Tap(870) 23.18", the app 23.19 (the
-      port is -4.191 here), and "Tap(550) 16.98", the app 16.99;
+    * set A (the user's screenshots, 1-2 Oct) settled the brackets, the
+      cascade position, the red 64 (no active at 11.18) and the Test lines
+      -- see item 1 and the three points below. Still open from it (set A2
+      in QUESTIONS.md): Lode's own Test list against its screen at 15.4
+      (23.18 / 16.98 where its screen gives the port as -4.19, the app's
+      -4.191, so 23.19 / 16.99); the WIFI OMNIs' cascade position (the app
+      4 on both; Lode 4 from 11.18 on 28 Sep, 3 from 11.16 on 29 Sep); the
+      red cable numbers (the older AL004's 505, 438, 515; not drawn red by
+      the app); S3's 1.2, which the corrected bracket rule draws `100<2>`;
+      the crossover lines' spacing (Lode prints the figure seven wide,
+      "Crossover of    3.85"; the app five, as before -- asked first);
+    * **Cascade Position — solved.** The Actives file's Custom Cascading,
+      u16 at +55 of each active (+35 in the older record): bit k + 1 set =
+      the active may sit at position k. Positions run from the network's
+      node down to the active, itself included; the node is 0 when it may
+      sit at 0 (WV750's and SHINSTON's Ripples: 0x0007), else 1 (WVEXT862's
+      HLN 3842 NODE 0x0005, NC4000 0x0000). So AL004's AL00416 is 1 and the
+      older AL004's 2; 6.1 2, 11.10 3, 25.3 4, 23.17 6 (set A boxes, every
+      figure). An active outside its positions is a Test line, red: "LE
+      11/5 before/0 after at 23.17." -- WVEXT862's "11" allows 1-5, 23.17
+      is 6 with 5 actives before and none after. No AL004 or SN001 active
+      is outside its positions, and their 68 positions are unchanged;
+    * **Actives' inputs and outputs — solved.** "870 input 10.97 to LE at
+      4.13.": the input less the active's forward pad and EQ loss (as its
+      Pads/EQs bank holds them) under its In; "40 output 36.64 from LE at
+      25.3.": its Out less the return pad and EQ under the level the line
+      needs. The figure is the line's level, printed seven wide; the
+      failing levels and the active's ID are drawn red (4.13: 10.97, 24.90
+      and 61; 25.3 all five and 11), not the whole line; all of them red
+      in the Test list, ahead of the line's tap lines. In at 550 is +127 of
+      the older record (14.1 on the LEs: 25.3's 20.98 less its 10 pad).
+      Exactly the older AL004's 12 such lines; none on AL004 or SN001
+      (their closest passes are 0.01 dB). This replaces the app's earlier
+      stand-in ("input below the module input", the whole line red);
     * where the Branch: line sits in the tap box, and which tap feeds the
       branch when a line has more than one;
     * what 0 on a tap feeding a branch does (kept here, fed by nothing);
-    * the older AL004's Test lines not produced yet (13 of its 94):
-      "870 input … to LE", "40 output … from LE", "LE 11/5 before/0 after".
-      Its five crossovers are there: WVEXT862 holds Max. Crossover 0.00, a
-      limit like any other (every positive crossover is listed);
+    * the older AL004's Test list — all 94 lines, in Lode's order (15.4's
+      three a cent apart, above). Its five crossovers: WVEXT862 holds Max.
+      Crossover 0.00, a limit like any other;
     * the 550 column — **built**: F3 = 550 is the Parameters' third forward
       frequency, drawn after the cplr[branch] columns; cables, couplers and
       taps carry it in slot 2 of their loss blocks, in-line devices as their
-      fifth loss, the older .atv's actives In at +135 and Out at +151. All
+      fifth loss, the older .atv's actives In at +127 and Out at +151. All
       57 values on the screenshots of branches 4, 6, 7, 11, 43 and 44 match,
       and 13 of the 14 Tap(550) lines (15.4 above). Not seen: a tap out at
       550 alone (its colour is taken to be its worst port's, as at the other

@@ -281,6 +281,12 @@ function renderGrid() {
         if (sev) extra += ' ' + sev;
       }
       if (r.end && /^(lvl|xlv):/.test(c.key)) extra += ' endlv';
+      // an input or output the active misses, and its ID, red (the older
+      // AL004's 4.13: 10.97 and 24.90 and its 61)
+      const lvsev = !r.end && /^(lvl|xlv):/.test(c.key) &&
+        (r[c.key[0] === 'l' ? 'level_severity' : 'extra_severity'] || [])[+c.key.slice(4)];
+      if (lvsev) extra += ' ' + lvsev;
+      if (c.key === 'amp' && r.amp_severity) extra += ' ' + r.amp_severity;
       return `<td class="${c.cls || ''}${cur}${extra}" data-r="${i}" data-c="${j}">${esc(text)}</td>`;
     }).join('');
     const main = `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;
