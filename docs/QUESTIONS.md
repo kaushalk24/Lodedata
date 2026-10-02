@@ -53,7 +53,9 @@ level after the first amplifier matches; the node's 2.50 dB (48.50 against
 A6. **Your current older AL004.** *Send:* the file as it is in Lode now —
    File → Save Network As… under a new name (e.g. AL004_SETA.ntw), so your
    own file is left as it is. *Settles:* comparing every number against
-   your file, not the pack's.
+   your file, not the pack's. (2 Oct: the AL004.ntw the user attached is
+   byte-for-byte the pack's `samples/AL004-WVEXT862/AL004.ntw` — the copy
+   with the NC4000 at 1.1 — so this is still to come as AL004_SETA.ntw.)
 A7. **A fresh Test list** of that file (screen menu 5), every row.
    *Settles:* the new input/output and cascade lines on your file as it is
    (with the HLN node, 4.13's and 5.12's input lines should be gone) and

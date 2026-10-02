@@ -42,8 +42,9 @@ branch is built and checked by GitHub Actions on a Windows machine
 (`.github/workflows/windows-exe.yml` → `desktop/build.bat`) and published as
 the release "windows-latest":
 https://github.com/kaushalk24/Lodedata/releases/download/windows-latest/LodeData-windows.zip
-After each push, check that run went green (Actions → "Windows program")
-and give the user that link along with the source link. Keep it working:
+After each push, check that run went green (Actions → "Windows program").
+Do not paste this link or the source link after every push — the user
+asked (2 Oct) to get them only when they ask for them. Keep it working:
 new Python dependencies go in `requirements.txt` (and, if PyInstaller does
 not find them, in `desktop/build.bat`); new files the page loads go under
 `app/web/`; Open/Save in the page go through `showOpenFilePicker` /
@@ -77,9 +78,15 @@ build's "as if downloaded" start checks it every time.
 * If the user's words and a screenshot disagree, follow the screenshot and
   say so (SHINSTON3 Q2: text "102[34]", screenshot `108<10>`).
 * Report plainly: what matches, what does not, what was guessed. Give the
-  download link after pushing:
-  https://github.com/kaushalk24/Lodedata/archive/refs/heads/claude/lode-data-reverse-engineer-65vgkc.zip
-  (the user runs it on Windows with `run.bat`, http://localhost:8000).
+  download links only when the user asks for them (source:
+  https://github.com/kaushalk24/Lodedata/archive/refs/heads/claude/lode-data-reverse-engineer-65vgkc.zip,
+  run with `run.bat`, http://localhost:8000; the Windows program link is
+  above).
+* Do not send `lodedata-samples.zip` / `lodedata-evidence.zip` after every
+  set. Keep `samples/` (and the unzipped evidence) up to date in the
+  session, and send the zips only when really necessary — the user asks,
+  or the regression baseline changed and a new chat would otherwise start
+  from the wrong one (say so when that happens).
 
 ## Security — never break these
 
@@ -117,11 +124,12 @@ build's "as if downloaded" start checks it every time.
 4. `python tools/regression.py snapshot /tmp/base.json`, then
    `python tools/regression.py diff samples/regression-baseline.json /tmp/base.json`
    — must print "0 of 70 changed": the new session starts exactly where the
-   last one ended (the baseline in the pack was taken on commit 5e55e0d,
-   the 550 column, and the user was sent the rebuilt `lodedata-samples.zip`
-   with it on 30 Sep. If the pack still holds the older baseline, from
-   d4d2065, exactly the 9 networks opened with WVEXT862 differ — their
-   Tap(550) Test lines — and nothing else). `/tmp/base.json` is then the baseline for the
+   last one ended (the baseline in the pack was taken on commit e129475,
+   set A, and the user was sent the rebuilt `lodedata-samples.zip` with it
+   on 2 Oct. If the pack still holds the 30 Sep baseline, from 5e55e0d,
+   the networks opened with WVEXT862, S3's 1.2 bracket and a few
+   mismatched-spec combinations differ — set A's changes — and nothing
+   else). `/tmp/base.json` is then the baseline for the
    regression check below.
 
 ## Regression check (every change)
