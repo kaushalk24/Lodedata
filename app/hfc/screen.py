@@ -32,6 +32,18 @@ def as_shown(v: float) -> float:
     return float(Decimal(repr(round(v, 9))).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
+def as_tested(v: float) -> float:
+    """A port level as the Test reads it: a half added and the rest of the
+    hundredths dropped, which takes a level under zero up, not down.  The
+    older AL004's 15.4 port at 870 MHz, -4.191, is -4.19 on the screen and
+    in its tap box but -4.18 to the Test: "Tap(870) 23.18 below min", and
+    at 550 -1.993 gives 16.98, its crossover 3.88 + 4.18 = 8.06 (Lode's list,
+    1 and 2 Oct).  At or above zero it is the screen's figure."""
+    if v >= 0:
+        return as_shown(v)
+    return int(Decimal(repr(round(v * 100 + 0.5, 6)))) / 100
+
+
 @dataclass
 class Row:
     branch: int
@@ -46,6 +58,9 @@ class Row:
     hc: int = 0
     cab: int = 0
     cab_name: str = ""
+    # the cable number's colour and the series' name, from the cable file
+    cab_color: str = ""
+    cab_series: str = ""
     lv: int = 0
     tsg: int = 0
     amp: str = ""
@@ -118,7 +133,8 @@ class Row:
             "amp_severity": "red" if self.level_severity else "",
             "inline": self.inline, "node_box": self.node_box,
             "ftg": round(self.ftg, 0), "hc": self.hc, "cab": self.cab,
-            "cab_name": self.cab_name, "lv": self.lv, "tsg": self.tsg,
+            "cab_name": self.cab_name, "cab_color": self.cab_color,
+            "cab_series": self.cab_series, "lv": self.lv, "tsg": self.tsg,
             "amp": self.amp, "amp_name": self.amp_name, "fixed": self.fixed,
             "amp_label": self.amp_label,
             "taps": self.taps, "tap_ports": self.tap_ports, "couplers": self.couplers,
@@ -298,6 +314,12 @@ def build(design: Design) -> Screen:
                 row.hc_severity = "red"
             cable = lib.cables.get(node.cab_part)
             row.cab_name = cable.name if cable else ""
+            # the number in its series' colour, the series named in the info
+            # box: the older AL004's 505 red, "EX P3 625 U    Dual New Build"
+            # (series 5 of cable 5), 438 red (series 4 of cable 38) where 405
+            # and 410 are 0,200,0; SN001's 10 0,200,0 by its 40 at 0,255,0
+            if cable and len(cable.series) == 10:
+                row.cab_color, row.cab_series = cable.series[node.cab // 100 % 10]
             cum_ft += node.ftg
             row.cumulative_ft = cum_ft
 
@@ -682,9 +704,13 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # 44.1 is 6 ft from its split, the tap at 11.18 (Lode's info box)
         return bool(nd.couplers or any(t.branch for t in nd.taps))
 
-    def allows(nd, position: int) -> bool:
+    def cascading(nd) -> int:
         part = lib.actives.get(nd.amp_part)
-        return bool(part and part.cascading >> (position + 1) & 1)
+        return part.cascading if part else 0
+
+    def counted(nd) -> bool:
+        # Custom Cascading's Exclude: WV750's and SHINSTON's Ripple nodes
+        return not cascading(nd) >> 1 & 1
 
     def children(nd) -> list:
         return [c.branch for c in nd.couplers + nd.taps
@@ -781,17 +807,18 @@ def _amp_info(design: Design, scr: Screen) -> None:
             shown_as.append((label, prefix + label))
         (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as
         # Cascade Position: the actives from the network's start down to this
-        # one, itself included; the first is 0 when its Custom Cascading
-        # allows position 0 (WV750's and SHINSTON's Ripple nodes), else 1
-        # (WVEXT862's NC4000 and HLN 3842 NODE: AL00416 reads 2 there, 1 on
-        # AL004).  A fibre-fed node allowed position 0 reads 0 wherever it is
+        # one, itself included, but those Custom Cascading excludes: WV750's
+        # and SHINSTON's Ripple nodes (Exclude) are 0 and the first amplifier
+        # after one is 1; WVEXT862's NC4000 and HLN 3842 NODE (Include) are 1,
+        # so AL00416 reads 2 there, 1 on AL004.  An excluded fibre-fed node
+        # reads 0 wherever it is
         chain = [node(bb, k) for bb, k in upstream(b, n) if has_amp(node(bb, k))][::-1]
-        position = (0 if allows(chain[0], 0) else 1) + len(chain) - 1
-        if fibre and allows(nd, 0):
+        position = sum(counted(x) for x in chain)
+        if fibre and not counted(nd):
             position = 0
-        if part and part.cascading >> 1 and not allows(nd, position):
-            # its Custom Cascading does not allow it here: 23.17's "11"
-            # (positions 1-5) at 6, "LE  11/5 before/0 after at 23.17."
+        if cascading(nd) & 1 and position and not cascading(nd) >> (position + 1) & 1:
+            # Cust. Casc. Yes and Casc. <position> Invalid: 23.17's "11"
+            # (Casc. 1-5) at 6, "LE  11/5 before/0 after at 23.17."
             r.active_notes.append(("red", f"LE {r.amp:>3}/{len(chain) - 1} before/"
                                           f"{chain_below(b, n)} after at {b}.{n}."))
         if not design.has_specs:
@@ -904,7 +931,7 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
     colour of each column's port value and the messages, in the list's order.
     """
     lim, windows = _limits(p, lv)
-    seen = {f: as_shown(ports[f]) for f in freqs}
+    seen = {f: as_tested(ports[f]) for f in freqs}
     per = [""] * len(freqs)
     errors = []
 

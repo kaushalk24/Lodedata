@@ -310,6 +310,10 @@ def test_the_amp_and_tap_columns_are_lodes(sn001):
     assert [rows[k].taps for k in ((5, 11), (5, 12), (18, 12), (28, 11), (28, 16))] == \
         [["117]"], ["111]"], ["117]"], ["117]"], ["117]"]]
     assert [rows[k].taps for k in ((8, 7), (8, 8), (18, 20))] == [["/10/"], ["/ 4/"], ["[15]"]]
+    # the cable number in its series' colour: 15.29's 10 (cable 10, series 0)
+    # 0,200,0 between 15.28's 140 and 15.30's 40 at 0,255,0 (SHINSTON2 1b)
+    assert [(rows[15, n].cab, rows[15, n].cab_color) for n in (28, 29, 30)] == \
+        [(140, "#00ff00"), (10, "#00c800"), (40, "#00ff00")]
 
 
 def test_the_node_box_lists_distances_where_lode_does(sn001):

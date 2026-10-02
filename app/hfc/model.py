@@ -64,6 +64,9 @@ class CableType:
     # [MHz, dB per 100 ft] at the third forward frequency, when there is one:
     # the spec's own figure, kept apart from the points interpolated above
     f3: list = field(default_factory=list)
+    # series 0-9 (the hundreds of the cable number): [colour "#rrggbb", name],
+    # from the cable file's Series/Colors tab
+    series: list = field(default_factory=list)
 
     def loss_db(self, mhz: float, feet: float) -> float:
         if self.f3 and mhz == self.f3[0]:
@@ -190,7 +193,8 @@ class ActiveType:
     # in and out at the third forward frequency, when the Parameters have one
     in_f3: float = 0.0
     out_f3: float = 0.0
-    # Custom Cascading: bit k + 1 set = allowed at cascade position k (0 = none)
+    # Custom Cascading: bit 0 Cust. Casc. (Yes), bit 1 Exclude, bit k + 1
+    # Casc. k Valid (lodedata.specs.ActiveSpec)
     cascading: int = 0
     noise_figure_db: float = 7.0
     # powering: current draw against applied voltage, [[volts, amps], ...].

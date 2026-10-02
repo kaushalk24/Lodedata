@@ -229,6 +229,14 @@ function expandedLines(r, cols) {
   return lines.join('');
 }
 
+// ftg, hc, cab and lv are one field to the program: with the cursor on any
+// of them all four are lit, the cable number in its series' colour (the
+// older AL004's 25.2 with the cursor on its red 505)
+function underCursor(cols, j) {
+  const line = ['ftg', 'hc', 'cab', 'lv'], at = cols[S.col];
+  return j === S.col || (S.mode === 'design' && !!at && line.includes(at.key) && line.includes(cols[j].key));
+}
+
 function renderGrid() {
   const cols = columns();
   const rows = pageRows();
@@ -262,7 +270,7 @@ function renderGrid() {
   tbody.innerHTML = rows.map((r, i) => {
     const cls = [r.severity, i === S.row ? 'onrow' : ''].filter(Boolean).join(' ');
     const tds = cols.map((c, j) => {
-      const cur = (i === S.row && j === S.col) ? ' cur' : '';
+      const cur = (i === S.row && underCursor(cols, j)) ? ' cur' : '';
       let text = cellText(r, c);
       if (i === S.row && j === S.col && S.buffer !== null) text = S.buffer + '_';
       let extra = '';
@@ -287,7 +295,9 @@ function renderGrid() {
         (r[c.key[0] === 'l' ? 'level_severity' : 'extra_severity'] || [])[+c.key.slice(4)];
       if (lvsev) extra += ' ' + lvsev;
       if (c.key === 'amp' && r.amp_severity) extra += ' ' + r.amp_severity;
-      return `<td class="${c.cls || ''}${cur}${extra}" data-r="${i}" data-c="${j}">${esc(text)}</td>`;
+      // the cable number in the colour its cable file gives its series
+      const style = c.key === 'cab' && r.cab_color && S.mode === 'design' ? ` style="--cab:${r.cab_color}"` : '';
+      return `<td class="${c.cls || ''}${cur}${extra}"${style} data-r="${i}" data-c="${j}">${esc(text)}</td>`;
     }).join('');
     const main = `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;
     return S.expanded && S.mode === 'design' && !r.end ? main + expandedLines(r, cols) : main;
@@ -300,7 +310,11 @@ function renderGrid() {
     // move the cursor in place: redrawing the grid would swallow a double-click
     $$('#grid td.cur').forEach(x => x.classList.remove('cur'));
     $$('#grid tr.onrow').forEach(x => x.classList.remove('onrow'));
-    td.classList.add('cur'); td.parentElement.classList.add('onrow');
+    const cols = columns();
+    td.parentElement.querySelectorAll('td[data-c]').forEach(x => {
+      if (underCursor(cols, +x.dataset.c)) x.classList.add('cur');
+    });
+    td.parentElement.classList.add('onrow');
     renderInfo();
   });
   renderInfo();
@@ -465,7 +479,10 @@ function infoNode(r) {
     line('Total Dist to Start of Network:', a.total_start) +
     line('Housecounts downstream:', a.homes_down) : '';
   const ps = r.supply_label ? '\n' + infoSupply(r).split('\n').slice(1).join('\n') : '';
-  return `${r.branch}.${r.node}\n${r.address || 'No Address'}\n${r.cab_name || ''}\n` + amp +
+  // the cable's series after it, from column 15: "EX P3 625 U    Dual New
+  // Build" (the older AL004's 25.2), "DROP RB 700 A  Upgrade" (5.9)
+  const cab = r.cab_series ? (r.cab_name || '').padEnd(14) + ' ' + r.cab_series : (r.cab_name || '');
+  return `${r.branch}.${r.node}\n${r.address || 'No Address'}\n${cab}\n` + amp +
     `<double-click or [.][ENTER] to edit address>` + ps;
 }
 

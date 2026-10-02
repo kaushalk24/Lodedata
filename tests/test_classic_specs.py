@@ -46,6 +46,14 @@ def test_the_older_spec_files_read_as_lode_shows_them():
     assert cable.index == 0 and round(cable.loop_resistance_ohm_per_ft * 1000, 2) == 1.72
     assert cable.forward_coeffs[:3] == [2.34, 0.54, 1.82]
     assert len(s.cables) == 39
+    # Series/Colors: cables 0-19 red on series 0, 2, 3 and 5, 0,200,0 on 1
+    # and 4; 20-39 the other way about, red on 4 only; 6-9 untouched, 0,255,0
+    red, green, bright = "#ff0000", "#00c800", "#00ff00"
+    by_index = {c.index: c for c in s.cables}
+    assert [c for c, _ in by_index[5].series] == [red, green, red, red, green, red] + [bright] * 4
+    assert [c for c, _ in by_index[38].series] == [green] * 4 + [red, green] + [bright] * 4
+    assert [n for _, n in by_index[5].series] == ["New Build", "Dual Cable", "Rebuild", "Overlash",
+                                                  "Upgrade", "Dual New Build", "", "", "", ""]
 
     three_way = next(c for c in s.couplers if c.name == "MGLSH-3F")
     assert three_way.tap_legs == 2 and three_way.code == 3.0
@@ -63,9 +71,23 @@ def test_the_older_spec_files_read_as_lode_shows_them():
     assert omni.f3_levels == [0.0, 0.0]
     assert by_id["11"].f3_levels == [14.1, 43.0] and by_id["61"].f3_levels == [10.1, 43.0]
     assert by_id["64"].f3_levels == [0.0, 41.1]
-    # Custom Cascading, bit k + 1 = position k: "11" 1-5, the bridger 1-4,
-    # HLN 3842 NODE 1 only, NC4000 none
-    assert [by_id[i].cascading for i in ("11", "61", "70", "64")] == [0x7D, 0x3D, 0x05, 0]
+    # Custom Cascading, the tab row by row as the user's set A2 shows it:
+    # Cust. Casc. (bit 0), Exclude (bit 1), the Casc. k marked Valid (bit k + 1)
+    def tab(a):
+        c = a.cascading
+        return ("Yes" if c & 1 else "No", "Exclude" if c >> 1 & 1 else "Include",
+                [k for k in range(1, 15) if c >> (k + 1) & 1])
+    lode = {"11": ("Yes", "Include", [1, 2, 3, 4, 5]), "21": ("Yes", "Include", [1, 2, 3, 4, 5]),
+            "22": ("Yes", "Include", [2, 3, 4, 5, 6]), "31": ("Yes", "Include", [1, 2, 3, 4, 5]),
+            "32": ("Yes", "Include", [2, 3, 4, 5, 6]), "33": ("Yes", "Include", [3, 4, 5, 6, 7]),
+            "11H": ("Yes", "Include", [1, 2, 3, 4, 5]), "21H": ("Yes", "Include", [1, 2, 3, 4, 5]),
+            "22H": ("Yes", "Include", [2, 3, 4, 5, 6]), "31H": ("Yes", "Include", [1, 2, 3, 4, 5]),
+            "32H": ("Yes", "Include", [2, 3, 4, 5, 6]), "33H": ("Yes", "Include", [3, 4, 5, 6, 7]),
+            "61": ("Yes", "Include", [1, 2, 3, 4]), "63": ("No", "Include", []),
+            "64": ("No", "Include", []), "70": ("Yes", "Include", [1]),
+            "85": ("No", "Include", []), "86": ("No", "Include", []), "88": ("No", "Include", []),
+            "41": ("Yes", "Include", [1, 2, 3, 4, 5, 6, 7])}
+    assert {i: tab(a) for i, a in by_id.items()} == lode
     assert (by_id["88"].name, by_id["88"].index) == ("FML1G7J ALC LE", 40)
     assert (by_id["41"].name, by_id["41"].index) == ("FNB99DJxx6x6x1", 42)
 
@@ -84,6 +106,20 @@ def test_the_older_spec_files_read_as_lode_shows_them():
     assert p["housings"][0] == {"number": 1, "part": "TV-60", "min_points": 4}
     assert p["power_interpolation"] == "constant_wattage"
     assert p["transformers"] == []
+
+
+def test_the_cable_numbers_in_their_series_colours():
+    # the user's set A2 (4a, 4b): 25.2's 505 and 5.28's 515 red (series 5 of
+    # cables 5 and 15), 5.9-5.22's 438 red (series 4 of cable 38), 404 405
+    # 410 414 415 0,200,0; the box names the series
+    d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
+    rows = {(r.branch, r.node): r for r in build(d).rows if not r.end}
+    got = {k: (rows[k].cab, rows[k].cab_color, rows[k].cab_series)
+           for k in ((25, 1), (25, 2), (25, 3), (5, 8), (5, 9), (5, 23), (5, 28), (5, 29))}
+    assert got == {(25, 1): (404, "#00c800", "Upgrade"), (25, 2): (505, "#ff0000", "Dual New Build"),
+                   (25, 3): (405, "#00c800", "Upgrade"), (5, 8): (410, "#00c800", "Upgrade"),
+                   (5, 9): (438, "#ff0000", "Upgrade"), (5, 23): (414, "#00c800", "Upgrade"),
+                   (5, 28): (515, "#ff0000", "Dual New Build"), (5, 29): (415, "#00c800", "Upgrade")}
 
 
 def test_the_older_design_opens_with_nothing_unresolved():
@@ -195,17 +231,10 @@ LODE_TESTS = [
 def test_the_test_list_is_lodes():
     d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
     tests = build(d).tests
-    got = [m for _, m in tests]
-    assert len(got) == len(LODE_TESTS)
-    # 15.4's forward ports are ~0.006 dB lower here than in Lode (870: 23.19
-    # against its 23.18, 550: 16.99 against 16.98, and so its crossover 8.07
-    # against 8.06): open, to be checked against Lode's levels on branch 15
-    open_ = {LODE_TESTS.index("Tap(870) 23.18 below min at 15.4."): "Tap(870) 23.19 below min at 15.4.",
-             LODE_TESTS.index("Tap(550) 16.98 below min at 15.4."): "Tap(550) 16.99 below min at 15.4.",
-             LODE_TESTS.index("Crossover of  8.06 at 15.4."): "Crossover of  8.07 at 15.4."}
-    assert [got[i] for i in open_] == list(open_.values())
-    assert [m for i, m in enumerate(got) if i not in open_] == \
-        [m for i, m in enumerate(LODE_TESTS) if i not in open_]
+    # every line, 15.4's three too: its 870 port, -4.191, is -4.19 on the
+    # screen but -4.18 to the Test (as_tested), so 23.18, 16.98 and 8.06
+    # (Lode's list of 1 Oct, and again of 2 Oct from AL004_SETA)
+    assert [m for _, m in tests] == LODE_TESTS
     # the Tap(550) lines' colours, as Lode's list shows them: yellow within
     # the 0.50 tap margin (5.29's 0.50 too) and for the window, red beyond
     # (3.1, 3.3, 3.5, 3.6, 5.29, 9.16, 9.17, 9.18, 10.2, 11.16, 14.1, 15.3, 15.4, 16.1)

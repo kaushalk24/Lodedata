@@ -345,27 +345,49 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 
     Still to confirm:
     * set A (the user's screenshots, 1-2 Oct) settled the brackets, the
-      cascade position, the red 64 (no active at 11.18) and the Test lines
-      -- see item 1 and the three points below. Still open from it (set A2
-      in QUESTIONS.md): Lode's own Test list against its screen at 15.4
-      (23.18 / 16.98 where its screen gives the port as -4.19, the app's
-      -4.191, so 23.19 / 16.99); the WIFI OMNIs' cascade position (the app
-      4 on both; Lode 4 from 11.18 on 28 Sep, 3 from 11.16 on 29 Sep); the
-      red cable numbers (the older AL004's 505, 438, 515; not drawn red by
-      the app); S3's 1.2, which the corrected bracket rule draws `100<2>`;
-      the crossover lines' spacing (Lode prints the figure seven wide,
-      "Crossover of    3.85"; the app five, as before -- asked first);
+      cascade position, the red 64 (no active at 11.18) and the Test lines;
+      set A2 (2 Oct, AL004_SETA.ntw and 14 screenshots) the rest of it --
+      see the points below. Still open from them (set A3 in QUESTIONS.md):
+      whether an excluded active in the middle of a cascade counts; why
+      Lode draws S3's 1.2 coupler red; the crossover lines' spacing (Lode
+      prints the figure seven wide, "Crossover of    3.85"; the app five,
+      as before -- asked first);
     * **Cascade Position — solved.** The Actives file's Custom Cascading,
-      u16 at +55 of each active (+35 in the older record): bit k + 1 set =
-      the active may sit at position k. Positions run from the network's
-      node down to the active, itself included; the node is 0 when it may
-      sit at 0 (WV750's and SHINSTON's Ripples: 0x0007), else 1 (WVEXT862's
-      HLN 3842 NODE 0x0005, NC4000 0x0000). So AL004's AL00416 is 1 and the
-      older AL004's 2; 6.1 2, 11.10 3, 25.3 4, 23.17 6 (set A boxes, every
-      figure). An active outside its positions is a Test line, red: "LE
-      11/5 before/0 after at 23.17." -- WVEXT862's "11" allows 1-5, 23.17
-      is 6 with 5 actives before and none after. No AL004 or SN001 active
-      is outside its positions, and their 68 positions are unchanged;
+      u16 at +55 of each active (+35 in the older record), the tab's row:
+      bit 0 Cust. Casc. (Yes), bit 1 Exclude, bit k + 1 Casc. k Valid
+      (k 1-14; the tab's Casc. 15-19 are Invalid on every row seen). Every
+      row of WVEXT862's and WVBeck750's tabs reads so (set A2). Positions
+      count the actives from the network's node down to this one, itself
+      included, but not the excluded: WV750's and SHINSTON's Ripples (Yes,
+      Exclude, Casc. 1: 0x0007) are 0, WVEXT862's HLN 3842 NODE (Include,
+      0x0005) and NC4000 (No, 0) are 1. So AL004's AL00416 is 1 and the
+      older AL004's 2; 6.1 2, 11.10 3, 25.3 4, 23.17 6, 43.1 and 44.1 4
+      (set A and A2 boxes, every figure). An active with Cust. Casc. Yes at
+      a position not Valid is a Test line, red: "LE  11/5 before/0 after at
+      23.17." -- WVEXT862's "11" is Valid at 1-5, 23.17 is 6 with 5 actives
+      before and none after. No AL004 or SN001 active is outside its
+      positions, and their 68 positions are unchanged. Not seen: an
+      excluded active in the middle of a cascade (taken as not counted,
+      the tab's word; A13 checks it);
+    * **Red cable numbers — solved.** Each cable record ends in ten series
+      slots of 23 bytes (+139 past the name: +154 in the older record, +164
+      in the current): a Windows colour, four zero bytes, the series' name.
+      The Design screen draws the cable number (series·100 + cable ID) in
+      its series' colour: WVEXT862's 505, 515 (series 5 of cables 5 and 15)
+      and 438 (series 4 of cable 38) red, 404-415 0,200,0; WV750's all
+      0,255,0 (its 515 green); SN001's 15.29 "10" 0,200,0 between 0,255,0
+      140 and 40. With the cursor on any of ftg, hc, cab or lv, Lode lights
+      all four, the cable cell in that colour; the line's box adds the
+      series' name from column 15 ("EX P3 625 U    Dual New Build", "DROP
+      RB 700 A  Upgrade");
+    * **The Test's rounding — solved.** The Test reads a port as Lode
+      rounds it, a half added and the rest of the hundredths dropped: at or
+      above zero that is the screen's figure, below zero a cent higher. The
+      older AL004's 15.4 port at 870, -4.191, is -4.19 on the screen and in
+      its box but -4.18 to the Test: 23.18 below min, and 16.98 at 550, a
+      crossover of 8.06 (Lode's list twice, 1 and 2 Oct). Changes only
+      lines whose port is under zero: none on AL004 or SN001; AL002 21.7,
+      AL005 23.8 and 14 of AL003's with WV750 now read a cent lower;
     * **Actives' inputs and outputs — solved.** "870 input 10.97 to LE at
       4.13.": the input less the active's forward pad and EQ loss (as its
       Pads/EQs bank holds them) under its In; "40 output 36.64 from LE at
@@ -381,15 +403,15 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     * where the Branch: line sits in the tap box, and which tap feeds the
       branch when a line has more than one;
     * what 0 on a tap feeding a branch does (kept here, fed by nothing);
-    * the older AL004's Test list — all 94 lines, in Lode's order (15.4's
-      three a cent apart, above). Its five crossovers: WVEXT862 holds Max.
-      Crossover 0.00, a limit like any other;
+    * the older AL004's Test list — all 94 lines, in Lode's order, every
+      line (twice: 1 Oct, and 2 Oct from AL004_SETA). Its five crossovers:
+      WVEXT862 holds Max. Crossover 0.00, a limit like any other;
     * the 550 column — **built**: F3 = 550 is the Parameters' third forward
       frequency, drawn after the cplr[branch] columns; cables, couplers and
       taps carry it in slot 2 of their loss blocks, in-line devices as their
       fifth loss, the older .atv's actives In at +127 and Out at +151. All
       57 values on the screenshots of branches 4, 6, 7, 11, 43 and 44 match,
-      and 13 of the 14 Tap(550) lines (15.4 above). Not seen: a tap out at
+      and all 14 Tap(550) lines. Not seen: a tap out at
       550 alone (its colour is taken to be its worst port's, as at the other
       frequencies); where a Lode 12 .atv keeps an active's F3 levels;
     * 23481/23483 and the three pairs at 36121;

@@ -58,7 +58,8 @@ td.cur{background:var(--green);color:#000!important}
 td.cur.yellow{background:var(--yellow)}
 td.cur.red{background:var(--red)}
 tr.red td.cur,tr.yellow td.cur{color:#000!important}
-td.cab{color:var(--bright)}
+td.cab{color:var(--cab,var(--bright))}
+td.cab.cur{background:var(--cab,var(--bright))}
 td.amp{color:var(--white)}
 table.grid td.spill{overflow:visible;text-align:left;position:relative;z-index:1}
 td.red,tr td.tap.red,tr td.port.red{color:var(--red)}

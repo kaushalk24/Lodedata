@@ -127,6 +127,10 @@ class CableSpec:
     footage_part: str                   # "FT-625" style footage/marker part
     connector_part: str                 # "PT-625" style connector part
     trailing: list
+    # the Series/Colors tab: for series 0-9 (the hundreds of the cable number
+    # on the Design screen) the colour that number is drawn in, "#rrggbb",
+    # and the series' name, which the line's info box adds after the cable
+    series: list = field(default_factory=list)
 
 
 def read_cables(data: bytes) -> list:
@@ -149,8 +153,17 @@ def read_cables(data: bytes) -> list:
             footage_part=_name(seg[89 + n:104 + n]),
             connector_part=_name(seg[104 + n:119 + n]),
             trailing=list(struct.unpack_from("<5i", seg, 119 + n)),
+            series=[_series(seg, 139 + n + 23 * k) for k in range(10)],
         ))
     return out
+
+
+def _series(seg: bytes, o: int) -> list:
+    """One series slot, 23 bytes: a Windows colour (0x00BBGGRR), four bytes
+    no file sets, the name (15).  WVEXT862 holds red 255,0,0 and green 0,200,0
+    with names (4 Upgrade, 5 Dual New Build); untouched slots are 0,255,0."""
+    c = struct.unpack_from("<I", seg, o)[0]
+    return [f"#{c & 0xFF:02x}{c >> 8 & 0xFF:02x}{c >> 16 & 0xFF:02x}", _name(seg[o + 8:o + 23])]
 
 
 # --------------------------------------------------------------------------
@@ -223,13 +236,17 @@ class ActiveSpec:
     # 25.3." is 20.98 less its 10 pad under 14.1).  No current spec set has F3
     # on, so where the current record keeps it is not settled
     f3_levels: list = field(default_factory=lambda: [0.0, 0.0])
-    # the Actives window's Custom Cascading: bit k + 1 set = the active may sit
-    # at cascade position k (bit 0 is something else).  WV750's and SHINSTON's
-    # Ripple nodes allow 0 and 1, so they are position 0 and the first
-    # amplifier after one is 1; WVEXT862's HLN 3842 NODE allows 1 only and its
-    # NC4000 nothing, so either counts as 1 and AL00416 is 2 (Lode's boxes).
-    # Its "11" line extenders allow 1-5: at 23.17, position 6, Lode's Test
-    # list says "LE  11/5 before/0 after".  u16 at +55, +35 in the older record
+    # the Actives window's Custom Cascading tab, one row per active: bit 0
+    # "Cust. Casc." (1 Yes), bit 1 "Exclude" (left out of the count), bit k + 1
+    # "Casc. k" Valid, k = 1-14 (the tab goes to 19; 15-19 are Invalid on
+    # every row seen and not in these 16 bits).  WV750's and SHINSTON's Ripple
+    # nodes are Yes, Exclude, Casc. 1 (0x0007), so they count 0 and the first
+    # amplifier after one is 1; WVEXT862's HLN 3842 NODE is Yes, Include,
+    # Casc. 1 (0x0005) and its NC4000 No (0), so either is 1 and AL00416 2
+    # (Lode's boxes).  Its "11" line extenders are Casc. 1-5: at 23.17,
+    # position 6, Lode's Test list says "LE  11/5 before/0 after".  Every row
+    # of WVEXT862's and WVBeck750's tabs (the user's set A2) reads so.  u16 at
+    # +55, +35 in the older record
     cascading: int = 0
 
 

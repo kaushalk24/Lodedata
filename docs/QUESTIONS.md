@@ -5,10 +5,10 @@ one list, with what to send for each. Kept up to date as answers come in;
 the details behind each item are in `open-questions.md` and
 `file-formats.md`.
 
-Status: **set A answered** (the user's screenshots of 1–2 Oct, all 18
-read); **set A2 below is next** — what set A raised. Answered so far: every
-question of the AL004, WVEXT862 and SHINSTON sets up to and including set
-A. Where each answer came from: `EVIDENCE.md`.
+Status: **set A2 answered** (the user's screenshots and AL004_SETA.ntw of
+2 Oct, all 14 read); **set A3 below is next** — what set A2 raised.
+Answered so far: every question of the AL004, WVEXT862 and SHINSTON sets up
+to and including set A2. Where each answer came from: `EVIDENCE.md`.
 
 "Older AL004" below means AL004.ntw opened with the WVEXT862 spec set;
 "AL004" the newer one with WV750-2026. A screenshot means the whole Lode
@@ -42,43 +42,64 @@ Data window, with the info box in the bottom-right corner showing.
    does not end the walk back) and 9.14 `2<14>` (on 404 cable: the cable
    does not matter, only the length).
 
-## A2. What set A raised (next set)
+## A2. What set A raised — answered
 
-Your copy of the older AL004 is not the one in the samples pack any more:
-its branch 1 has five lines, with an HLN 3842 NODE (70) alone on 1.1; the
-pack's has four, an NC4000 (64) and coupler 100<2> both on 1.1. Every
-level after the first amplifier matches; the node's 2.50 dB (48.50 against
-46.00) is the difference before it.
+Sent 2 Oct as `wxext862-2.zip`: AL004_SETA.ntw, its Test list, the WIFI
+OMNI boxes, 25.2 and 5.9 with their cable boxes, WVEXT862's Cables tab,
+S3's 1.2, and the Custom Cascading tab of WVEXT862 and WVBeck750.
 
-A6. **Your current older AL004.** *Send:* the file as it is in Lode now —
-   File → Save Network As… under a new name (e.g. AL004_SETA.ntw), so your
-   own file is left as it is. *Settles:* comparing every number against
-   your file, not the pack's. (2 Oct: the AL004.ntw the user attached is
-   byte-for-byte the pack's `samples/AL004-WVEXT862/AL004.ntw` — the copy
-   with the NC4000 at 1.1 — so this is still to come as AL004_SETA.ntw.)
-A7. **A fresh Test list** of that file (screen menu 5), every row.
-   *Settles:* the new input/output and cascade lines on your file as it is
-   (with the HLN node, 4.13's and 5.12's input lines should be gone) and
-   whether 15.4 still reads 23.18 / 16.98.
-A8. **The two WIFI OMNI boxes,** 43.1 and 44.1 (cursor on the amp column).
-   The replica gives both Cascade Position 4; your 28 Sep box (from 11.18)
-   read 4, your 29 Sep one (from 11.16) 3.
-A9. **Red cable numbers.** Lode draws 25.2's 505, 5.9–5.22's 438 and
-   5.28's 515 red (515 is not red with WV750). *Send:* the info box with
-   the cursor on 25.2's 505, and Spec Edit → Cables of WVEXT862 showing
-   cable IDs 5, 15 and 38 with every column. *Settles:* what makes a
-   cable number red.
-A10. **S3 (keyed in Lode).** Open keyed S3.ntw with WV750-2026: does the
-    coupler on 1.2 read `100<2>` (the corrected rule: branch 2's first
-    100 ft, on 406, as long as 1.2's own span) or `100[2]`, as before?
-A11. **Crossover spacing.** Lode prints "Crossover of    3.85" (the number
-    seven wide — measured on your Test lists of both AL004s); the replica
-    prints "Crossover of  3.85". *Answer:* yes or no to changing it (it
-    changes AL004's Test list text, so asked first).
-A12. **Custom Cascading** (optional — the rule above fits every box seen).
-    *Send:* Spec Edit → Actives → the Custom Cascading tab, with WVEXT862
-    and with WV750-2026. *Settles:* the bytes' meaning beyond the
-    positions (one bit is not yet known).
+A6. **AL004_SETA.ntw is the pack's file.** It differs from
+   `samples/AL004-WVEXT862/AL004.ntw` only in the header's licence and user
+   fields and the name it was saved under (preamble 44542). Lode's branch 5
+   now starts at 1.4 and 5.1 reads 46.00, as the app has it: set A's 1a
+   (HLN 3842 NODE alone on 1.1, five lines) was another copy.
+A7. **The fresh Test list is the app's, all 94 lines.** 15.4 still reads
+   23.18 / 16.98 / 8.06 — solved: the Test reads a port as Lode rounds it,
+   a half added and the rest dropped, which takes a level under zero up a
+   cent (-4.191 tests as -4.18 though the screen shows -4.19). Every line
+   of the list is now the app's.
+A8. **43.1 and 44.1:** Cascade Position 4 both, every figure of both boxes
+   and both lines as the app has them.
+A9. **Red cable numbers — solved.** The cable number is the series (its
+   hundreds) and the cable ID; the cable file holds, for each cable, ten
+   series slots with a colour and a name (Spec Edit → Cables →
+   Series/Colors), and Lode draws the number in that colour. WVEXT862:
+   cables 0–19 red on series 0, 2, 3, 5, green on 1 and 4; cables 20–39
+   red on 4 only — so 505 and 515 red, 438 red, 404–415 green. WV750 and
+   KERMIT leave every slot at the default bright green (515 not red);
+   SHINSTON sets cables 0–39 a darker green on series 0–5 (SN001's 15.29
+   "10", drawn so in SHINSTON2 1b). The line's box names the series after
+   the cable from column 15 ("EX P3 625 U    Dual New Build"). The user:
+   5xx are risers (aerial–underground, 20 or 25 ft), 1xx double runs, 4xx
+   here not a 4th run, 2xx rarely a riser.
+A10. **S3's 1.2 reads `100<2>`**, as the corrected rule draws it. Lode
+    draws that coupler red (A14); the user's S3 has also been edited since
+    the pack's copy (taps 14, 47.71 at 1.2).
+A11. Not answered yet — asked again in A3.
+A12. **Custom Cascading — solved.** Every row of both tabs reads from the
+    actives' u16: bit 0 Cust. Casc. (Yes/No), bit 1 Exclude, bit k + 1
+    Casc. k Valid (k 1–14; the tab shows 19 columns, 15–19 Invalid on every
+    row). Ripple and Ripple No Power are Yes, Exclude, Casc. 1; WVEXT862's
+    HLN 3842 NODE Yes, Include, Casc. 1; NC4000 and the WIFI OMNI No.
+    Cascade Position counts the actives that are not excluded (A13 checks
+    the middle of a cascade).
+
+## A3. What set A2 raised (next set)
+
+A13. **Exclude in the middle of a cascade.** On a copy of AL004 (File →
+    Save Network As… AL004_X.ntw, with WV750-2026), put a Ripple (70) on
+    4.20, a line with no active between bridgers 4.13 and 4.24. *Send:*
+    the amp boxes of 4.20 and 4.24. *Settles:* whether an excluded active
+    counts in the cascade. The app reads 4.24 as 2 (not counted) and the
+    Ripple 0; if Lode says 3, it counts.
+A14. **S3's red coupler.** *Send:* S3 as it is now (File → Save Network
+    As… S3_A2.ntw) and the whole window with the cursor on 1.2's coupler,
+    info box showing. *Settles:* why Lode draws `100<2>` red (the app draws
+    it green).
+A11. **Crossover spacing** (again). Lode prints "Crossover of    3.85" (the
+    figure seven wide — your 2 Oct list again); the app prints "Crossover
+    of  3.85". *Answer:* yes or no to changing it (it changes AL004's Test
+    list text).
 
 ## B. Couplers and branches
 

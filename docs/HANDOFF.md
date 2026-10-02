@@ -123,14 +123,15 @@ build's "as if downloaded" start checks it every time.
    tests use `/opt/pw-browsers/chromium` (or `CHROMIUM_PATH`).
 4. `python tools/regression.py snapshot /tmp/base.json`, then
    `python tools/regression.py diff samples/regression-baseline.json /tmp/base.json`
-   — must print "0 of 70 changed": the new session starts exactly where the
-   last one ended (the baseline in the pack was taken on commit e129475,
-   set A, and the user was sent the rebuilt `lodedata-samples.zip` with it
-   on 2 Oct. If the pack still holds the 30 Sep baseline, from 5e55e0d,
-   the networks opened with WVEXT862, S3's 1.2 bracket and a few
-   mismatched-spec combinations differ — set A's changes — and nothing
-   else). `/tmp/base.json` is then the baseline for the
-   regression check below.
+   — the baseline in the pack was taken on commit e129475 (set A) and sent
+   on 2 Oct; set A2 changed 23 of the 70 since (see "Set A2" below: the
+   older AL004 + WVEXT862, Test lines with a port under zero, cascade
+   positions with KERMIT's or SHINSTON's actives — AL004 + WV750 and SN001
+   + SHINSTON unchanged). Exactly those 23, and nothing else, means the
+   session starts where the last one ended. If the pack holds the 30 Sep
+   baseline, from 5e55e0d, set A's changes differ too: the networks opened
+   with WVEXT862, S3's 1.2 bracket and a few mismatched-spec combinations.
+   `/tmp/base.json` is then the baseline for the regression check below.
 
 ## Regression check (every change)
 
@@ -178,14 +179,19 @@ asked about before pushing. Add every new sample the user sends to
 * **Older AL004 + WVEXT862:** opens with nothing unresolved and saves byte
   for byte; branches 5 (from 5.13), 6, 7, 9, 11, 15, 16, 23 and 25 match
   line for line, with the 550 column (57 values) and the amp boxes of 6.1,
-  11.10, 25.3 and 23.17 field for field; all 94 of Lode's Test lines in its
-  order (15.4's three a cent apart: Lode's list against its own screen, set
-  A2). The user's own copy now differs from the pack's (set A2 A6).
+  11.10, 25.3, 23.17, 43.1 and 44.1 field for field; all 94 of Lode's Test
+  lines in its order, every line (twice: 1 Oct, and 2 Oct from the user's
+  AL004_SETA.ntw, which is the pack's file but for its header and name);
+  cable numbers in their series' colours (505, 515, 438 red).
 * **SN001 + SHINSTON:** 47 branches, 390 lines; branches 1, 2, 5, 8, 15, 18,
   24, 28 match; 15-line Test list; Notes written exactly as Lode writes them.
 * **Coupler brackets:** 85 of 85 seen match (AL004 29, older 28, SN001 28).
 * **Cascade Position:** from the actives' Custom Cascading (file-formats
-  3.3): every box seen on all three networks.
+  3.3; every row of WVEXT862's and WVBeck750's tabs decoded): every box
+  seen on all three networks.
+* **Cable colours:** the cable number in the colour its cable file gives
+  its series (file-formats 3.2), on all three spec sets; the cursor on ftg,
+  hc, cab or lv lights all four.
 * **Saving:** byte-for-byte round trips; Lode opened every file the app
   saved (seven edit tests, NEW_T1 keyed from scratch, Notes).
 * **Keys and mouse:** Design screen menu digits, `0` Alter, `.`-moves,
@@ -196,10 +202,31 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-**Question set A2** in `docs/QUESTIONS.md` (what set A raised) goes to the
-user next: their current older AL004 file and a fresh Test list of it, the
-WIFI OMNIs' cascade, the red cable numbers, S3's 1.2 bracket, the
-crossover spacing (yes/no), and optionally the Custom Cascading tab.
+**Question set A3** in `docs/QUESTIONS.md` (what set A2 raised) goes to the
+user next: an excluded active (a Ripple) put in the middle of a cascade on a
+copy of AL004, S3's red coupler (the file and the window), and the
+crossover spacing (yes/no, asked twice now).
+
+**Set A2 (answered 2 Oct, `EVIDENCE.md` 3):** AL004_SETA.ntw is the pack's
+older AL004 (set A's HLN screenshot was another copy) and its Test list is
+the app's, all 94 lines; 15.4's three lines solved — the Test rounds a
+level under zero a cent up (`screen.as_tested`); 43.1 and 44.1 Cascade
+Position 4; red cable numbers solved — the cable file's Series/Colors slots
+(`CableSpec.series`), drawn by the page with the cursor lighting ftg–lv and
+the box naming the series; S3's 1.2 `100<2>` confirmed; Custom Cascading
+decoded field by field (Cust. Casc., Exclude, Casc. 1–14) and the position
+restated as a count of the actives not excluded (the same on every real
+network). The regression check against the pack's baseline (e129475)
+changes 23 of 70: the older AL004 + WVEXT862 (15.4's three lines, wanted);
+lines whose port is under zero a cent lower on AL002, AL003 and AL005 with
+WV750 and on mismatched combinations; and cascade positions on networks
+opened with KERMIT's or SHINSTON's actives, whose "61" is an excluded node.
+AL004 + WV750 and SN001 + SHINSTON are unchanged. The 23: AL002, AL003
+and AL005 with each of the four sets (12); the older AL004 with each (4);
+AL004 and AL004_NOTES with KERMIT and with SHINSTON (4); SN001_MID,
+SN001_NOTES_test and SN001_NOTES with KERMIT (3). The samples pack was not
+re-sent: a new session that finds exactly those 23 takes its own snapshot
+as the baseline.
 
 **Set A (answered 1–2 Oct, `EVIDENCE.md` 3):** cascade position from the
 Custom Cascading bytes; Lode's input/output Test lines and red cells in
@@ -232,7 +259,7 @@ with others' spec sets.
   levels — no current spec set has F3 on (values at +171 / +195 look like
   them); F4–F6 and R3–R4 (no spec set has them on).
 
-After set A2: sets B–G of QUESTIONS.md, one at a time.
+After set A3: sets B–G of QUESTIONS.md, one at a time.
 
 **Later topics the user named, not started:** the design engine itself
 (what Recalc, AutoCpl and the other screen-menu commands do — "the main

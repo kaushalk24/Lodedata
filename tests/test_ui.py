@@ -1039,6 +1039,23 @@ def test_the_older_al004_with_its_older_spec_set(page):
                          "  .querySelectorAll('td[data-c]')).filter(td => td.classList.contains('red'))"
                          "  .map(td => td.textContent)")
     assert reds == ["22.64", "18.03", "36.64", "35.32", "11", "20.98"]
+    # the cable numbers in the colours WVEXT862's cable file gives their
+    # series (the user's set A2): 404 and 405 0,200,0, 505 red; with the
+    # cursor on the 505, ftg hc cab lv lit, the 505 on red, and the series
+    # named in the box from column 15
+    colour = ("getComputedStyle(document.querySelectorAll('#grid tbody tr')[S.row]"
+              f"  .querySelector('td[data-c=\"{_col(page, 'cab')}\"]')).%s")
+    want = {1: "rgb(0, 200, 0)", 2: "rgb(255, 0, 0)", 3: "rgb(0, 200, 0)"}
+    for node, rgb in want.items():
+        _goto(page, 25, node, "node")
+        assert page.evaluate(colour % "color") == rgb
+    _goto(page, 25, 2, "cab")
+    assert page.evaluate(colour % "backgroundColor") == "rgb(255, 0, 0)"
+    lit = page.evaluate("Array.from(document.querySelectorAll('#grid tbody tr')[S.row]"
+                        "  .querySelectorAll('td.cur')).map(td => columns()[+td.dataset.c].key)")
+    assert lit == ["ftg", "hc", "cab", "lv"]
+    info = page.evaluate("document.getElementById('info').textContent")
+    assert "EX P3 625 U    Dual New Build" in info
     assert not page.errors
 
 

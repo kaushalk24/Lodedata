@@ -174,6 +174,7 @@ def library_from_spec_set(base: str | Path,
             attenuation=_loss_points(c.forward_coeffs, params),
             f3=_f3(params, c.forward_coeffs[BLOCK_F3]),
             cable_index=c.index,
+            series=c.series,
             notes="; ".join(
                 [f"cable ID {c.index} ({'aerial' if c.index % 2 == 0 else 'underground'})"]
                 + notes),

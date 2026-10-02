@@ -162,7 +162,7 @@ tables are smaller. A reader tells them apart by the version at byte 26
 
 | file | older layout | current |
 |---|---|---|
-| `.cbl` | 512 + 384·n, 100 records, marker 0x33 (5·10 + 1); name char[15], then resistance +20, loss blocks +24/+64, parts +104/+119 | 394-byte records, fields +30 … |
+| `.cbl` | 512 + 384·n, 100 records, marker 0x33 (5·10 + 1); name char[15], then resistance +20, loss blocks +24/+64, parts +104/+119, Series/Colors +154 | 394-byte records, fields +30 … |
 | `.cpr` | 616 + 104·n; name char[15]; loss blocks +20/+60, tap legs +100, internal +103 | 626 + 114·n |
 | `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, Custom Cascading u16 +35, power steps +79 (six), In F3 +127, Out F3 +151, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, Custom Cascading u16 +55, table +214; F3 levels not placed (+171 / +195 look like them) |
 | `.atv` banks | 4 banks from 17240, same 8816-byte bank and 68-byte row | 8 banks from 93884 |
@@ -215,6 +215,23 @@ crossover.
 | 114 | char[15] | footage/marker part, e.g. `FT-625` |
 | 129 | char[15] | connector part, e.g. `PT-625` |
 | 144 | i32[5] | flags, all `1` in the samples **(unconfirmed)** |
+| 164 + 23·k | 10 × 23 bytes | **Series/Colors**, series k = 0–9: u32 Windows colour (0x00BBGGRR), 4 bytes always 0, char[15] the series' name |
+
+**Series/Colors** (Spec Edit → Cables, third tab). A line's cable number on
+the Design screen is series·100 + cable ID, and Lode draws it in the colour
+this cable holds for that series; the line's box adds the series' name from
+column 15 ("EX P3 625 U    Dual New Build"). Untouched slots are 0,255,0
+with no name: all of WV750's, KERMIT's and WVBeck750's. SHINSTON sets
+cables 0–39 to 0,200,0 on series 0–5 (SN001's 15.29 "10", by its 140 and 40
+at 0,255,0, the user's SHINSTON2 1b). WVEXT862 (older record, slots at
++154) names series 0 New Build, 1 Dual Cable, 2 Rebuild, 3 Overlash,
+4 Upgrade, 5 Dual New Build on every cable, colours cables 0–19 red
+(255,0,0) on 0, 2, 3, 5 and 0,200,0 on 1, 4, and cables 20–39 0,200,0 but
+red on 4: so the older AL004's 505, 515 and 438 are red and 404–415 green,
+every number on the user's set A2 screenshots. Measured on those: the
+levels are 0,191,0, the cable numbers exactly their stored colour, and with
+the cursor on ftg, hc, cab or lv all four are lit, the cable cell in its
+colour with black text.
 
 The table is exactly 100 records, matching the manual's "one hundred different
 types of cable, numbered 0 through 99". The aerial/underground parity rule holds
@@ -373,16 +390,22 @@ ID 5 bytes into each. Slot 0 is the base unit, the others plug-in variants
 An In level of 0 on both forward columns (WV750's `Ripple`, `NC4000`) marks a
 fibre-fed node, like the 99 sentinel.
 
-**Custom Cascading** (the Actives window's tab): a u16 at +55 (+35 in the
-older record), bit k + 1 set = the active may sit at cascade position k;
-bit 0 is not known. WV750: the LEs `11` 0x3FFD (positions 1–12), `22`
-0x7FF9 (2–13), `33` 0xFFF1 (3–14); `Ripple` 0x0007 (0–1); NC4000 0.
-WVEXT862: `11` 0x007D (1–5), `22` 0x00F9 (2–6), `33` 0x01F1 (3–7), the
-FNB99 bridger 0x003D (1–4), HLN 3842 NODE 0x0005 (1 only), NC4000 0.
-Cascade Position counts the actives from the node down, itself included,
-the node 0 when it may sit at 0 and 1 otherwise — so AL00416 reads 1 on
-AL004 and 2 on the older AL004 (Lode's boxes); an active outside its
-positions is Lode's "LE  11/5 before/0 after at 23.17." (open-questions).
+**Custom Cascading** (the Actives window's tab, one row per active): a u16
+at +55 (+35 in the older record). Bit 0 is **Cust. Casc.** (1 Yes, 0 No),
+bit 1 **Exclude** (1 Exclude, 0 Include), bit k + 1 **Casc. k** (1 Valid),
+k = 1–14. The tab has Casc. 1–19; 15–19 are Invalid on every row seen and
+are not in these 16 bits (the next bytes are other fields). Every row of
+WVEXT862's and WVBeck750's tabs reads so (the user's set A2). WV750: the
+LEs `11` 0x3FFD (Yes, Include, Casc. 1–12), `22` 0x7FF9 (2–13), `33`
+0xFFF1 (3–14); `Ripple` 0x0007 (Yes, Exclude, Casc. 1); NC4000 0 (No);
+FM901e-B 0x7FFC (No, yet Casc. 1–13). WVEXT862: `11` 0x007D (1–5), `22`
+0x00F9 (2–6), `33` 0x01F1 (3–7), the FNB99 bridger 0x003D (1–4), HLN 3842
+NODE 0x0005 (Yes, Include, Casc. 1), NC4000 0. WVBeck750: every LE and node
+type Casc. 1–10, Ripple and FML332 Exclude. Cascade Position counts the
+actives from the node down, itself included, but not those excluded — so
+AL00416 reads 1 on AL004 (Ripple excluded) and 2 on the older AL004 (NC4000
+included), Lode's boxes; an active with Cust. Casc. Yes at a position not
+Valid is Lode's "LE  11/5 before/0 after at 23.17." (open-questions).
 
 ### 3.4 `.tap` — taps: 454-byte rows — solved
 
