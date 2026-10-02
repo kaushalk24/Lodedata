@@ -21,39 +21,48 @@ empty tabs; taps hold the most not yet known.
 
 S1. **Every other spec set — answered 2 Oct** (168 sets from 20 markets):
     all 164 complete sets load; file-formats "The regions' spec sets".
-S1a. **Two extra frequencies.** Bullhead's and Eureka's 1 GHz specs have
-    F3 and F4 on (550 and 860/870). *Send:* any network opened with
-    BH1GHzMid or HUMB1GHzMid: the Design screen (both extra columns) and
-    its Test list. *Settles:* where Lode draws the second extra column and
-    where its tap lines go, so the app can draw it.
-S1b. **Frequencies named high / low / Rh / Rl** (11 old specs, e.g. Lake
-    Charles' LKMac862). *Send:* a network opened with one of them: the
-    column heads. *Settles:* what Lode heads the columns with.
-S1c. **The old formats** (7 old specs: actives 2.20 / 3.0 / 5.0, cables and
-    couplers 2.10). *Answer:* are networks still opened with them? If so,
-    they will be decoded next; if not, they stay as they are.
-S1d. **New Bern's table.** *Send:* Spec Edit → Actives with NBERN1GHz, the
-    tab that lists `2&4 PORT` / CS12 / EQ02 / RP02 … *Settles:* what it is
-    and whether it changes a level.
-S2. **Spec Edit → Taps** with WV750-2026: every tab, every column (scroll
-    right), with rows 1–12 and an AN-WIFI row showing. *Settles:* a byte on
-    every tap row, a flag and four more bytes on every port count, two
-    figures at the top of the file (35.0).
-S3. **Spec Edit → Actives** with WV750-2026: (a) the Actives tab scrolled
-    all the way right, rows 1–42 showing (41 BRIDGER, 85/86 WIFI);
-    (b) one screenshot each of Reserve Gain, Power Steps, Configuration
-    Table, Plug-Ins, Plug-Ins Powering, Bridgers, Feedermakers, Boosters,
-    Booster Powering and EQs Bank 9. *Settles:* In and Out at every
-    frequency (the WIFI units' 44.5), the pair before the power steps, how
-    many steps there is room for, the plug-in bytes, and the table of
-    names (SWAP BR TO LE, NEW LE …).
-S4. **Spec Edit → Couplers** with WV750-2026: every tab, with the DC and
-    splitter rows showing. *Settles:* the coupler code (408, 612, 216 …)
-    and what it is made of.
-S5. **Spec Edit → Cables** with WV750-2026: the Connectors tab. *Settles:*
-    the cable record's second loss block and its five flags.
-S6. (optional) KERMIT750-2026's Custom Cascading tab. *Settles:* its line
-    extenders Valid at Casc. 15 (the file says so).
+The user has few networks for these specs (2 Oct) but can send Spec Edit
+screenshots: those show the values the files hold, so each one checks the
+readers field by field. A screenshot is the whole window, every column
+showing (scroll right and send a second shot if needed), the spec's name in
+the title bar. In the order they matter:
+
+S2. **Bullhead's BH1GHzMid** (F3 = 550 and F4 = 860 on): Parameters, the
+    frequencies tab and the System Levels tab; Cables, Actives and Taps,
+    each scrolled to show the 550 and 860 columns. *Settles:* that the app
+    reads every F3 and F4 figure right (In +175 / Out +199 for F4, the
+    loss blocks' slot 3, Min F4).
+S3. **WV750-2026, the Actives window:** the Actives tab scrolled all the
+    way right (rows 1–42: 41 BRIDGER, 85/86 WIFI); then one shot each of
+    Reserve Gain, Power Steps, Configuration Table, Plug-Ins, Plug-Ins
+    Powering, Bridgers, Feedermakers, Boosters, Booster Powering and EQs
+    Bank 9. *Settles:* In and Out at every frequency (the WIFI units'
+    44.5), the pair before the power steps, how many steps fit, the
+    plug-in bytes, the table of names (SWAP BR TO LE …).
+S4. **WV750-2026, the Taps window:** every tab, rows 1–12 and an AN-WIFI
+    row showing. *Settles:* a byte on every tap row, a flag and four bytes
+    on every port count, the 35.0 at the top of the file.
+S5. **WV750-2026, the Couplers window** (every tab, DC and splitter rows
+    showing) **and the Cables window's Connectors tab.** *Settles:* the
+    coupler code (408, 612, 216 …), the cable's second loss block and its
+    five flags.
+S6. **NBERN1GHz, the Actives window:** the tab that lists `2&4 PORT` /
+    CS12 / EQ02 / RP02 … *Settles:* what New Bern's extra table is.
+S7. **Lake Charles' LKMac862 (old):** Parameters, the frequencies tab, and
+    the Cables tab (its column heads). *Settles:* what Lode calls the
+    columns when the frequencies are named high / low / Rh / Rl.
+S8. **Only if networks are still opened with the oldest specs:** Bossier's
+    bymac862, the Actives tab; Georgetown's gefd862, the Actives, Cables
+    and Couplers tabs; Bullhead's npg550, those three and the Parameters
+    frequencies tab. *Settles:* the old layouts (actives 2.20 / 3.0 / 5.0,
+    cables and couplers 2.10), so they can be read.
+S9. (optional, needs no file of yours) **A small network keyed with
+    BH1GHzMid:** File → New, the spec set BH1GHzMid, a node, two lines and
+    a tap; the Design screen and its Test list, and the file saved (e.g.
+    BH_TEST.ntw). *Settles:* where Lode draws the second extra column and
+    where its tap lines go — the one thing a Spec Edit screen cannot show.
+S10. (optional) KERMIT750-2026's Custom Cascading tab. *Settles:* its line
+    extenders Valid at Casc. 15.
 
 "Older AL004" below means AL004.ntw opened with the WVEXT862 spec set;
 "AL004" the newer one with WV750-2026. A screenshot means the whole Lode

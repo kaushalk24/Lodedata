@@ -228,7 +228,7 @@ every value read, 11 with frequencies named high/low/Rh/Rl, 11 with one
 actives table unread, 7 old formats (actives 2.20/3.0/5.0) not readable —
 file-formats "The regions' spec sets". The gap that matters most: 14 current
 1 GHz sets (Bullhead, Eureka) have a fourth forward frequency (F4) on, and
-the app draws only F3 — asked first (S1a) for Lode's screen.
+the app draws only F3 — its figures checked by Spec Edit shots (S2), where Lode draws the column by a small keyed network (S9).
 
 **Question set A3** (what set A2 raised) follows set S: an excluded active
 (a Ripple) put in the middle of a cascade on a copy of AL004, S3's red
