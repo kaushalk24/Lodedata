@@ -6,9 +6,43 @@ the details behind each item are in `open-questions.md` and
 `file-formats.md`.
 
 Status: **set A2 answered** (the user's screenshots and AL004_SETA.ntw of
-2 Oct, all 14 read); **set A3 below is next** — what set A2 raised.
-Answered so far: every question of the AL004, WVEXT862 and SHINSTON sets up
-to and including set A2. Where each answer came from: `EVIDENCE.md`.
+2 Oct, all 14 read). **The user's priority (2 Oct): decode the spec files
+first, so the app loads every region's spec set — the spec is the key to
+every value.** So **set S below is next**, then set A3. Answered so far:
+every question of the AL004, WVEXT862 and SHINSTON sets up to and including
+set A2. Where each answer came from: `EVIDENCE.md`.
+
+## S. The spec files (next set)
+
+What no spec file explains yet is listed in file-formats.md ("Decode
+status"); `tools/spec_coverage.py` measures it. Cables and Parameters are
+placed whole, couplers but one field, actives all but a few fields and
+empty tabs; taps hold the most not yet known.
+
+S1. **Every other spec set you have**, from every region, any age: the
+    five files of each (.par .atv .tap .cpr .cbl), each set in its own
+    folder, all in one zip. *Settles:* that the app reads each of them; a
+    file in a layout not seen before is caught at once; fields other sets
+    fill in show what they are.
+S2. **Spec Edit → Taps** with WV750-2026: every tab, every column (scroll
+    right), with rows 1–12 and an AN-WIFI row showing. *Settles:* a byte on
+    every tap row, a flag and four more bytes on every port count, two
+    figures at the top of the file (35.0).
+S3. **Spec Edit → Actives** with WV750-2026: (a) the Actives tab scrolled
+    all the way right, rows 1–42 showing (41 BRIDGER, 85/86 WIFI);
+    (b) one screenshot each of Reserve Gain, Power Steps, Configuration
+    Table, Plug-Ins, Plug-Ins Powering, Bridgers, Feedermakers, Boosters,
+    Booster Powering and EQs Bank 9. *Settles:* In and Out at every
+    frequency (the WIFI units' 44.5), the pair before the power steps, how
+    many steps there is room for, the plug-in bytes, and the table of
+    names (SWAP BR TO LE, NEW LE …).
+S4. **Spec Edit → Couplers** with WV750-2026: every tab, with the DC and
+    splitter rows showing. *Settles:* the coupler code (408, 612, 216 …)
+    and what it is made of.
+S5. **Spec Edit → Cables** with WV750-2026: the Connectors tab. *Settles:*
+    the cable record's second loss block and its five flags.
+S6. (optional) KERMIT750-2026's Custom Cascading tab. *Settles:* its line
+    extenders Valid at Casc. 15 (the file says so).
 
 "Older AL004" below means AL004.ntw opened with the WVEXT862 spec set;
 "AL004" the newer one with WV750-2026. A screenshot means the whole Lode
@@ -84,7 +118,7 @@ A12. **Custom Cascading — solved.** Every row of both tabs reads from the
     Cascade Position counts the actives that are not excluded (A13 checks
     the middle of a cascade).
 
-## A3. What set A2 raised (next set)
+## A3. What set A2 raised (after set S)
 
 A13. **Exclude in the middle of a cascade.** On a copy of AL004 (File →
     Save Network As… AL004_X.ntw, with WV750-2026), put a Ripple (70) on

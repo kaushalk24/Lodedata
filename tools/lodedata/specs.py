@@ -96,6 +96,20 @@ CLASSIC_LAYOUT = {
 }
 CLASSIC_ATV_RECORDS = 51
 CLASSIC_ATV_F3 = (127, 151)     # the older record's In and Out at F3
+# The actives table is 251 records in the current file, 51 in the older:
+# the Pads/EQs banks start one byte after the last (93884 = 3021 + 251 x 362
+# + 1; 17240 = 1021 + 51 x 318 + 1).  Records are read by that count, not
+# by whether their figures look likely.
+ATV_RECORDS = 251
+# Power Steps, (volts, amps) pairs: the older record six from +79 up to In
+# F3 at +127 (WVEXT862's LEs 42 V ... 90 V); the current one from +99 up to
+# its In F3 at +171, room for nine (KERMIT's MB-750D-H uses seven, 38 V ...
+# 90 V).  The pair before them (+71, +91) is 0 in every file: not read.
+CLASSIC_ATV_STEPS, ATV_STEPS = (79, 6), (99, 9)
+# the current record's In and Out at F3, 44 on from the older record's:
+# WV750's bridger 41 holds 10.1 / 43.0 there, as WVEXT862's FNB99 41 does at
+# +127 / +151; SHINSTON's FML332 12.9 / 45.0 (no current set has F3 on)
+ATV_F3 = (171, 195)
 CLASSIC_TAP_PORT_SLOTS = {2: 5, 4: 107, 6: 209, 8: 311}
 
 
@@ -228,49 +242,26 @@ class ActiveSpec:
     values: list = field(default_factory=list)
     # Pads/EQs Bank used for forward pad, return pad, forward EQ, return EQ
     banks: list = field(default_factory=lambda: [1, 1, 1, 1])
-    # in and out at the third forward frequency (F3): read from the older
-    # record only, In at +127 (after the six power steps) and Out at +151 --
-    # WVEXT862's LEs need 14.1 in and put out 43.0, the FNB99s 10.1 and 43.0,
-    # NC4000 0 and 41.1, HLN 3842 NODE 0 and 43.5, the WIFI OMNI 0 and 0
-    # (43.1's end line reads 0.00 at 550; Lode's "550 input 20.98 to LE at
-    # 25.3." is 20.98 less its 10 pad under 14.1).  No current spec set has F3
-    # on, so where the current record keeps it is not settled
+    # in and out at the third forward frequency (F3): the older record's In
+    # at +127 (after the six power steps) and Out at +151 -- WVEXT862's LEs
+    # need 14.1 in and put out 43.0, the FNB99s 10.1 and 43.0, NC4000 0 and
+    # 41.1, HLN 3842 NODE 0 and 43.5, the WIFI OMNI 0 and 0 (43.1's end line
+    # reads 0.00 at 550; Lode's "550 input 20.98 to LE at 25.3." is 20.98 less
+    # its 10 pad under 14.1).  The current record's at +171 and +195 (ATV_F3);
+    # no current spec set has F3 on, so Lode has not shown those yet
     f3_levels: list = field(default_factory=lambda: [0.0, 0.0])
     # the Actives window's Custom Cascading tab, one row per active: bit 0
     # "Cust. Casc." (1 Yes), bit 1 "Exclude" (left out of the count), bit k + 1
-    # "Casc. k" Valid, k = 1-14 (the tab goes to 19; 15-19 are Invalid on
-    # every row seen and not in these 16 bits).  WV750's and SHINSTON's Ripple
+    # "Casc. k" Valid, k = 1-19: the four bytes before the levels (KERMIT's
+    # actives Valid at 1-14 hold Casc. 15 too, in the third).  WV750's and SHINSTON's Ripple
     # nodes are Yes, Exclude, Casc. 1 (0x0007), so they count 0 and the first
     # amplifier after one is 1; WVEXT862's HLN 3842 NODE is Yes, Include,
     # Casc. 1 (0x0005) and its NC4000 No (0), so either is 1 and AL00416 2
     # (Lode's boxes).  Its "11" line extenders are Casc. 1-5: at 23.17,
     # position 6, Lode's Test list says "LE  11/5 before/0 after".  Every row
-    # of WVEXT862's and WVBeck750's tabs (the user's set A2) reads so.  u16 at
+    # of WVEXT862's and WVBeck750's tabs (the user's set A2) reads so.  u32 at
     # +55, +35 in the older record
     cascading: int = 0
-
-
-# The .atv file holds more than the Actives table -- the manual describes
-# Reserve Gain, Power Steps, Pads/EQ banks 1-8 and a Configuration Table as
-# further pages.  Where the Actives table ends is not mapped, so records are
-# checked for plausibility instead of assumed: past the end, the fixed stride
-# reads into another page and produces levels like 538.97 dB.
-LEVEL_RANGE = (-40.0, 120.0)
-VOLTAGE_RANGE = (20.0, 150.0)
-MAX_AMPS = 30.0
-
-
-def _plausible_active(name: str, levels: list, table: list) -> bool:
-    if len(name) < 2 or not all(32 <= ord(c) < 127 for c in name):
-        return False
-    if not all(LEVEL_RANGE[0] <= v <= LEVEL_RANGE[1] for v in levels):
-        return False
-    for volts, amps in table:
-        if not (VOLTAGE_RANGE[0] <= volts <= VOLTAGE_RANGE[1]):
-            return False
-        if not (0 < amps <= MAX_AMPS):
-            return False
-    return True
 
 
 def read_actives(data: bytes) -> list:
@@ -280,10 +271,13 @@ def read_actives(data: bytes) -> list:
     # its option parts are not placed), levels at +39 (current +59), the
     # Configuration Table at +170 (current +214); record 0 is index 0
     levels_at, config_at = (39, 170) if classic else (59, ATV_CONFIG_BASE)
+    (steps_at, steps), f3_at = (CLASSIC_ATV_STEPS, CLASSIC_ATV_F3) if classic else (ATV_STEPS, ATV_F3)
+    first, count = (0, CLASSIC_ATV_RECORDS) if classic else (ATV_INDEX_BASE, ATV_RECORDS)
     for slot, off, seg in _records(data, "atv"):
-        if classic and slot >= CLASSIC_ATV_RECORDS:
+        index = slot - first
+        if index >= count:
             break
-        if (slot if classic else slot - ATV_INDEX_BASE) < 1:
+        if index < 1:
             # a design stores 0 for no active, so record 0 is never placed
             # (SHINSTON's holds "BRIDGER" with every level 0)
             continue
@@ -291,26 +285,21 @@ def read_actives(data: bytes) -> list:
         if not name:
             continue
         parts = [] if classic else [x for x in (_name(seg[30:40]), _name(seg[40:45])) if x]
-        nums = [_fx(v) for v in struct.unpack_from("<24i", seg, levels_at)]
-        # +99 onward is a (volts, amps) table, terminated by a zero volts entry
+        levels = [round(_fx(v), 2) for v in struct.unpack_from("<8i", seg, levels_at)]
         table = []
-        for i in range(8, 24, 2):
-            volts, amps = nums[i], nums[i + 1]
+        for volts, amps in zip(*[iter(struct.unpack_from(f"<{2 * steps}i", seg, steps_at))] * 2):
             if volts > 0 and amps > 0:
-                table.append([round(volts, 1), round(amps, 3)])
-        levels = [round(v, 2) for v in nums[0:8]]
-        if not _plausible_active(name, levels, table):
-            continue
+                table.append([round(_fx(volts), 1), round(_fx(amps), 3)])
         ids = [_name(seg[o + 5:o + 10]) for o in range(
             config_at, config_at + ATV_CONFIG_STRIDE * ATV_CONFIG_SLOTS,
             ATV_CONFIG_STRIDE)]
-        f3 = [round(_fx(struct.unpack_from("<i", seg, o)[0]), 2) for o in CLASSIC_ATV_F3] \
-            if classic else [0.0, 0.0]
-        cascading = struct.unpack_from("<H", seg, 35 if classic else 55)[0]
+        f3 = [round(_fx(struct.unpack_from("<i", seg, o)[0]), 2) for o in f3_at]
+        # the four bytes before the levels: Cust. Casc., Exclude, Casc. 1-19
+        cascading = struct.unpack_from("<I", seg, levels_at - 4)[0]
         out.append(ActiveSpec(
             slot=slot,
             name=name,
-            index=slot if classic else slot - ATV_INDEX_BASE,
+            index=index,
             active_id=ids[0],
             config_ids=[i for i in ids if i],
             config_slots=ids,
@@ -319,7 +308,7 @@ def read_actives(data: bytes) -> list:
             input_levels=levels[0:4],
             output_levels=levels[4:8],
             power_draw=table,
-            values=nums,
+            values=[_fx(v) for v in struct.unpack_from("<24i", seg, levels_at)],
             banks=[seg[ATV_PAD_BANKS] + 1, seg[ATV_PAD_BANKS + 1] + 1,
                    seg[ATV_EQ_BANKS] + 1, seg[ATV_EQ_BANKS + 1] + 1],
             f3_levels=f3,
@@ -496,7 +485,7 @@ def read_inline(data: bytes) -> list:
             break
         name = _name(data[o:o + min(at, 20)])
         losses = [round(_fx(v), 3) for v in struct.unpack_from("<5i", data, o + at)]
-        if name and all(abs(v) < 60 for v in losses):
+        if name:
             out.append(InlineSpec(number=k, name=name, losses=losses[:4], f3=losses[4]))
     return out
 

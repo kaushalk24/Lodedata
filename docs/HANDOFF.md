@@ -165,6 +165,8 @@ asked about before pushing. Add every new sample the user sends to
 | `tests/test_ntw_writer.py` | byte-for-byte saves, totals, new networks |
 | `tests/test_classic_specs.py` | older AL004 + WVEXT862 |
 | `tests/test_sn001.py` | SN001 + SHINSTON |
+| `tests/test_spec_sets.py` | every spec set under samples/, read whole |
+| `tools/spec_coverage.py` | what each spec file's bytes mean to the readers, and what is left |
 | `tests/test_ui.py` | the page in a real browser (Playwright) |
 | `desktop/` | the Windows program: `lodedata_desktop.py` (window + engine), `build.bat`, `README.md` |
 | `.github/workflows/windows-exe.yml` | builds and publishes `LodeData.exe` at every push |
@@ -202,10 +204,28 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-**Question set A3** in `docs/QUESTIONS.md` (what set A2 raised) goes to the
-user next: an excluded active (a Ripple) put in the middle of a cascade on a
-copy of AL004, S3's red coupler (the file and the window), and the
-crossover spacing (yes/no, asked twice now).
+**The user's priority (2 Oct): the spec files first** — every region's spec
+set must load, the spec being the key to every value. **Question set S** in
+`docs/QUESTIONS.md` goes to the user next: every other spec set they have,
+and the Spec Edit tabs (Taps, Actives, Couplers, Cables) that show the
+fields still unexplained. `python tools/spec_coverage.py [base …]` measures
+what each file's bytes mean to the readers and lists the rest
+(file-formats "Decode status"); `tests/test_spec_sets.py` checks every set
+under samples/. When a new set arrives: run the tool on it first — a file
+of a version or size not seen is flagged — then the tests and the
+regression check with it in samples/.
+
+Done for it on 2 Oct, no screen or saved byte changed: the actives table is
+read by its size (251 records, 51 in the older file — the banks start one
+byte after it), not by whether its figures look likely; the power steps by
+the record's room (six older, nine current); Custom Cascading as 32 bits
+(KERMIT's line extenders hold Casc. 15); In and Out at F3 in the current
+record (+171 / +195); the in-line table by its size.
+
+**Question set A3** (what set A2 raised) follows set S: an excluded active
+(a Ripple) put in the middle of a cascade on a copy of AL004, S3's red
+coupler (the file and the window), and the crossover spacing (yes/no,
+asked twice now).
 
 **Set A2 (answered 2 Oct, `EVIDENCE.md` 3):** AL004_SETA.ntw is the pack's
 older AL004 (set A's HLN screenshot was another copy) and its Test list is

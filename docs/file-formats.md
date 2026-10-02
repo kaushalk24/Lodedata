@@ -150,6 +150,40 @@ Live `.cbl` and `.cpr` records begin with the marker byte `0x6F`; empty slots ar
 zero-filled. Strings are NUL-terminated inside fixed-width fields, often
 right-aligned with leading spaces.
 
+### Decode status (2 Oct) — what is still not known
+
+`python tools/spec_coverage.py` maps every byte the readers use and lists
+the rest. Bytes in use explained, blank text aside (WV750 / WVEXT862 /
+KERMIT / SHINSTON): cables 100 / 100 / 100 / 100 %; couplers 99.9 / 99.9 /
+100 / 99.9; actives 96 / 99.8 / 97 / 93; taps 29 / 63 / 25 / 25;
+parameters 97 / 95 / 97 / 95. Every file of the five sets is a layout
+already checked against Lode (`tests/test_spec_sets.py`); a set with another
+version or size is reported by the tool. What no file explains yet:
+
+* **Taps.** Byte +4 of each row (1–4: WV750 4 on most rows, 1 on 17, 2 on
+  the AN-WIFI rows); in each port slot, after the two loss blocks, the port
+  code (0–3, redundant), a byte 1 on a few rows (WVEXT862's two AN-WIFI
+  taps that feed branches), and four bytes FF FF FF FF (KERMIT's 6-port
+  rows 08 08 08 08); bytes 580 (35.0 in WV750 and WVEXT862, 0 in the others)
+  and 640 (1) of the file.
+* **Actives.** The pair before the power steps (+71 / +91: 0 everywhere —
+  the Reserve Gain tab?); In and Out at F4–F6 and R3–R4 (after F3's;
+  the WIFI units hold 44.5 four bytes after Out F3's); the Configuration
+  Table's slots beyond the ID (+10: 4–17 on the plug-in variants); a table
+  of 18 names after the banks (SWAP BR TO LE, NEW LE, UPGRADE LE, MOVE LE,
+  NEW FMB … — the same in every file); a 24 × 461-byte table only the 12.1
+  file has (empty); and where the tabs EQs Bank 9–16, Plug-Ins, Plug-Ins
+  Powering, Bridgers, Feedermakers, Boosters and Booster Powering keep
+  theirs (nothing in the samples fills them). The power-step room: six in
+  the older record (+79 up to In F3), nine in the current (+99 up to +171;
+  KERMIT uses seven).
+* **Couplers.** The code at +1, shown as the coupler's ID (`100`, `12`, `2`);
+  how it packs a family and a value (408, 612, 216) is not known.
+* **Cables.** The second loss block (equal to the first in every file) and
+  the five flags (all 1).
+* **Parameters.** Four fixed figures that no tab shows (1082: the tap
+  windows again; 2972: 7777; 3900 / 3905: 100/30, 101/30).
+
 ### 3.0 Older spec files (WVEXT862, Lode 4)
 
 WVEXT862 was saved by an older program: format versions `.cbl`/`.cpr` 5.1,
@@ -164,7 +198,7 @@ tables are smaller. A reader tells them apart by the version at byte 26
 |---|---|---|
 | `.cbl` | 512 + 384·n, 100 records, marker 0x33 (5·10 + 1); name char[15], then resistance +20, loss blocks +24/+64, parts +104/+119, Series/Colors +154 | 394-byte records, fields +30 … |
 | `.cpr` | 616 + 104·n; name char[15]; loss blocks +20/+60, tap legs +100, internal +103 | 626 + 114·n |
-| `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, Custom Cascading u16 +35, power steps +79 (six), In F3 +127, Out F3 +151, Configuration Table +170 | index i at 3021 + 362·i, 251 records; levels +59, Custom Cascading u16 +55, table +214; F3 levels not placed (+171 / +195 look like them) |
+| `.atv` actives | index i at 1021 + 318·i, 51 records (0 – 50); name char[15] at +5 (its last two characters are the current file's housing field), levels +39, Custom Cascading u32 +35, power steps +79 (six), In F3 +127, Out F3 +151, Configuration Table +170 | index i at 3021 + 362·i, 251 records (the banks start one byte after); levels +59, Custom Cascading u32 +55, power steps +99 (room for nine), In F3 +171, Out F3 +195 (WV750's bridger 41: 10.1 / 43.0, as WVEXT862's FNB99), table +214 |
 | `.atv` banks | 4 banks from 17240, same 8816-byte bank and 68-byte row | 8 banks from 93884 |
 | `.atv` 11.1 (SHINSTON, 262 136 bytes) | as the current 12.1 file up to the in-line devices; the 11 064 bytes it lacks are past them, where nothing is read | 273 200 bytes |
 | `.atv` in-line | 25 records of 59 bytes from 57464, name char[15], losses +19 (F1 F2 R1 R2 F3 …) | 40 of 69 from 169372, +29 |
@@ -332,8 +366,11 @@ family+value for the rest (`RLDC12-8` → 408, `GNA INT DC-12` → 612,
 | 45 | char[10] | (blank in samples) |
 | 59 | i32[4] | **In** — level required at forward High, forward Low, return Rh, return Rl. The manual's own column headings read `In - 860 | In - 54 | In - 42 | In - 5`, matching the frequencies derived independently from the cable ratios |
 | 75 | i32[4] | **Out** — level produced at the same four frequencies |
+| 55 | u32 | **Custom Cascading** (below) |
 | 91 | i32[2] | zero in every sample |
-| 99 | i32[2]×n | **Power Steps**: (volts, amps) pairs, ends at a zero entry |
+| 99 | i32[2]×9 | **Power Steps**: (volts, amps) pairs, ends at a zero entry; room for nine (KERMIT uses seven) |
+| 171, 195 | i32 | **In** and **Out** at F3 |
+| 214 | 8 × 18 | Configuration Table: the Active ID 5 bytes into each slot |
 
 Confirmed by the manual: the actives file holds "the signal levels required at
 the forward and return inputs, as well as the forward and return outputs
@@ -390,11 +427,11 @@ ID 5 bytes into each. Slot 0 is the base unit, the others plug-in variants
 An In level of 0 on both forward columns (WV750's `Ripple`, `NC4000`) marks a
 fibre-fed node, like the 99 sentinel.
 
-**Custom Cascading** (the Actives window's tab, one row per active): a u16
-at +55 (+35 in the older record). Bit 0 is **Cust. Casc.** (1 Yes, 0 No),
-bit 1 **Exclude** (1 Exclude, 0 Include), bit k + 1 **Casc. k** (1 Valid),
-k = 1–14. The tab has Casc. 1–19; 15–19 are Invalid on every row seen and
-are not in these 16 bits (the next bytes are other fields). Every row of
+**Custom Cascading** (the Actives window's tab, one row per active): a u32
+at +55 (+35 in the older record), the four bytes before the levels. Bit 0
+is **Cust. Casc.** (1 Yes, 0 No), bit 1 **Exclude** (1 Exclude, 0 Include),
+bit k + 1 **Casc. k** (1 Valid), k = 1–19. KERMIT's actives Valid at 1–14
+hold Casc. 15 as well (bit 16, the third byte); no file sets 16–19. Every row of
 WVEXT862's and WVBeck750's tabs reads so (the user's set A2). WV750: the
 LEs `11` 0x3FFD (Yes, Include, Casc. 1–12), `22` 0x7FF9 (2–13), `33`
 0xFFF1 (3–14); `Ripple` 0x0007 (Yes, Exclude, Casc. 1); NC4000 0 (No);
