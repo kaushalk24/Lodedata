@@ -222,6 +222,14 @@ the record's room (six older, nine current); Custom Cascading as 32 bits
 (KERMIT's line extenders hold Casc. 15); In and Out at F3 in the current
 record (+171 / +195); the in-line table by its size.
 
+**The regions' spec sets (2 Oct):** 168 different sets from 20 markets, all
+164 complete ones load and open AL004 and SN001 without an error; 135 with
+every value read, 11 with frequencies named high/low/Rh/Rl, 11 with one
+actives table unread, 7 old formats (actives 2.20/3.0/5.0) not readable —
+file-formats "The regions' spec sets". The gap that matters most: 14 current
+1 GHz sets (Bullhead, Eureka) have a fourth forward frequency (F4) on, and
+the app draws only F3 — asked first (S1a) for Lode's screen.
+
 **Question set A3** (what set A2 raised) follows set S: an excluded active
 (a Ripple) put in the middle of a cascade on a copy of AL004, S3's red
 coupler (the file and the window), and the crossover spacing (yes/no,

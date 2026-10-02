@@ -30,6 +30,20 @@ SEEN = {
     "tap": {((3, 0), 26723), ((11, 1), 233089)},
     "par": {((2, 10), 3102), ((11, 1), 6515), ((12, 1), 6516)},
 }
+# Other versions met in the user's regions' spec sets (2 Oct, 168 sets): the
+# same layout as one above -- every value reads sensibly and the same share of
+# each file is explained -- but not yet checked against Lode's screens.  The
+# Parameters files of 3095-5190 bytes are the 3102-byte layout with fields
+# added at the end; taps 10.0 are the older rows, 256 of them.
+SAME_LAYOUT = {
+    "cbl": {((10, 0), 38912)},
+    "cpr": {((10, 0), 111823), ((10, 6), 111823)},
+    "atv": {((10, 0), 104922), ((12, 2), 273200)},
+    "tap": {((2, 10), 26723), ((10, 0), 106625), ((12, 1), 233089)},
+    "par": {((2, 10), 3095), ((5, 1), 3106), ((7, 0), 5186), ((10, 0), 5190), ((10, 2), 5190)},
+}
+# Older still, and not readable yet: the actives 2.20, 3.0 and 5.0, cables and
+# couplers 2.10, Parameters 2.10 of 2162 bytes (the regions' "old spec" sets)
 
 
 def _table(start, stride, count, fields):
@@ -189,6 +203,7 @@ def audit(path: Path) -> dict:
     version = (data[26], data[27])
     return {"kind": kind, "size": len(data), "version": version,
             "seen": (version, len(data)) in SEEN.get(kind, set()),
+            "same_layout": (version, len(data)) in SAME_LAYOUT.get(kind, set()),
             "used": used, "unexplained": len(unexplained) - a_blank, "tables": tables,
             "by_field": by_field, "runs": runs, "data": data}
 
@@ -202,7 +217,9 @@ def report(base: Path) -> None:
             continue
         a = audit(p)
         share = 100 * (a["used"] - a["unexplained"]) / max(a["used"], 1)
-        note = "" if a["seen"] else "  ** version/size not seen before: layout unchecked **"
+        note = "" if a["seen"] else (
+            "  (a layout already read, this version not yet checked against Lode)" if a["same_layout"]
+            else "  ** version/size not seen before: layout unchecked **")
         print(f"  .{ext} {a['version'][0]}.{a['version'][1]} {a['size']} bytes: "
               f"{share:.1f}% of {a['used']} bytes in use explained (spaces aside){note}")
         for (k, o), recs in sorted(a["by_field"].items()):

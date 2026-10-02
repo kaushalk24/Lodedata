@@ -19,11 +19,22 @@ status"); `tools/spec_coverage.py` measures it. Cables and Parameters are
 placed whole, couplers but one field, actives all but a few fields and
 empty tabs; taps hold the most not yet known.
 
-S1. **Every other spec set you have**, from every region, any age: the
-    five files of each (.par .atv .tap .cpr .cbl), each set in its own
-    folder, all in one zip. *Settles:* that the app reads each of them; a
-    file in a layout not seen before is caught at once; fields other sets
-    fill in show what they are.
+S1. **Every other spec set — answered 2 Oct** (168 sets from 20 markets):
+    all 164 complete sets load; file-formats "The regions' spec sets".
+S1a. **Two extra frequencies.** Bullhead's and Eureka's 1 GHz specs have
+    F3 and F4 on (550 and 860/870). *Send:* any network opened with
+    BH1GHzMid or HUMB1GHzMid: the Design screen (both extra columns) and
+    its Test list. *Settles:* where Lode draws the second extra column and
+    where its tap lines go, so the app can draw it.
+S1b. **Frequencies named high / low / Rh / Rl** (11 old specs, e.g. Lake
+    Charles' LKMac862). *Send:* a network opened with one of them: the
+    column heads. *Settles:* what Lode heads the columns with.
+S1c. **The old formats** (7 old specs: actives 2.20 / 3.0 / 5.0, cables and
+    couplers 2.10). *Answer:* are networks still opened with them? If so,
+    they will be decoded next; if not, they stay as they are.
+S1d. **New Bern's table.** *Send:* Spec Edit → Actives with NBERN1GHz, the
+    tab that lists `2&4 PORT` / CS12 / EQ02 / RP02 … *Settles:* what it is
+    and whether it changes a level.
 S2. **Spec Edit → Taps** with WV750-2026: every tab, every column (scroll
     right), with rows 1–12 and an AN-WIFI row showing. *Settles:* a byte on
     every tap row, a flag and four more bytes on every port count, two

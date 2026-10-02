@@ -184,6 +184,39 @@ version or size is reported by the tool. What no file explains yet:
 * **Parameters.** Four fixed figures that no tab shows (1082: the tap
   windows again; 2972: 7777; 3900 / 3905: 100/30, 101/30).
 
+### The regions' spec sets (2 Oct) — what loads
+
+The user sent every region's spec sets (seven OneDrive zips, ~950 files: 20
+markets and areas, each with dated versions and old specs). 185 sets, 168
+different by content: 164 complete, 4 missing files. Every complete set
+loads, and opens AL004 and SN001 through the app (screen, powering, Test
+list) without an error. By what the readers make of them:
+
+| sets | what |
+|---|---|
+| 135 | every value read (names, losses, levels, steps, tap IDs, frequencies all sensible) |
+| 11 | the same, but the Parameters name the frequencies `high`, `low`, `Rh`, `Rl` instead of MHz (all in old-spec folders): the app takes 750 / 54 / 42 / 5 for them, so each column still gets its own figures but is headed with a number |
+| 11 | the same, but the actives file holds a table no reader uses: New Bern's 1 GHz set (all six dates) and its old 750 (rows `2&4 PORT` with CS12 … CS03, EQ02 … EQ16, RP02 …: plug-ins for taps?), and one each of Tyler, Bullhead, Narrows and a Beverly-Elkins "don't use" set |
+| 7 | old formats not yet readable, all in old-spec folders: actives 2.20, 3.0 and 5.0 (Bossier's bymac862, Bullhead's npg550 / npg750 / npg860, Georgetown's gefd862 / jarr625, Beckley Stephenson's steph870), with their cables and couplers 2.10 and Parameters 2.10 of 2162 bytes where present |
+
+Every current set (89, outside the old-spec and "don't use" folders) loads
+with every value read; 8 of them hold the unread table. Versions met that
+share a checked layout are listed in `tools/spec_coverage.py`
+(`SAME_LAYOUT`): Parameters of 3095, 3106, 5186 and 5190 bytes are the
+3102-byte layout with fields added at the end; taps 10.0 are the older rows,
+256 of them; the rest are new version numbers on the same sizes.
+
+**More than one extra frequency.** 86 sets have F3 on (the 1 GHz specs: 1002
+102 862 / 85 5, or 750, 550 …), and 14 — Bullhead's and Eureka's current 1
+GHz specs — F4 as well (1002 102 550 860 or 870 / 85 5). F4 sits next to F3
+everywhere: an active's In at +175 and Out at +199 (Bullhead's FM332 In 12.2
+/ 12.9, Out 45 / 50 at 550 / 860), slot 3 of the cable, coupler and tap
+blocks (its .500 cable 1.82 at 550, 2.34 at 860), Min F4 beside Min F3 in
+the extra levels (14 / 17). The current record's In / Out at F3 (+171 /
++195) is borne out on all the 1 GHz specs (In 15.3 / 12.9 / 10.3 and Out 52
+/ 50 / 38 at 1002 / 862 / 102 on their LEs). The app draws one extra
+column (F3) only: an F4 column and its tap tests are not built.
+
 ### 3.0 Older spec files (WVEXT862, Lode 4)
 
 WVEXT862 was saved by an older program: format versions `.cbl`/`.cpr` 5.1,

@@ -43,6 +43,10 @@ spec files); **SN001** = `SN001_MID.ntw` with "SHINN1GHz Mid" (SHINSTON).
 | `app-saved/SN001_NOTES.ntw`, `AL004_NOTES.ntw` | written by the app, 29 Sep | Notes test files: SN001's was opened and re-saved by Lode (= `SN001_NOTES_test.ntw`); AL004's is still to be opened (QUESTIONS 22) | `test_sn001.py` |
 
 **Not in the pack (ask the user again if needed):**
+* **The regions' spec sets** (2 Oct, `OneDrive_2026-10-02_7.zip`, 104 MB,
+  seven zips inside, ~950 files, 168 different sets from 20 markets and
+  areas) — what loads: file-formats "The regions' spec sets". Read in the
+  session's scratchpad only; not put in `samples/` (the user's files, large).
 * **WVBeck750** spec set (`.par .atv .tap .cpr .cbl`) — 34 tests in
   `test_import.py` / `test_entry.py` need it together with KERMIT750 and skip
   without it (QUESTIONS 23). The user uploaded it as `WVBeck750.zip` on
