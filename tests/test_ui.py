@@ -1191,3 +1191,29 @@ def test_spec_edit_actives_is_the_programs_window(page):
     page.keyboard.press("Escape")
     assert page.query_selector("#specwin") is None
     assert not page.errors
+
+
+def test_spec_edit_taps_and_couplers_are_the_programs_windows(page):
+    """Spec Edit > Taps... and Couplers... open the program's windows on the
+    network's own files (the user's recordings of BH1GHzMid's Taps window and
+    HUMB1GHzMid's Couplers window): the Tap Selection Group in grey."""
+    page.click('.mi[data-menu="spec"]')
+    page.wait_for_timeout(200)
+    page.click('.dropdown .di:has-text("Taps...")')
+    page.wait_for_selector("#specwin", timeout=10000)
+    assert page.inner_text(".sw-title .sw-name") == "Design Assistant Tap Specs - WV750-2026.tap"
+    tabs = page.eval_on_selector_all(".sw-tabs .sw-tab", "s => s.map(x => x.textContent)")
+    assert tabs[0] == "Tap IDs/PartNumbers" and len(tabs) == 11
+    assert page.eval_on_selector_all("table.sw-t tbody tr", "s => s.length") == 512
+    grey = page.eval_on_selector("table.sw-t tbody tr td.group", "e => getComputedStyle(e).backgroundColor")
+    assert grey == "rgb(192, 192, 192)"
+    page.keyboard.press("Escape")
+    page.click('.mi[data-menu="spec"]')
+    page.wait_for_timeout(200)
+    page.click('.dropdown .di:has-text("Couplers...")')
+    page.wait_for_selector("#specwin", timeout=10000)
+    assert page.inner_text(".sw-title .sw-name") == "Design Assistant Coupler Specs - WV750-2026.cpr"
+    head = page.eval_on_selector_all("table.sw-t th", "s => s.map(x => x.textContent)")
+    assert head[:6] == ["It...", "Part Number", "Coupler ID", "Optical", "Internal", "Tap 750"]
+    page.keyboard.press("Escape")
+    assert not page.errors

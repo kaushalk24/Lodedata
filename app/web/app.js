@@ -284,6 +284,8 @@ function renderGrid() {
       if (c.key === 'tap0' && S.mode === 'design' && r.amp_label && !r.taps.length) extra = ' amp spill';
       if (c.key === 'supply' && r.supply) extra = ' spill';
       if (/^cplr\d$/.test(c.key) && psInCplr(r, +c.key.slice(4))) extra = ' pslabel';
+      // an active's own output split away from any active: red (S3's 1.2)
+      else if (/^cplr\d$/.test(c.key) && (r.coupler_severity || [])[+c.key.slice(4)]) extra = ' ' + r.coupler_severity[+c.key.slice(4)];
       if (/^tap\d$/.test(c.key)) {
         const k = +c.key.slice(3);
         const sev = r.end ? (r.port_severity || [])[k] : (r.tap_severity || [])[k];
@@ -1336,7 +1338,7 @@ const MENU_ACTIONS = {
            ['TSG', NYI('Global Change TSG')]],
   spec: [
     ['Parameters...', () => specEdit('par')], ['Actives...', () => specEdit('atv')],
-    ['Taps...', viewLibrary], ['Couplers...', viewLibrary], ['Cables...', () => specEdit('cbl')],
+    ['Taps...', () => specEdit('tap')], ['Couplers...', () => specEdit('cpr')], ['Cables...', () => specEdit('cbl')],
     ['Pricing...', NYI('Pricing editor')], ['Performance...', NYI('Performance editor')],
     ['Control...', NYI('Control editor')],
   ],
@@ -1564,39 +1566,11 @@ async function sampleSpecs() {
   await api(`/api/networks/${S.nid}/library/sample`, { method: 'POST' });
   await reload(); msg('sample specs attached — samples only, not for real design');
 }
-function viewLibrary() {
-  const lib = S.net.library;
-  const sect = (t, cols) => `<h2 style="margin-top:14px">${t}</h2><table><thead><tr>${
-    cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${
-    Object.values(lib[t.toLowerCase()] || {}).map(p => `<tr>${
-      cols.map(c => `<td>${esc(fmtLib(p, c))}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-  modal(`<h2>${esc(lib.name || 'no spec set')}</h2>` +
-    sect('Cables', ['name', 'loop', 'attenuation']) +
-    sect('Taps', ['name', 'ports', 'value', 'insertion']) +
-    sect('Passives', ['name', 'kind', 'legs']) +
-    sect('Actives', ['name', 'kind', 'in', 'out', 'power']) +
-    `<div class="row"><button id="mClose" class="primary">Close</button></div>`);
-}
-function fmtLib(p, c) {
-  switch (c) {
-    case 'name': return p.name;
-    case 'loop': return p.loop_resistance_ohm_per_1000ft;
-    case 'attenuation': return (p.attenuation || []).map(a => `${a[0]}:${a[1]}`).join('  ');
-    case 'ports': return p.ports;
-    case 'value': return p.tap_value_db;
-    case 'insertion': return (p.through_loss || []).map(a => `${a[0]}:${a[1]}`).join('  ');
-    case 'kind': return p.kind;
-    case 'legs': return (p.port_losses || []).join(' / ');
-    case 'in': return [p.in_forward_high, p.in_forward_low, p.in_return_high, p.in_return_low].join('/');
-    case 'out': return [p.out_forward_high, p.out_forward_low, p.out_return_high, p.out_return_low].join('/');
-    case 'power': return (p.power_draw || []).map(a => `${a[0]}V:${a[1]}A`).join(' ');
-  }
-  return '';
-}
 // ---------------------------------------------------------------- Spec Edit
-// Spec Edit > Parameters, Actives, Cables: the program's own windows, tab for
-// tab and column for column (the user's recording of NBERN1GHz's Actives
-// window, WV750's six Parameters tabs, WVEXT862's Cables tab), filled from
+// Spec Edit > Parameters, Actives, Taps, Couplers, Cables: the program's own
+// windows, tab for tab and column for column (the user's recordings of
+// NBERN1GHz's and BH1GHzMid's Actives, BH1GHzMid's Taps and HUMB1GHzMid's
+// Couplers windows, WV750's six Parameters tabs, WVEXT862's Cables), filled from
 // the network's spec file itself, every record of it.  Shown as they are:
 // nothing here edits a spec file, so Load and Cancel both close the window.
 const SW = { data: null, tab: 0, sub: {}, note: '' };
@@ -1653,7 +1627,10 @@ function swGrid(g, cls, plain) {
   return `<div class="sw-gridbox${cls ? ' ' + cls : ''}"><table class="sw-t${plain ? ' plain' : ''}" style="width:${total}px">` +
     `<colgroup>${cols.map(c => `<col style="width:${c.w}px">`).join('')}</colgroup>` +
     `<thead><tr>${cols.map(c => `<th>${esc(c.head)}</th>`).join('')}</tr></thead><tbody>` +
-    g.rows.map(r => `<tr>${r.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('') +
+    // a cell's own colour: the Cables window's Series/Colors, each series'
+    // name in the colour the cable file gives it
+    g.rows.map((r, k) => `<tr>${r.map((v, i) => `<td${cols[i] && cols[i].cls ? ` class="${cols[i].cls}"` : ''}` +
+      `${g.colors && g.colors[k] && g.colors[k][i] ? ` style="color:${g.colors[k][i]}"` : ''}>${esc(v)}</td>`).join('')}</tr>`).join('') +
     '</tbody></table></div>';
 }
 
@@ -1712,7 +1689,7 @@ function swPage(w, tab) {
     return `<div class="sw-prefix">Prefix: <input readonly value="${esc(tab.prefix)}"></div>` +
       swGrid(tab.grid, 'prefixed');
   }
-  return swGrid(tab.grid);
+  return swGrid(tab.grid, '', tab.plain);
 }
 
 // The Parameters tabs: each field where WV750's screenshots have it.  Those

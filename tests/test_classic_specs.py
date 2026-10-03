@@ -170,18 +170,18 @@ def test_the_older_design_saves_back_as_it_came():
 # order (the user's screenshots, SHINSTON2 5a-5c): the tap checks at 870,
 # 54, 550, 40 and 5 MHz, the crossovers (WVEXT862's Max. Crossover is 0.00),
 # the actives' inputs and outputs with their pads and EQs, the Custom
-# Cascading line and the EQ slope.  Lode prints a crossover seven wide
-# ("Crossover of    3.85", its pixels), the app five: asked of the user
+# Cascading line and the EQ slope.  A crossover is printed seven wide,
+# "Crossover of    3.85", as Lode's pixels show (the user: match it)
 LODE_TESTS = [
     "Tap(54)  1.24 below min at 3.1.", "Tap(550)  0.74 below min at 3.1.",
     "Tap(870)  2.18 below min at 3.3.", "Tap(550)  0.32 below min at 3.3.",
-    "Tap(870) 10.72 below min at 3.5.", "Tap(550)  6.52 below min at 3.5.", "Crossover of  3.85 at 3.5.",
+    "Tap(870) 10.72 below min at 3.5.", "Tap(550)  6.52 below min at 3.5.", "Crossover of    3.85 at 3.5.",
     "Tap(870) 12.74 below min at 3.6.", "Tap(550)  5.64 below min at 3.6.",
-    "Tap(5)  2.79 below window at 3.6.", "Crossover of 11.22 at 3.6.",
+    "Tap(5)  2.79 below window at 3.6.", "Crossover of   11.22 at 3.6.",
     "870 input   10.97 to LE at 4.13.", "54 input   24.90 to LE at 4.13.",
     "870 input    9.17 to LE at 5.12.", "54 input   24.50 to LE at 5.12.",
     "Tap(870)  4.12 below min at 5.29.", "Tap(550)  0.50 below min at 5.29.",
-    "Tap(5)  1.23 below window at 5.29.", "Crossover of  2.01 at 5.29.", "Tap(5)  0.53 below window at 6.7.",
+    "Tap(5)  1.23 below window at 5.29.", "Crossover of    2.01 at 5.29.", "Tap(5)  0.53 below window at 6.7.",
     "Tap(40)  1.73 above max at 6.10.", "Tap(40)  2.04 above max at 7.7.",
     "Tap(5)  0.62 above max at 7.7.", "Tap(870)  8.05 below min at 9.16.",
     "Tap(54)  8.09 below min at 9.16.", "Tap(550)  6.52 below min at 9.16.",
@@ -205,11 +205,11 @@ LODE_TESTS = [
     "Tap(870) 17.67 below min at 15.3.", "Tap(54)  6.00 below min at 15.3.",
     "Tap(550) 13.13 below min at 15.3.",
     "Tap(40)  5.35 above max at 15.3.", "Tap(5)  0.70 above max at 15.3.",
-    "Crossover of  2.67 at 15.3.",
+    "Crossover of    2.67 at 15.3.",
     "Tap(870) 23.18 below min at 15.4.", "Tap(54)  6.12 below min at 15.4.",
     "Tap(550) 16.98 below min at 15.4.",
     "Tap(40)  5.23 above max at 15.4.", "Tap(5)  0.08 above max at 15.4.",
-    "Crossover of  8.06 at 15.4.",
+    "Crossover of    8.06 at 15.4.",
     "Tap(870)  6.12 below min at 16.1.", "Tap(54)  4.92 below min at 16.1.",
     "Tap(550)  4.96 below min at 16.1.",
     "Tap(40)  4.68 above max at 16.1.", "Tap(5)  2.18 above max at 16.1.",

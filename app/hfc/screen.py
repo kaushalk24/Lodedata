@@ -93,6 +93,7 @@ class Row:
     tap_branches: list = field(default_factory=list)  # per tap, the branch its port feeds, 0 = none
     couplers: list = field(default_factory=list)   # e.g. "200[2]"
     coupler_parts: list = field(default_factory=list)
+    coupler_severity: list = field(default_factory=list)  # "red" per coupler column
     cumulative_ft: float = 0.0
     # powering
     volts: float | None = None
@@ -151,6 +152,7 @@ class Row:
             "port_severity": self.port_severity,
             "tap_parts": self.tap_parts, "tap_branches": self.tap_branches,
             "coupler_parts": self.coupler_parts,
+            "coupler_severity": self.coupler_severity,
             "cumulative_ft": round(self.cumulative_ft, 0),
             "volts": None if self.volts is None else round(self.volts, 2),
             "current": round(self.current, 2),
@@ -361,11 +363,19 @@ def build(design: Design) -> Screen:
                     if not part.pad_eq[3][1]:
                         row.slope_notes.append(("yellow", f"Rslope too low to equalize at {at}"))
                 if part:
-                    if not part.needs_rf_input:
-                        # fibre fed: there is no RF input to show on this line
+                    at = f"{branch.number}.{row.node}."
+                    if part.needs_rf_input:
+                        _active_checks(p, part, node.pads, row, at)
+                    elif depth == 0 and idx == 0:
+                        # fibre fed at the network's first line: nothing
+                        # reaches it, every column 0.00 (BH1GHzMid's 1.1)
                         row.levels = {f: 0.0 for f in allf}
                     else:
-                        _active_checks(p, part, node.pads, row, f"{branch.number}.{row.node}.")
+                        # further down, the line's levels as they arrive and
+                        # its return checked, not its forward: the user's
+                        # Ripple on AL004 4.20 reads 25.96 23.48 35.27 34.26,
+                        # 40 and 5 red, the 70 red
+                        _active_checks(p, part, node.pads, row, at, forward=False)
                     levels[p.forward_high_mhz] = part.out_forward_high
                     levels[p.forward_low_mhz] = part.out_forward_low
                     levels[p.return_high_mhz] = part.in_return_high
@@ -480,6 +490,12 @@ def build(design: Design) -> Screen:
                     shown = cid or ("0" if not design.has_specs else "")
                     if i == 0 or not shared:
                         row.couplers.append(f"{shown}{mark if i == 0 else ''}{text}")
+                        # an internal coupler (an active's own output split)
+                        # away from any active is drawn red: WV750's MULTI
+                        # OUT (100) on S3's 1.2, 100 ft from its Ripple; on
+                        # a 0-ft line after it, green (the user's 7a, 7b)
+                        row.coupler_severity.append(
+                            "red" if own and own.internal and not _at_an_active(design, branch, idx) else "")
                     else:
                         row.couplers[0] += text
                     if passive and i == 0:
@@ -535,9 +551,14 @@ def build(design: Design) -> Screen:
         start[lo] = design.source_dbmv - design.source_tilt_db
         start[p.return_high_mhz] = p.return_target_at_node_dbmv
         start[p.return_low_mhz] = p.return_target_at_node_dbmv
-        if not design.has_specs:
-            # nothing to compute from: the program shows 0.00 throughout
-            start = {f: 0.0 for f in freqs}
+        if not design.has_specs or design.library.imported_from:
+            # nothing feeds a network's first line: with no spec set the
+            # program shows 0.00 throughout; with one, the first line reads
+            # 0.00 and so does whatever sits on it before an active (H043B's
+            # PCD on 1.1, its NC4000 on 1.2: no return to check, its pads
+            # and EQs picked for 0.00).  The launch level above is the
+            # sample specs' only
+            start = {f: 0.0 for f in allf}
         walk(feeder, start, 0, 0.0, False)
 
     _gutter(scr)
@@ -563,7 +584,27 @@ def build(design: Design) -> Screen:
     return scr
 
 
-def _active_checks(p, part, pads, row: Row, at: str) -> None:
+def _at_an_active(design: Design, branch: Branch, idx: int) -> bool:
+    """Whether a line is at the same place as an active: the lines from the
+    last one with footage up to it and the 0-ft lines after it -- a
+    branch's 0-ft first line is where its coupler is (AL004's 7.1, 112<8>,
+    at bridger 6.1's place)."""
+    nodes = branch.nodes
+    start = idx
+    while start > 0 and not nodes[start].ftg:
+        start -= 1
+    end = idx
+    while end + 1 < len(nodes) and not nodes[end + 1].ftg:
+        end += 1
+    if any(n.amp for n in nodes[start:end + 1]):
+        return True
+    parent = design.branch(branch.parent_branch) if branch.parent_branch else None
+    if start == 0 and not nodes[0].ftg and parent and 0 < branch.parent_node <= len(parent.nodes):
+        return _at_an_active(design, parent, branch.parent_node - 1)
+    return False
+
+
+def _active_checks(p, part, pads, row: Row, at: str, forward: bool = True) -> None:
     """Lode's Test of an active's levels, with the pads and EQs it holds.
 
     Forward, the line's input less the forward pad and the EQ's loss must
@@ -584,12 +625,12 @@ def _active_checks(p, part, pads, row: Row, at: str) -> None:
         values = column[2][v]
         return values[i] if i < len(values) else 0.0
 
-    forward = [(p.forward_high_mhz, part.in_forward_high, 0),
-               (p.forward_low_mhz, part.in_forward_low, 1)]
+    checks = [(p.forward_high_mhz, part.in_forward_high, 0),
+              (p.forward_low_mhz, part.in_forward_low, 1)]
     # Fk's In, and the forward EQ's loss at Fk
-    forward += [(f, (extra_at(part.extra_levels, f) or [f, 0.0])[1], _extra_slot(p, f) - 1)
-                for f in _extra_freqs(p)]
-    for f, need, i in forward:
+    checks += [(f, (extra_at(part.extra_levels, f) or [f, 0.0])[1], _extra_slot(p, f) - 1)
+               for f in _extra_freqs(p)]
+    for f, need, i in checks if forward else ():
         have = as_shown(row.levels.get(f, 0.0))
         if need - (have - loss(0, 0) - loss(2, i)) > 0.005:
             row.level_severity[f] = "red"
@@ -652,17 +693,21 @@ def choose_pads_eqs(part, levels: dict, p) -> list:
         return max((v for v in range(len(pads)) if fits(pads[v][0])), default=0)
 
     need = (part.in_forward_high - part.in_forward_low) - (hi - lo)
-    rows = None
+    rows = rrows = None
     if not getattr(p, "allow_over_equalization", True):
-        # "Allow Over Equalization" unticked: no forward EQ that leaves more
-        # tilt than the active's own In tilt.  BH1GHzMid's FM332 at 1.7 of
-        # the user's screenshot, 39.67 / 33.70 in against 15.3 / 10.3: CS1
-        # (0.80 of tilt off) would leave 5.18, CS2 (1.50) leaves 4.48 --
-        # Lode shows CS2; HUMB1GHzMid's, 39.57 / 33.90 against 14.3 / 9.3,
-        # CS1.  WV750 has it ticked: the nearest, all 27 of AL004's
+        # "Allow Over Equalization" unticked: no EQ that takes off more tilt
+        # than is there.  BH1GHzMid's FM332 at 1.7 of the user's screenshot,
+        # 39.67 / 33.70 in against 15.3 / 10.3: CS1 (0.80 of tilt off) would
+        # leave 5.18, CS2 (1.50) leaves 4.48 -- Lode shows CS2; HUMB1GHzMid's,
+        # 39.57 / 33.90 against 14.3 / 9.3, CS1.  The return the same way:
+        # 18.41 / 12.74 needed at the user's 1b takes Return Eq 6 (5.00 off),
+        # not 7 (6.06); 12.29 / 11.30 at 1a takes 2 (0.98), as the 48
+        # actives of H043A_MID and H043B_MID have it.  WV750 has it ticked:
+        # the nearest, all 27 of AL004's
         rows = [v for v in range(len(feq)) if feq[v][1] - feq[v][0] <= need + slack] or None
+        rrows = [v for v in range(len(req)) if req[v][1] - req[v][0] <= rh - rl + slack] or None
     fe = nearest(feq, need, rows)
-    re_ = nearest(req, rh - rl)
+    re_ = nearest(req, rh - rl, rrows)
     f_loss = feq[fe] if feq else [0.0, 0.0]
     r_loss = req[re_] if req else [0.0, 0.0]
     fp = largest(fpad, lambda db: hi - db - f_loss[0] >= part.in_forward_high - slack
@@ -670,6 +715,44 @@ def choose_pads_eqs(part, levels: dict, p) -> list:
     rp = largest(rpad, lambda db: part.out_return_high - db - r_loss[0] >= rh - slack
                  and part.out_return_low - db - r_loss[1] >= rl - slack)
     return [fp, rp, fe, re_]
+
+
+def _active_lines(design: Design, scr: Screen):
+    """(node, its part, its row) for each line carrying an active."""
+    for r in scr.rows:
+        if r.end:
+            continue
+        node = design.branch(r.branch).nodes[r.node - 1]
+        if node.amp:
+            yield node, design.library.actives.get(node.amp_part), r
+
+
+def active_inputs(design: Design) -> dict:
+    """{id(node): its input levels as shown} for every active: what an edit
+    is compared against to know whose input it changed."""
+    if not design.has_specs:
+        return {}
+    return {id(node): tuple(as_shown(v) for _, v in sorted(r.levels.items()))
+            for node, _, r in _active_lines(design, build(design))}
+
+
+def repick(design: Design, before: dict, keyed=()) -> None:
+    """After an edit, the program picks the pads and EQs again for every
+    active whose input it changed, and for one just keyed: the user's 1a
+    (BH1GHzMid, amp 11 keyed at 1.3: Flag / CS8 / Flag / 2 at once), 1b
+    (1.3's ftg 0 -> 900: 060 / 13 / 190 / 6; Recalc changes nothing), and
+    6b (a Ripple placed on AL004 4.20: AL00419 at 4.24 FLAG / SCS6 / 20 / 0,
+    AL00416 at 4.13, whose input it left, as stored).  A fibre-fed active
+    has none to pick."""
+    if not design.has_specs:
+        return
+    p = design.parameters
+    for node, part, r in _active_lines(design, build(design)):
+        if not part or len(part.pad_eq) != 4 or not part.needs_rf_input:
+            continue
+        now = tuple(as_shown(v) for _, v in sorted(r.levels.items()))
+        if id(node) in keyed or before.get(id(node)) != now:
+            node.pads = choose_pads_eqs(part, r.levels, p)
 
 
 def _amp_info(design: Design, scr: Screen) -> None:
@@ -812,7 +895,6 @@ def _amp_info(design: Design, scr: Screen) -> None:
         if not has_amp(nd):
             continue
         part = lib.actives.get(nd.amp_part)
-        fibre = part is not None and part.fibre_fed
         # the stored values index the active's Pads/EQs Banks: the info box
         # shows the label, the expanded display the prefix and label
         # (AL00416: forward EQ 16 -> "12", SEQ-750-12)
@@ -838,12 +920,11 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # one, itself included, but those Custom Cascading excludes: WV750's
         # and SHINSTON's Ripple nodes (Exclude) are 0 and the first amplifier
         # after one is 1; WVEXT862's NC4000 and HLN 3842 NODE (Include) are 1,
-        # so AL00416 reads 2 there, 1 on AL004.  An excluded fibre-fed node
-        # reads 0 wherever it is
+        # so AL00416 reads 2 there, 1 on AL004.  An excluded active counts
+        # those before it: the user's Ripple on AL004 4.20 reads 1 (AL00416),
+        # AL00419 after it 2
         chain = [node(bb, k) for bb, k in upstream(b, n) if has_amp(node(bb, k))][::-1]
         position = sum(counted(x) for x in chain)
-        if fibre and not counted(nd):
-            position = 0
         if cascading(nd) & 1 and position and not cascading(nd) >> (position + 1) & 1:
             # Cust. Casc. Yes and Casc. <position> Invalid: 23.17's "11"
             # (Casc. 1-5) at 6, "LE  11/5 before/0 after at 23.17."
@@ -994,7 +1075,7 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
     if cross > p.max_crossover_db + 0.005:
         mark(hi, "yellow")
         mark(lo, "yellow")
-        errors.append(("yellow", f"Crossover of {cross:5.2f}"))
+        errors.append(("yellow", f"Crossover of {cross:7.2f}"))
     return per, errors
 
 

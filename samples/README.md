@@ -17,6 +17,9 @@ Put real Lode Data files here to run the checks against them. They come in
       regions/          BH1GHzMid, HUMB1GHzMid, NBERN1GHz (the 7-29-2025 sets of
                         the regions' zip) -- tests/test_keyed_regions.py and
                         tests/test_spec_windows.py
+      bullhead/         H043A_MID.ntw, H043B_MID.ntw (Bullhead, on BH1GHzMid,
+                        joined by a PCD) -- tests/test_bullhead.py
+      AL005-Beckley750/ Beckley750.par .atv .tap .cpr .cbl (AL005's own set)
 
     Still missing: WVBeck750.par .atv .tap .cpr .cbl -- tests/test_import.py
     and tests/test_entry.py need it with KERMIT750 and skip without it.

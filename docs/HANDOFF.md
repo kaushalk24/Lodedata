@@ -4,10 +4,10 @@ Everything a new session needs to carry on without losing anything: the
 goal, how the user works, the rules learned, where the evidence is, what is
 done and what comes next. Then read, in this order:
 
-1. `docs/QUESTIONS.md` — every question still open, one numbered list in
-   priority order (Priority 1–7), each with what to do in Lode, what to
-   send, what it settles and what the app does now. **Questions 1–10 are
-   next** (in order).
+1. `docs/QUESTIONS.md` — every question still open: part A (left from the
+   3 Oct morning list, its numbers kept) and part B (new, N1–N12), each with
+   what to do in Lode, what to send, what it settles and what the app does
+   now. **Part A, then part B** (in order).
 2. `docs/open-questions.md` — each rule with its evidence, and the list
    "Still to confirm" at the end.
 3. `docs/EVIDENCE.md` — every file, screenshot and recording the user sent,
@@ -211,7 +211,7 @@ asked about before pushing. Add every new sample the user sends to
   (the app now keeps the five files with the network; `GET
   /api/networks/{id}/specs/atv|cbl|par`, `app/hfc/specwindow.py`). Shown
   only — nothing edits a spec file yet. Taps and Couplers still open the
-  plain list until their windows are seen (QUESTIONS 14, 15).
+  plain list until their windows were seen (built 3 Oct).
 * **Keys and mouse:** Design screen menu digits, `0` Alter, `.`-moves,
   Insert, Delete, Amplifier Definition, Notes, Select Tap, double-click a
   coupler to enter its branch, **mouse wheel** moves the cursor within the
@@ -220,13 +220,43 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-**Questions 1–10** in `docs/QUESTIONS.md` (Priority 1), in order: when
-Lode picks pads and EQs (1), the Test lists of the BH / HUMB networks (2),
-HUMB's yellow `<21>` and its branch 2 (3, 4: whether a 0 in a spec column
-is taken as 0), a tap ID keyed with a port count its row lacks (5), an
-excluded active mid-cascade (6), S3's red coupler (7), the crossover
-spacing (8), empty tap slots on mismatched specs (9), reserve gain (10).
-Then Priority 2 (the Spec Edit tabs still unseen, 11–19) and on.
+`docs/QUESTIONS.md` **part A** (what is still open from the 3 Oct morning
+list: 22, 25–42), then **part B** (N1–N12, raised by the 3 Oct answers).
+The work item that needs no answer first: **reading the oldest actives
+formats** (2.20 / 3.0 / 5.0) from the user's recording of NPG550's Actives
+window (`2026-10-03_set/19a.mp4`, every tab; 19b–19f its Couplers and Taps
+windows, the older 10.0 / 3.0 layouts the readers already know).
+
+**Done 3 Oct** (the user's answers to the morning's 1–24; `EVIDENCE.md`):
+
+* Pads and EQs: picked as an active is keyed and again for every active
+  whose input an edit changes (`screen.repick`, called by the API's edit
+  endpoints through `load_for_edit` / `save`); with "Allow Over
+  Equalization" unticked the return EQ is held back too. Opening a file
+  changes nothing.
+* Couplers: each column as it stands — 0 is 0 dB, a negative figure a gain
+  (`importer._coupler_points`). Bullhead's FMT Split (-9 forward) put every
+  active behind an FM902T 18 dB low; now H043A/B's 48 actives all hold the
+  pick for the app's levels and H043B's Test list is Lode's.
+* A fibre-fed active away from the network's first line shows the levels
+  arriving and has its return checked; the first line reads 0.00 and a
+  Lode spec set's network starts from 0.00 (the launch level is the sample
+  specs' only). An excluded active's Cascade Position counts those before it.
+* An internal coupler away from any active is red (S3's 1.2).
+* Crossover lines seven wide.
+* Taps: Self-Term. read from the file (current layout).
+* PCD networks (H043A/B): the network table before branch 1 kept, the
+  branch head's coupler field a u16 (999), PCDs left out of the coupler
+  count and given one connector; a PCD's display and the underground
+  housings' tally are open (part B).
+* Spec Edit: the Actives tab's every column, Configuration Quantity, the
+  Taps window (eleven tabs), the Couplers window (five), Cables' Connectors
+  and Series/Colors.
+* Regression against the morning's commit: every network on its own spec set
+  changes only in the crossover lines' spacing; no saved byte changes; the
+  mismatched combinations move (the couplers' signs and zeros, the 0.00
+  start) — the user: those do not matter. New: H043A/B save; AL005 +
+  Beckley750.
 
 **Done 2 Oct, evening** (the user's BH / HUMB / LK002 screenshots and the
 recording of NBERN1GHz's Actives window; `EVIDENCE.md`):
@@ -249,7 +279,7 @@ recording of NBERN1GHz's Actives window; `EVIDENCE.md`):
   AL003 / AL005, whose own sets are not in the pack): taps on empty slots
   now drawn, and stored pads pointing at a bank's FLAG row shown `FLAG`.
   Every pairing checked against Lode is unchanged, and nothing a save
-  writes. Asked as QUESTIONS 9.
+  writes. Asked as QUESTIONS 9; the user (3 Oct): mismatched sets do not matter.
 * `samples/regions/` (local only) holds BH1GHzMid, HUMB1GHzMid and
   NBERN1GHz of 29 Jul 2025 for `test_keyed_regions.py` and
   `test_spec_windows.py`; the pack the user holds does not have them yet —
@@ -268,7 +298,7 @@ regression check with it in samples/.
 formats (actives 2.20/3.0/5.0) not readable — file-formats "The regions'
 spec sets".
 
-**What set A2 raised** (now QUESTIONS 6–8): an excluded active
+**What set A2 raised** (answered 3 Oct): an excluded active
 (a Ripple) put in the middle of a cascade on a copy of AL004, S3's red
 coupler (the file and the window), and the crossover spacing (yes/no,
 asked twice now).

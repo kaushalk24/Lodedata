@@ -67,7 +67,11 @@ def _fx(seg: bytes, o: int) -> float:
 
 
 def _grid(cols: list, rows: list) -> dict:
-    return {"cols": [{"head": h, "w": w} for h, w in cols], "rows": rows}
+    """``cols``: (head, width) or (head, width, cell style) -- "group" the
+    grey of Tap Selection Group, "id" the light grey of a column Lode does
+    not let you edit."""
+    return {"cols": [{"head": c[0], "w": c[1], **({"cls": c[2]} if len(c) > 2 else {})}
+                     for c in cols], "rows": rows}
 
 
 # --------------------------------------------------------------------------
@@ -99,14 +103,19 @@ def actives_window(atv: bytes, par: bytes | None, name: str) -> dict:
     def part(seg):
         return S._name(seg[5:5 + width])
 
-    # Actives: In/Out at the four, the banks, then In at F3, F4, F5 (what the
-    # recording shows before it scrolls)
+    # Actives: In/Out at the four, the banks, then In at F3-F6, R3, R4 and
+    # Out at F3-F6, R3, R4, each Out with its Out/Loss (the user's Q11
+    # recording, scrolled to the end): In from +171 and Out from +195, six
+    # each -- no file has a figure at R3 or R4 yet (+187 to +218 empty in all)
     cols = [("It...", _w(31)), ("Active ID", _w(93)), ("Part Number", _w(214))]
     cols += [(f"In - {L[k]}", _fw(57, L[k])) for k in ("F1", "F2", "R1", "R2")]
     for k in ("F1", "F2", "R1", "R2"):
         cols += [(f"Out - {L[k]}", _fw(67, L[k])), ("Out/Loss", _w(93))]
     cols += [("Fwd Pad", _w(88)), ("Ret Pad", _w(83)), ("Fwd EQ", _w(80)), ("Ret EQ", _w(74))]
-    cols += [(f"In - {L[k]}", _fw(57, L[k])) for k in ("F3", "F4", "F5")]
+    extra = ("F3", "F4", "F5", "F6", "R3", "R4")
+    cols += [(f"In - {L[k]}", _fw(57, L[k])) for k in extra]
+    for k in extra:
+        cols += [(f"Out - {L[k]}", _fw(67, L[k])), ("Out/Loss", _w(93))]
     rows = []
     for i, seg in recs:
         ins = struct.unpack_from("<4i", seg, levels_at)
@@ -116,11 +125,14 @@ def actives_window(atv: bytes, par: bytes | None, name: str) -> dict:
             row += [_f2(v / S.SCALE), "0 Out"]
         row += [str(seg[S.ATV_PAD_BANKS] + 1), str(seg[S.ATV_PAD_BANKS + 1] + 1),
                 str(seg[S.ATV_EQ_BANKS] + 1), str(seg[S.ATV_EQ_BANKS + 1] + 1)]
-        row += [_f2(_fx(seg, in_at + 4 * k)) for k in range(3)]
+        row += [_f2(_fx(seg, in_at + 4 * k)) for k in range(6)]
+        for k in range(6):
+            row += [_f2(_fx(seg, out_at + 4 * k)), "0 Out"]
         rows.append(row)
     tabs.append({"name": "Actives", "grid": _grid(cols, rows),
-                 "note": "Out/Loss: every row of the recording reads 0 Out; where the "
-                         "file keeps it is not known yet."})
+                 "note": "Out/Loss: set to Loss on row 1's Out - F1 it is byte 518 of "
+                         "the file (TEST_OL.atv); where the other rows and columns keep "
+                         "it is not known yet, so every row reads 0 Out."})
 
     # Reserve Gain
     cols = [("It...", _w(36)), ("Active ID", _w(93)), ("Ret. Mod. Part Number", _w(231)),
@@ -224,11 +236,14 @@ def actives_window(atv: bytes, par: bytes | None, name: str) -> dict:
             o = config_at + S.ATV_CONFIG_STRIDE * slot
             plugs = list(seg[o + 10:o + 18]) if o + 18 <= len(seg) else [0] * 8
             row = [str(n), f"{i}/{slot}", part(seg), ident(seg, slot)]
+            # Quantity: 1 beside every plug-in named, 0 beside none -- every
+            # row of the user's 13c-13h (WV750's 68N-68B, 69N-69M); the
+            # slot holds no 1, so where a larger one would be kept is not known
             for p in plugs:
-                row += [str(p), "0"]
+                row += [str(p), "1" if p else "0"]
             rows.append(row)
     tabs.append({"name": "Configuration Table", "grid": _grid(cols, rows),
-                 "note": "Quantity and Plugin 2-8: not read from the file yet."})
+                 "note": "Plugin 2-8: no file names one yet."})
 
     # Bridgers, Feedermakers: places not known
     cols = [("It...", _w(36)), ("Bridger", _w(62)), (f"In - {L['R1']}", _fw(57, L["R1"])),
@@ -328,9 +343,33 @@ def cables_window(cbl: bytes, par: bytes | None, name: str) -> dict:
                     # the return columns are stored negative (-0.46, -0.16
                     # for EX P3 500 A); Lode shows them 0.460000, 0.160000
                     + [f"{abs(v) / S.SCALE:.6f}" for v in struct.unpack_from("<10i", seg, 9 + n)])
-    tabs = [{"name": "Cables", "grid": _grid(cols, rows)},
-            {"name": "Connectors", "unseen": True},
-            {"name": "Series/Colors", "unseen": True}]
+    tabs = [{"name": "Cables", "grid": _grid(cols, rows)}]
+    # Connectors (the user's 16a, the older WVEXT862): the Feed-Thru and
+    # Pin-Type part numbers, then for Line Extender, Amplifier, Equalizer,
+    # Tap and Coupler 1 Pin-Type or 0 Feed-Thru (every named cable 1, the
+    # empty ones 0)
+    cols = [("It...", _w(37)), ("Cable ID", _w(87)), ("Part Number", _w(213)),
+            ("Feed-Thru Part #", _w(229)), ("Pin-Type Part #", _w(219))]
+    cols += [(h, _w(138)) for h in ("Line Extender", "Amplifier", "Equalizer", "Tap", "Coupler")]
+    conn, series, colors = [], [], []
+    for r in range(100):
+        seg = cbl[start + stride * r:start + stride * (r + 1)]
+        if len(seg) < stride:
+            seg = bytes(stride)
+        flags = struct.unpack_from("<5i", seg, 119 + n)
+        conn.append([str(r + 1), str(r), S._name(seg[5:5 + n]), S._name(seg[89 + n:104 + n]),
+                     S._name(seg[104 + n:119 + n])]
+                    + ["1 - Pin-Type" if v else "0 - Feed-Thru" for v in flags])
+        # Series/Colors (16c): each series' name in its colour, on black
+        slots = [S._series(seg, 139 + n + 23 * k) for k in range(10)]
+        series.append([str(r + 1), str(r), S._name(seg[5:5 + n])] + [name for _, name in slots])
+        colors.append(["", "", ""] + [color for color, _ in slots])
+    tabs.append({"name": "Connectors", "grid": _grid(cols, conn)})
+    cols = [("It...", _w(37)), ("Cable ID", _w(87)), ("Part Number", _w(213))]
+    cols += [(f"{k}00 Series" if k else "000 Series", _w(106), "series") for k in range(10)]
+    grid = _grid(cols, series)
+    grid["colors"] = colors
+    tabs.append({"name": "Series/Colors", "grid": grid})
     return {"kind": "cbl", "title": f"Design Assistant Cable Specs - {name}",
             "menus": ["File", "Series", "Edit"], "tabs": tabs}
 
@@ -408,7 +447,174 @@ def parameters_window(par: bytes, name: str) -> dict:
     }
 
 
-WINDOWS = {".atv": "Actives", ".cbl": "Cables", ".par": "Parameters"}
+# --------------------------------------------------------------------------
+# the Taps window: eleven tabs (the user's Q14 recording of BH1GHzMid.tap)
+# --------------------------------------------------------------------------
+# The 128 bytes before the rows: Active Taps, four rows (2/4/6/8 Port Taps)
+# of Min. Voltage, Amperage 1, Voltage 2 ... Amperage 4 (all 0.00 there).
+# In each port slot, after its Values (+25) and Losses (+65): the Swap
+# Opt. as a port code (2 Port 0 ... 8 Port 3), Active, Self-Term., then the
+# F-Pad, R-Pad, F-EQ and R-EQ banks less one (FF: 0)
+TAP_ACTIVE, TAP_GROUP = S.TAP_ACTIVE_TABLE, S.TAP_GROUP
+TAP_SWAP, TAP_ACTIVE_FLAG, TAP_SELF_TERM, TAP_BANKS = S.TAP_SWAP, S.TAP_ACTIVE, S.TAP_SELF_TERM, S.TAP_BANKS
+# the order of a Values or Losses block, and the order Lode's columns take
+TAP_BLOCK = ("F1", "F2", "F3", "F4", "F5", "F6", "R1", "R2", "R3", "R4")
+TAP_SHOWN = ("F1", "F2", "R1", "R2", "F3", "F4", "F5", "F6", "R3", "R4")
+
+
+def taps_window(tap: bytes, par: bytes | None, name: str) -> dict:
+    """Every row of the tap file (512), as the program's Tap Specs window
+    shows it: BH1GHzMid's 30 (8 Port 9830 only), 29 (9229, 9429) ... 4
+    (9204), its groups 1 and 2 (129 RMT2122-29 ... 104 RMT2122-04), Values
+    and Losses row by row (30's 8 Port: 30.00 at every frequency on, Loss
+    1.10 0.40 0.40 0.30, 550 0.60, 860 1.00)."""
+    L = freq_labels(par)
+    classic = S._classic(tap)
+    start, stride, _ = (S.CLASSIC_LAYOUT if classic else S.LAYOUT)["tap"]
+    slots = S.CLASSIC_TAP_PORT_SLOTS if classic else S.TAP_PORT_SLOTS
+    width = S.CLASSIC_NAME if classic else 25
+    rows = []
+    for r in range(512):
+        seg = tap[start + stride * r:start + stride * (r + 1)]
+        rows.append(seg if len(seg) == stride else bytes(stride))
+
+    def tap_id(seg) -> float:
+        return _fx(seg, S.TAP_ID_OFFSET)
+
+    def shown_id(seg) -> str:
+        v = tap_id(seg)
+        return "" if not v else (str(int(v)) if v == int(v) else _f2(v))
+
+    def part(seg, n) -> str:
+        o = slots[n]
+        return S._name(seg[o:o + min(width, 20)])
+
+    def block(seg, n, at) -> dict:
+        o = slots[n] + width + at - 25
+        return dict(zip(TAP_BLOCK, (v / S.SCALE for v in struct.unpack_from("<10i", seg, o))))
+
+    def tail(seg, n, k) -> int:
+        o = slots[n] + width + k - 25
+        return seg[o] if o < len(seg) else 0
+
+    def yes(v) -> str:
+        return "1 - Yes" if v else "0 - No"
+
+    tabs = []
+    cols = [("It...", _w(35)), ("Tap ID", _w(70))]
+    cols += [(f"{n} Port Part Number", _w(191)) for n in (2, 4, 6, 8)]
+    cols += [("Tap Selection Group", _w(206), "group")]
+    tabs.append({"name": "Tap IDs/PartNumbers", "grid": _grid(cols, [
+        [str(r + 1), shown_id(seg)] + [part(seg, n) for n in (2, 4, 6, 8)] + [str(seg[TAP_GROUP] + 1)]
+        for r, seg in enumerate(rows)])})
+    for n in (2, 4, 6, 8):
+        cols = [("It...", _w(38)), ("Tap ID", _w(61)), ("Part Number", _w(189)),
+                ("Active", _w(56)), ("Self-Term.", _w(90))]
+        cols += [(f"Value - {L[f]}", _fw(87, L[f], 13)) for f in TAP_SHOWN]
+        cols += [(f"Loss - {L[f]}", _fw(78, L[f], 13)) for f in TAP_SHOWN]
+        grid = []
+        for r, seg in enumerate(rows):
+            value, loss = block(seg, n, S.TAP_VALUE_BLOCK), block(seg, n, S.TAP_INSERTION_BLOCK)
+            grid.append([str(r + 1), shown_id(seg), part(seg, n),
+                         yes(tail(seg, n, TAP_ACTIVE_FLAG)), yes(tail(seg, n, TAP_SELF_TERM))]
+                        + [_f2(value[f]) for f in TAP_SHOWN] + [_f2(loss[f]) for f in TAP_SHOWN])
+        tabs.append({"name": f"{n} Port Taps", "grid": _grid(cols, grid)})
+    cols = [("It...", _w(37)), ("Tap Type", _w(86)), ("Min. Voltage", _w(110)), ("Amperage 1", _w(120))]
+    for k in (2, 3, 4):
+        cols += [(f"Voltage {k}", _w(95)), (f"Amperage {k}", _w(120))]
+    grid = []
+    for k, n in enumerate((2, 4, 6, 8)):
+        vals = [] if classic else struct.unpack_from("<8i", tap, TAP_ACTIVE + 32 * k)
+        grid.append([str(k + 1), f"{n} Port Taps"] + [_f2(v / S.SCALE) for v in vals or [0] * 8])
+    tabs.append({"name": "Active Taps", "grid": _grid(cols, grid)})
+    cols = []
+    for n in (2, 4, 6, 8):
+        cols += [(f"{n} Port ID", _w(88), "id"), (f"{n} Port Swap Opt.", _w(172))]
+    tabs.append({"name": "Tap Swap Options", "plain": True, "grid": _grid(cols, [
+        sum(([_f2(tap_id(seg)), str(2 * (tail(seg, n, TAP_SWAP) + 1))] for n in (2, 4, 6, 8)), [])
+        for seg in rows])})
+    for n in (2, 4, 6, 8):
+        cols = [("It...", _w(37)), (f"{n} Port Part Num.", _w(164)), (f"{n} Port F-Pad", _w(125)),
+                (f"{n} Port R-Pad", _w(129)), (f"{n} Port F-EQ", _w(116)), (f"{n} Port R-EQ", _w(120))]
+        tabs.append({"name": f"{n} Port Pad/EQ Banks", "grid": _grid(cols, [
+            [str(r + 1), part(seg, n)] + [str((tail(seg, n, TAP_BANKS + k) + 1) & 0xFF) for k in range(4)]
+            for r, seg in enumerate(rows)])})
+    return {"kind": "tap", "title": f"Design Assistant Tap Specs - {name}",
+            "menus": ["File", "Edit"], "tabs": tabs}
+
+
+# --------------------------------------------------------------------------
+# the Couplers window (the user's Q15 recording of HUMB1GHzMid.cpr)
+# --------------------------------------------------------------------------
+COUPLER_RECORDS = 998      # the NIU tables follow; a PCD's record (998) is past them
+NIU_NOTE = ("Every row Lode showed for HUMB1GHzMid is empty; where the file keeps "
+            "these, and how many rows there are, is not known yet.")
+
+
+def couplers_window(cpr: bytes, par: bytes | None, name: str) -> dict:
+    """Every coupler record, as the Coupler Specs window's Couplers tab shows
+    it: HUMB1GHzMid's 1 SSP-3N (2) Tap 5.30 3.60 3.60 3.90, Thru 5.30 3.60
+    3.60 3.90, legs 1, Tap 550 4.40 870 4.90; 9 FMT Split (62), Internal,
+    Tap -9.00 at 1002, 102, 550 and 870; 11 no part, 92, Internal, Tap 1002
+    99.00.  A block is F1 F2 F3-F6 R1 R2 R3 R4; Lode shows F1 F2 R1 R2 first."""
+    L = freq_labels(par)
+    classic = S._classic(cpr)
+    start, stride, _ = (S.CLASSIC_LAYOUT if classic else S.LAYOUT)["cpr"]
+    n = S.CLASSIC_NAME if classic else 25
+    first4, rest = ("F1", "F2", "R1", "R2"), ("F3", "F4", "F5", "F6", "R3", "R4")
+
+    def head(word, f, base):
+        return (f"{word} {L[f]}", _fw(base, L[f], 13))
+
+    cols = [("It...", _w(35)), ("Part Number", _w(215)), ("Coupler ID", _w(105)),
+            ("Optical", _w(72)), ("Internal", _w(73))]
+    cols += [head("Tap", f, 57) for f in first4] + [head("Thru", f, 67) for f in first4]
+    cols += [("Tap Legs", _w(94))]
+    cols += [head("Tap", f, 57) for f in rest] + [head("Thru", f, 67) for f in rest]
+    rows = []
+    for r in range(COUPLER_RECORDS):
+        seg = cpr[start + stride * r:start + stride * (r + 1)]
+        if len(seg) < stride:
+            break
+        code = _fx(seg, 1)
+        # the Tap leg block, then the Thru leg block
+        keys = [f"t{f}" for f in TAP_BLOCK] + [f"h{f}" for f in TAP_BLOCK]
+        values = dict(zip(keys, (v / S.SCALE for v in struct.unpack_from("<20i", seg, 5 + n))))
+        rows.append([str(r + 1), S._name(seg[5:5 + n]),
+                     str(int(code)) if code == int(code) else _f2(code),
+                     "0 - No", "1 - Yes" if seg[88 + n] else "0 - No"]
+                    + [_f2(values[f"t{f}"]) for f in first4] + [_f2(values[f"h{f}"]) for f in first4]
+                    + [str(seg[85 + n] + 1)]
+                    + [_f2(values[f"t{f}"]) for f in rest] + [_f2(values[f"h{f}"]) for f in rest])
+    tabs = [{"name": "Couplers", "grid": _grid(cols, rows),
+             "note": "Optical: no file seen sets it; every row reads 0 - No."}]
+    blank = [""] * 30
+    cols = [("It...", _w(38)), ("Part Number", _w(213)), ("NIU ID#", _w(82)), ("Phone Ports", _w(123)),
+            ("Video Ports", _w(115)), ("Min. Ports", _w(102)), ("Homes", _w(68))]
+    cols += [(f"{'Min.' if f[0] == 'F' else 'Max.'} {L[f]}", _fw(67, L[f], 12))
+             for f in ("F1", "F2", "R1", "R2", "F3", "F4", "F5", "F6", "R3", "R4")]
+    tabs.append({"name": "Base NIUs", "note": NIU_NOTE, "grid": _grid(cols, [
+        [str(k + 1), ""] + ["0"] * 5 + ["0.00"] * 10 for k, _ in enumerate(blank)])})
+    cols = [("It...", _w(38)), ("Part Number", _w(213)), ("Coupler ID", _w(104)), ("Idle Power", _w(108)),
+            ("1 Line Active", _w(130)), ("2+ Lines Active", _w(155)), ("Add1 Ring", _w(100)),
+            ("Min. Voltage", _w(127)), ("Max. Voltage", _w(130))]
+    tabs.append({"name": "NIU Power Requirements", "note": NIU_NOTE, "grid": _grid(cols, [
+        [str(k + 1), "", "0"] + ["0.00"] * 6 for k, _ in enumerate(blank)])})
+    cols = [("It...", _w(38)), ("Array Code", _w(108)), ("Drop Coupler", _w(132))]
+    cols += [c for _ in range(8) for c in (("NIU ID#", _w(85)), ("Quantity", _w(82)))]
+    tabs.append({"name": "NIU Arrays", "note": NIU_NOTE, "grid": _grid(cols, [
+        [str(k + 1), "", "0"] + ["0"] * 16 for k, _ in enumerate(blank)])})
+    cols = [("It...", _w(38)), ("Cumulative Prob.", _w(168)), ("Percent", _w(82)), ("Array Code", _w(105)),
+            ("Add1 Lines", _w(110)), ("Base Offhook", _w(138)), ("Base Ringing", _w(132)),
+            ("Extra Offhook", _w(135)), ("Extra Ringing", _w(135))]
+    tabs.append({"name": "Meta NIUs", "note": NIU_NOTE, "grid": _grid(cols, [
+        [str(k + 1), "0.00", "0.00", ""] + ["0.00"] * 5 for k, _ in enumerate(blank)])})
+    return {"kind": "cpr", "title": f"Design Assistant Coupler Specs - {name}",
+            "menus": ["File", "Edit"], "tabs": tabs}
+
+
+WINDOWS = {".atv": "Actives", ".cbl": "Cables", ".par": "Parameters", ".tap": "Taps",
+           ".cpr": "Couplers"}
 
 
 def window(ext: str, data: bytes, par: bytes | None, name: str) -> dict:
@@ -418,4 +624,8 @@ def window(ext: str, data: bytes, par: bytes | None, name: str) -> dict:
         return cables_window(data, par, name)
     if ext == ".par":
         return parameters_window(data, name)
+    if ext == ".tap":
+        return taps_window(data, par, name)
+    if ext == ".cpr":
+        return couplers_window(data, par, name)
     raise ValueError(ext)

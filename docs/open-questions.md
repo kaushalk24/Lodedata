@@ -89,8 +89,14 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    Pad → 2 moved byte +4). 34.6's `SPB-  16` was the program's own state:
    after reopening it shows `SPB-16`, and the spec saved in that session
    carries exactly 34.6's four labels trimmed. How the program picks pads
-   and EQs is solved too (file-formats 3.4c) — the replica uses it for an
-   amplifier with none stored, i.e. one placed in the replica.
+   and EQs is solved too (file-formats 3.4c). **When** (3 Oct, the user's
+   1a/1b and 6b): as an active is keyed, and again for every active whose
+   input an edit changes (1.3's ftg 0 -> 900; a Ripple placed upstream of
+   AL00419) — Recalc changes nothing, opening a file keeps what it holds.
+   With "Allow Over Equalization" unticked neither EQ takes off more tilt
+   than is there, return as forward (1b's Return Eq 6, not 7; all 48
+   actives of H043A/B). Not explained: WV750's 88 (FML1G7J ALC LE) keyed on
+   AL004 4.2 on 28 Sep kept 0 / SCS6 / 0 / 0 (QUESTIONS N1).
 5. **Tap and port colours — closed.** The user's recording of Test (screen
    menu 5) lists 37 problems on AL004; the replica produces the same 37 lines,
    word for word, from three checks on each tap's port levels, compared to
@@ -300,9 +306,9 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       fibre-fed node is neither in the expanded display). The user placed
       WV750's item 40, "FML1G7J ALC LE", on AL004 4.2 and the block counted
       it an amplifier, 1-0-0 9-7-0. The Bridgers and Feedermakers tabs say
-      nothing about it. The same test showed an active placed holds 0 in its
-      pads and EQs (the program does not pick them) and, unnamed, has no
-      Amp Name line in its box. Done.
+      nothing about it. The same test showed the 88 placed holding 0 in its
+      pads and EQs (asked again: other actives keyed are picked, 3 Oct) and,
+      unnamed, no Amp Name line in its box.
 
     * The older AL004 opens with the older WVEXT862 spec set (Lode 4's
       files); its 11.16 and 11.18 are taps feeding a branch from the port,
@@ -347,11 +353,12 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     * set A (the user's screenshots, 1-2 Oct) settled the brackets, the
       cascade position, the red 64 (no active at 11.18) and the Test lines;
       set A2 (2 Oct, AL004_SETA.ntw and 14 screenshots) the rest of it --
-      see the points below. Still open from them (QUESTIONS 6-8):
-      whether an excluded active in the middle of a cascade counts; why
-      Lode draws S3's 1.2 coupler red; the crossover lines' spacing (Lode
-      prints the figure seven wide, "Crossover of    3.85"; the app five,
-      as before -- asked first);
+      see the points below. What they raised, answered 3 Oct: an excluded
+      active mid-cascade counts the actives before it (the Ripple on 4.20
+      reads 1, AL00419 after it 2) and its line reads the levels arriving,
+      its return checked (25.96 23.48 35.27 34.26, 40 and 5 red); S3's 1.2
+      is red as an internal coupler away from any active; crossover lines
+      print the figure seven wide, as Lode does;
     * **Cascade Position — solved.** The Actives file's Custom Cascading,
       u16 at +55 of each active (+35 in the older record), the tab's row:
       bit 0 Cust. Casc. (Yes), bit 1 Exclude, bit k + 1 Casc. k Valid

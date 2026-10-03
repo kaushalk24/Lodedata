@@ -87,6 +87,24 @@ def _loss_points(block, params: DesignParameters) -> list:
     return [[f, round(v, 4)] for f, v in pairs if v]
 
 
+def _coupler_points(block, params: DesignParameters) -> list:
+    """A coupler leg's block -> [(MHz, dB)], each column as it stands: a 0
+    is 0 dB and a negative loss a gain.  HUMB1GHzMid's 92 (99 at 1002, 0
+    elsewhere): Lode's 2.1 behind it reads -48.00 37.00 11.00 11.00 | 44.50
+    49.00 (the user's 4a, 3 Oct).  BH1GHzMid's FMT Split, the FM902T's own
+    output split, holds -9 at the forward columns and 0 at the return:
+    every active behind one in the user's H043A_MID and H043B_MID was given
+    pads and EQs for 9 dB more than the FM902T's Out and a return 0 dB
+    up to it (30 actives, to the cent)."""
+    pairs = [
+        (params.return_low_mhz,   block[BLOCK_RL]),
+        (params.return_high_mhz,  block[BLOCK_RH]),
+        (params.forward_low_mhz,  block[BLOCK_LOW]),
+        (params.forward_high_mhz, block[BLOCK_HIGH]),
+    ]
+    return [[f, round(v, 4)] for f, v in pairs]
+
+
 def _tap_value_from_part(part: str) -> float | None:
     """`MMT2830` -> 30.0.  Tap part numbers end in the tap value."""
     digits = ""
@@ -225,7 +243,8 @@ def library_from_spec_set(base: str | Path,
                                      if p[0] <= params.return_high_mhz],
                 # a zero insertion loss marks a terminating tap: nothing
                 # continues past it (the screen shows 0.00 on the next line)
-                self_terminating=not any(abs(v) for v in port.insertion),
+                self_terminating=(port.self_term if port.self_term is not None
+                                  else not any(abs(v) for v in port.insertion)),
                 extra=_extra(params, lambda k: port.extra[k - 3]),
                 source=f"lodedata:{base.name}.tap",
             ))
@@ -249,8 +268,8 @@ def library_from_spec_set(base: str | Path,
         # "the Tap leg columns come first, then the Thru leg columns"
         tap_leg, thru_leg = p.values[0:10], p.values[10:20]
         legs = max(1, p.tap_legs)
-        thru_pts = _loss_points(thru_leg, params)
-        tap_pts = _loss_points(tap_leg, params)
+        thru_pts = _coupler_points(thru_leg, params)
+        tap_pts = _coupler_points(tap_leg, params)
         lib.add(PassiveType(
             id=new_id("psv"),
             name=p.name,
@@ -262,7 +281,7 @@ def library_from_spec_set(base: str | Path,
                         + [round(abs(tap_leg[BLOCK_HIGH]), 2)] * legs,
             power_passing=[True] * (legs + 1),
             leg_losses=[thru_pts] + [tap_pts] * legs,
-            extra_legs=[[mhz, [round(abs(thru_leg[k - 1]), 4)] + [round(abs(tap_leg[k - 1]), 4)] * legs]
+            extra_legs=[[mhz, [round(thru_leg[k - 1], 4)] + [round(tap_leg[k - 1], 4)] * legs]
                         for mhz, k in _extra_slots(params)],
             record=p.slot + 1,
             internal=p.internal,

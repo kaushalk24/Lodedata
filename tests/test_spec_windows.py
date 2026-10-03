@@ -46,12 +46,13 @@ def test_nbern_actives_window_as_recorded():
     a = tabs["Actives"]["grid"]
     assert _heads(a)[:8] == ["It...", "Active ID", "Part Number", "In - 1002", "In - 102",
                              "In - 85", "In - 5", "Out - 1002"]
-    assert _heads(a)[-3:] == ["In - 750", "In - F4", "In - F5"]
+    assert _heads(a)[19:25] == ["In - 750", "In - F4", "In - F5", "In - F6", "In - R3", "In - R4"]
+    assert _heads(a)[-2:] == ["Out - R4", "Out/Loss"]
     rows = a["rows"]
     assert len(rows) == 250
-    assert rows[0] == ["1", "11", "FM332", "16.30", "11.30", "11.00", "11.00", "53.00", "0 Out",
-                       "39.00", "0 Out", "39.00", "0 Out", "39.00", "0 Out", "1", "1", "1", "1",
-                       "13.90", "0.00", "0.00"]
+    assert rows[0][:22] == ["1", "11", "FM332", "16.30", "11.30", "11.00", "11.00", "53.00", "0 Out",
+                            "39.00", "0 Out", "39.00", "0 Out", "39.00", "0 Out", "1", "1", "1", "1",
+                            "13.90", "0.00", "0.00"]
     # 11H-33H: an ID and no part number; 21H-33H put out 52.00
     assert [r[1:3] + [r[7]] for r in rows[6:12]] == [["11H", "", "0.00"]] + \
         [[i, "", "52.00"] for i in ("21H", "22H", "31H", "32H", "33H")]
@@ -139,3 +140,88 @@ def test_wvext862_cables_tab_as_4c():
                             "0.000000", "0.000000"]
     assert g["rows"][29][:4] == ["30", "29", "", "0.00"]
     assert g["rows"][37][2:5] == ["NEW RG-6 U", "40.47", "6.100000"]
+
+
+def test_bh_actives_tab_scrolled_to_its_end():
+    """The user's Q11 recording: after Ret EQ, In at F3-F6, R3, R4, then Out
+    at each with its Out/Loss; FM332 In 12.20 12.90, Out 45.00 50.00 (550,
+    860); FM902T 8.60 8.60, 36.00 41.00; 64 Out 860 41.00."""
+    base = _set("BH1GHzMid")
+    w = W.actives_window(_read(base, ".atv"), _read(base, ".par"), "BH1GHzMid.atv")
+    a = _tabs(w)["Actives"]["grid"]
+    assert _heads(a)[19:] == ["In - 550", "In - 860", "In - F5", "In - F6", "In - R3", "In - R4",
+                              "Out - 550", "Out/Loss", "Out - 860", "Out/Loss", "Out - F5", "Out/Loss",
+                              "Out - F6", "Out/Loss", "Out - R3", "Out/Loss", "Out - R4", "Out/Loss"]
+    assert a["rows"][0][19:23] + a["rows"][0][25:28] == ["12.20", "12.90", "0.00", "0.00", "45.00", "0 Out", "50.00"]
+    assert a["rows"][12][19:21] + a["rows"][12][25:28:2] == ["8.60", "8.60", "36.00", "41.00"]
+    assert a["rows"][14][27] == "41.00"
+    gains = _tabs(w)["Reserve Gain"]["grid"]["rows"]
+    assert [r[1] for r in gains[:13]] == ["11", "21", "22", "31", "32", "33", "21H", "22H", "11H",
+                                          "31H", "32H", "33H", "62"]
+    assert all(r[3:] == ["0.00", "0.00"] for r in gains)
+
+
+def test_wv750_configuration_table_quantities():
+    """13h: 68N-68B and 69N-69M Quantity 1 beside their plug-in, 0 elsewhere;
+    the Plug-Ins tab 31 rows."""
+    base = _set("WV750-2026")
+    tabs = _tabs(W.actives_window(_read(base, ".atv"), _read(base, ".par"), "WV750-2026.atv"))
+    rows = {r[1]: r for r in tabs["Configuration Table"]["grid"]["rows"]}
+    assert rows["20/1"][3:6] == ["68N", "8", "1"] and rows["20/0"][3:6] == ["68", "0", "0"]
+    assert rows["21/3"][3:6] == ["69M", "14", "1"] and rows["20/6"][4:6] == ["0", "0"]
+    assert len(tabs["Plug-Ins"]["grid"]["rows"]) == 31
+
+
+def test_bh_taps_window_as_recorded():
+    """The user's Q14 recording of BH1GHzMid.tap: eleven tabs; rows 1-17
+    group 1, 18 on group 2; 4 Port 29 Loss 1.00 0.50 0.50 0.30; 8 Port 12
+    (9812) Self-Term. 1 - Yes, its losses -0.00; Swap Opt. 2 4 6 8."""
+    base = _set("BH1GHzMid")
+    w = W.window(".tap", _read(base, ".tap"), _read(base, ".par"), "BH1GHzMid.tap")
+    assert w["title"] == "Design Assistant Tap Specs - BH1GHzMid.tap"
+    tabs = _tabs(w)
+    assert [t["name"] for t in w["tabs"]] == [
+        "Tap IDs/PartNumbers", "2 Port Taps", "4 Port Taps", "6 Port Taps", "8 Port Taps", "Active Taps",
+        "Tap Swap Options", "2 Port Pad/EQ Banks", "4 Port Pad/EQ Banks", "6 Port Pad/EQ Banks",
+        "8 Port Pad/EQ Banks"]
+    ids = tabs["Tap IDs/PartNumbers"]["grid"]["rows"]
+    assert ids[0] == ["1", "30", "", "", "", "9830", "1"] and ids[1] == ["2", "29", "9229", "9429", "", "", "1"]
+    assert ids[16] == ["17", "", "", "", "", "", "1"] and ids[17][1:3] + ids[17][-1:] == ["129", "RMT2122-29", "2"]
+    four = tabs["4 Port Taps"]["grid"]
+    assert four["rows"][1][2:5] + four["rows"][1][15:19] == ["9429", "0 - No", "0 - No", "1.00", "0.50", "0.50", "0.30"]
+    eight = tabs["8 Port Taps"]["grid"]["rows"][12]
+    assert eight[2:5] == ["9812", "0 - No", "1 - Yes"] and eight[15:17] == ["-0.00", "-0.00"]
+    assert tabs["Tap Swap Options"]["grid"]["rows"][0] == ["30.00", "2", "30.00", "4", "30.00", "6", "30.00", "8"]
+    assert tabs["2 Port Pad/EQ Banks"]["grid"]["rows"][1] == ["2", "9229", "0", "0", "0", "0"]
+
+
+def test_humb_couplers_window_as_recorded():
+    """The user's Q15 recording of HUMB1GHzMid.cpr: FMT Split (62) Internal,
+    Tap -9.00 at 1002, 102, 550 and 870; 92 with no part, Tap 1002 99.00;
+    SSP-363N two tap legs."""
+    base = _set("HUMB1GHzMid")
+    w = W.window(".cpr", _read(base, ".cpr"), _read(base, ".par"), "HUMB1GHzMid.cpr")
+    tabs = _tabs(w)
+    assert list(tabs) == ["Couplers", "Base NIUs", "NIU Power Requirements", "NIU Arrays", "Meta NIUs"]
+    rows = tabs["Couplers"]["grid"]["rows"]
+    assert rows[0][1:14] == ["SSP-3N", "2", "0 - No", "0 - No", "5.30", "3.60", "3.60", "3.90",
+                             "5.30", "3.60", "3.60", "3.90", "1"]
+    assert rows[1][13:16] == ["2", "7.70", "8.70"]
+    assert rows[8][1:7] + rows[8][13:16] == ["FMT Split", "62", "0 - No", "1 - Yes", "-9.00", "-9.00",
+                                             "2", "-9.00", "-9.00"]
+    assert rows[10][1:6] == ["", "92", "0 - No", "1 - Yes", "99.00"]
+
+
+def test_wvext862_connectors_and_series_colors():
+    """The user's 16a and 16c: Pin-Type P3 500 P-T and 1 - Pin-Type for named
+    cables, 0 - Feed-Thru for the empty 29; New Build red on cables 0-19,
+    Upgrade red on 20 on."""
+    base = _set("WVEXT862")
+    tabs = _tabs(W.cables_window(_read(base, ".cbl"), _read(base, ".par"), "WVEXT862.cbl"))
+    conn = tabs["Connectors"]["grid"]["rows"]
+    assert conn[0][2:6] == ["EX P3 500 A", "", "P3 500 P-T", "1 - Pin-Type"]
+    assert conn[20][4] == "MC2  750 P-T" and conn[29][5:] == ["0 - Feed-Thru"] * 5
+    s = tabs["Series/Colors"]["grid"]
+    assert s["rows"][0][3:9] == ["New Build", "Dual Cable", "Rebuild", "Overlash", "Upgrade", "Dual New Build"]
+    assert s["colors"][0][3:9] == ["#ff0000", "#00c800", "#ff0000", "#ff0000", "#00c800", "#ff0000"]
+    assert s["colors"][20][3:9] == ["#00c800", "#00c800", "#00c800", "#00c800", "#ff0000", "#00c800"]

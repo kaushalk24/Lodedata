@@ -193,23 +193,23 @@ def test_parameters_read_back_as_the_spec_edit_tabs_show_them():
 # the user's recording shows it: "Design Assistant Test Results - 37 Errors"
 TEST_RESULTS = """\
 R Tap(750)  6.16 below min at 3.5.
-Y Crossover of  3.79 at 3.5.
+Y Crossover of    3.79 at 3.5.
 R Tap(750)  5.69 below min at 3.6.
-Y Crossover of 10.67 at 3.6.
+Y Crossover of   10.67 at 3.6.
 Y Tap(40)  0.22 above max at 4.27.
 Y Tap(750)  0.15 below min at 5.30.
-Y Crossover of  4.04 at 5.30.
+Y Crossover of    4.04 at 5.30.
 Y Tap(54)  0.82 over window at 6.8.
-Y Crossover of  3.18 at 6.9.
+Y Crossover of    3.18 at 6.9.
 R Tap(40)  2.04 above max at 7.6.
 R Tap(5)  0.62 above max at 7.6.
 R Tap(750)  1.35 below min at 10.2.
 R Tap(40)  1.19 above max at 10.2.
-Y Crossover of  3.34 at 10.14.
+Y Crossover of    3.34 at 10.14.
 R Tap(750)  2.38 below min at 10.15.
-Y Crossover of  5.86 at 10.15.
+Y Crossover of    5.86 at 10.15.
 R Tap(750)  2.86 below min at 13.3.
-Y Crossover of  3.77 at 13.3.
+Y Crossover of    3.77 at 13.3.
 R Tap(750)  2.68 below min at 14.1.
 R Tap(54)  0.92 below min at 14.1.
 R Tap(40)  4.68 above max at 14.1.
@@ -225,9 +225,9 @@ Y Tap(750)  0.20 over window at 36.6.
 Y Tap(750)  1.91 over window at 37.6.
 Y Tap(54)  1.42 over window at 37.6.
 R Tap(750)  5.60 below min at 40.4.
-Y Crossover of  3.40 at 40.4.
+Y Crossover of    3.40 at 40.4.
 R Tap(750) 10.88 below min at 40.5.
-Y Crossover of  8.56 at 40.5.
+Y Crossover of    8.56 at 40.5.
 Y Tap(750)  0.75 over window at 42.1."""
 
 
@@ -247,13 +247,13 @@ def test_the_test_results_match_lode_data_line_for_line():
 # to 3.50 (6.8 as imported): "36 Errors", from the user's two screenshots
 WINDOW_TEST = """\
 R Tap(750)  6.16 below min at 3.5.
-Y Crossover of  3.79 at 3.5.
+Y Crossover of    3.79 at 3.5.
 R Tap(750)  5.69 below min at 3.6.
 Y Tap(5)  0.29 below window at 3.6.
-Y Crossover of 10.67 at 3.6.
+Y Crossover of   10.67 at 3.6.
 Y Tap(40)  0.22 above max at 4.27.
 Y Tap(750)  0.15 below min at 5.30.
-Y Crossover of  4.04 at 5.30.
+Y Crossover of    4.04 at 5.30.
 Y Tap(54)  0.82 over window at 6.8.
 R Tap(40)  1.73 above max at 6.9.
 R Tap(40)  2.04 above max at 7.6.
@@ -261,9 +261,9 @@ R Tap(5)  0.62 above max at 7.6.
 R Tap(750)  1.35 below min at 10.2.
 R Tap(40)  1.19 above max at 10.2.
 R Tap(750)  2.38 below min at 10.15.
-Y Crossover of  5.86 at 10.15.
+Y Crossover of    5.86 at 10.15.
 R Tap(750)  2.86 below min at 13.3.
-Y Crossover of  3.77 at 13.3.
+Y Crossover of    3.77 at 13.3.
 R Tap(750)  2.68 below min at 14.1.
 R Tap(54)  0.92 below min at 14.1.
 R Tap(40)  4.68 above max at 14.1.
@@ -280,7 +280,7 @@ Y Tap(750)  1.91 over window at 37.6.
 Y Tap(54)  1.42 over window at 37.6.
 R Tap(750)  5.60 below min at 40.4.
 R Tap(750) 10.88 below min at 40.5.
-Y Crossover of  8.56 at 40.5.
+Y Crossover of    8.56 at 40.5.
 Y Tap(750)  0.75 over window at 42.1."""
 
 
@@ -795,3 +795,58 @@ def test_branches_14_and_20_as_the_screen_and_boxes_show_them(screen):
             "supply", "homes_down")
     assert tuple(r14[3].amp_info[k] for k in keys) == \
         ("AL00424", "LE 750MHz THM", "0", "7", "2", "2", 594, 2621, 294, 594, 2621, 2, "A", 17)
+
+
+def test_a_ripple_placed_in_the_middle_of_a_cascade():
+    """The user's 6a-6c (3 Oct): a Ripple (70) keyed on AL004 4.20.  Its line
+    reads the levels arriving there, 25.96 23.48 35.27 34.26, its return
+    short of them (40 and 5 red, the 70 red); its Cascade Position is 1 (the
+    actives before it, AL00416), AL00419 at 4.24 still 2; 4.24's input
+    changed, so the program picked its pads and EQs again: FLAG / SCS6 / 20
+    / 0; AL00416's at 4.13, whose input it left, stay 4 / 12 / 14 / 4."""
+    from hfc.entry import resolve_active
+    from hfc.screen import active_inputs, repick
+    design = design_from_ntw(NTW, SPEC)[0]
+    before = active_inputs(design)
+    part = resolve_active(design.library, "70")
+    nd = design.branch(4).nodes[19]
+    nd.amp, nd.amp_part, nd.pads = part.active_id, part.id, [0, 0, 0, 0]
+    repick(design, before, keyed={id(nd)})
+    rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
+    r = rows[(4, 20)]
+    assert [as_shown(v) for v in r.levels.values()] == [25.96, 23.48, 35.27, 34.26]
+    assert r.level_severity == {40.0: "red", 5.0: "red"}
+    assert r.amp_info["cascade"] == 1 and r.amp_info["fwd_pad"] == "."
+    assert [as_shown(v) for v in rows[(4, 21)].levels.values()] == [47.53, 37.63, 17.31, 17.11]
+    b = rows[(4, 24)].amp_info
+    assert [b[k] for k in ("fwd_pad", "fwd_eq", "ret_pad", "ret_eq", "cascade")] == ["FLAG", "SCS6", "20", "0", 2]
+    assert [b[k] for k in ("aerial_prev", "aerial_start", "total_split")] == [387.0, 2920.0, 387.0]
+    b = rows[(4, 13)].amp_info
+    assert [b[k] for k in ("fwd_pad", "fwd_eq", "ret_pad", "ret_eq", "cascade")] == ["4", "12", "14", "4", 1]
+
+
+def test_only_an_internal_coupler_away_from_an_active_is_red():
+    """No coupler on AL004 is red: a bridger's own splits sit on its line, or
+    on a branch's 0-ft first line, which is where its coupler is (7.1's
+    112<8> at bridger 6.1's place)."""
+    design = design_from_ntw(NTW, SPEC)[0]
+    assert not [(r.branch, r.node) for r in build(design).rows if "red" in r.coupler_severity]
+
+
+def test_s3s_multi_out_100_ft_from_its_ripple_is_red():
+    """The user's 7a: on S3, WV750's MULTI OUT (100, internal) on 1.2, 100 ft
+    from the Ripple on 1.1, is drawn red; 7b, moved to a 0-ft line under the
+    Ripple, green."""
+    s3 = NTW.parents[1] / "keyed" / "S3.ntw"
+    if not s3.exists():
+        pytest.skip("S3.ntw not in samples")
+    design = design_from_ntw(s3, SPEC)[0]
+    rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
+    assert (rows[(1, 2)].couplers, rows[(1, 2)].coupler_severity) == (["100<2>"], ["red"])
+    nd = design.branch(1).nodes[1]
+    moved = type(nd)(couplers=nd.couplers, through_leg=nd.through_leg, cab=nd.cab, cab_part=nd.cab_part)
+    nd.couplers = []
+    design.branch(1).nodes.insert(1, moved)
+    design.renumber(design.branch(1))
+    rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
+    assert rows[(1, 2)].coupler_severity == [""]

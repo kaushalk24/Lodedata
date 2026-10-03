@@ -62,6 +62,12 @@ TAP_PORT_CODES = {2: 0, 4: 1, 6: 2, 8: 3}
 TAP_VALUE_BLOCK = 25        # losses toward the tap ports
 TAP_INSERTION_BLOCK = 65    # hard cable in to hard cable out
 TAP_ID_OFFSET = 0
+# within a part slot, after the two blocks: Swap Opt. (a port code), Active,
+# Self-Term., then the F-Pad, R-Pad, F-EQ, R-EQ banks less one (the user's
+# recording of BH1GHzMid's Taps window: 8 Port 12, 9812, Self-Term. 1 - Yes)
+TAP_SWAP, TAP_ACTIVE, TAP_SELF_TERM, TAP_BANKS = 105, 106, 107, 108
+TAP_GROUP = 4               # the row's Tap Selection Group, less one
+TAP_ACTIVE_TABLE = 512      # Active Taps: 4 rows x (Min. Voltage, Amperage 1 ... 4)
 TAP_NAME_SLOTS = TAP_PORT_SLOTS      # kept for older callers
 
 # The actives table starts six records into the .atv record area: a design
@@ -354,6 +360,10 @@ class TapPort:
     extra: list = field(default_factory=list)
     # at F3 alone
     f3: list = field(default_factory=lambda: [0.0, 0.0])
+    # the Taps window's Self-Term. (None: the older file, where it is not
+    # known); a part with no insertion loss is one bar a few WiFi and RF
+    # devices (SHINSTON's AN-WIFI-208: 0 - No)
+    self_term: bool | None = None
 
 
 @dataclass
@@ -406,6 +416,7 @@ def read_taps(data: bytes) -> list:
                 insertion=_loss4(seg, insertion),
                 extra=extra,
                 f3=extra[0],
+                self_term=None if classic else bool(seg[o + TAP_SELF_TERM]),
             )
         if not ports:
             continue

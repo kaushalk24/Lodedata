@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from hfc.model import Library, DesignParameters, new_id
 from hfc.plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
                        BRANCH_NORMAL)
-from hfc.screen import build, tap_candidates
+from hfc.screen import build, tap_candidates, active_inputs, repick
 from hfc.entry import resolve_tap, resolve_coupler, resolve_active, config_slot, EntryError
 from hfc.starter import starter_library
 from hfc.reports import level_report, bill_of_materials, powering_report, to_csv
@@ -137,7 +137,18 @@ def load(design_id: str) -> Design:
     return Design.from_dict(json.loads(row[0]))
 
 
-def save(d: Design) -> Design:
+def load_for_edit(design_id: str) -> Design:
+    """A network about to be edited: its actives' input levels are noted,
+    so that saving it picks the pads and EQs again where they changed."""
+    d = load(design_id)
+    d._inputs_before = active_inputs(d)
+    return d
+
+
+def save(d: Design, keyed=()) -> Design:
+    before = getattr(d, "_inputs_before", None)
+    if before is not None:
+        repick(d, before, keyed)
     con = db()
     con.execute("INSERT INTO designs(id,name,updated,doc) "
                 "VALUES(?,?,datetime('now'),?) "
@@ -259,15 +270,15 @@ def _node(d: Design, branch: int, node: int) -> Node:
 
 @app.patch("/api/networks/{nid}/nodes/{branch}/{node}")
 def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
-    d = load(nid)
+    d = load_for_edit(nid)
     n = _node(d, branch, node)
     if body.clear_amp:
         n.amp, n.amp_part, n.amp_label = "", None, ""
         n.pads, n.kept_active, n.amp_config = [], 0, 0
     if body.amp_code is not None:
         n.kept_active = 0
-        # a newly placed active holds 0 in its pads and EQs: the program does
-        # not pick them (the user's 88 on AL004 4.2)
+        # the program picks its pads and EQs as it is keyed (saving below);
+        # a fibre-fed one holds 0 in all four
         n.pads = [0, 0, 0, 0]
         try:
             part = resolve_active(d.library, body.amp_code)
@@ -288,7 +299,7 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
         # names the cable, as when a .ntw is read
         n.cab_part = next((c.id for c in d.library.cables.values()
                            if c.cable_index == body.cab % 100), None)
-    save(d)
+    save(d, keyed={id(n)} if body.amp_code is not None and n.amp else ())
     return n.to_dict()
 
 
@@ -300,7 +311,7 @@ class InsertNode(BaseModel):
 
 @app.post("/api/networks/{nid}/branches/{branch}/nodes")
 def insert_node(nid: str, branch: int, body: InsertNode):
-    d = load(nid)
+    d = load_for_edit(nid)
     b = d.branch(branch)
     if not b:
         raise HTTPException(404, "branch not found")
@@ -336,7 +347,7 @@ def delete_node(nid: str, branch: int, branch_node: int = 0, node: int = 0,
     line with a power stop is not deleted; one a branch begins at is
     deleted with that branch and everything down it, once the "Delete
     Branch(es)?" box has been answered OK (``confirm``)."""
-    d = load(nid)
+    d = load_for_edit(nid)
     b = d.branch(branch)
     if not b:
         raise HTTPException(404, "branch not found")
@@ -380,7 +391,7 @@ def tap_choices(nid: str, branch: int, node: int, slot: int):
 
 @app.put("/api/networks/{nid}/nodes/{branch}/{node}/tap")
 def set_tap(nid: str, branch: int, node: int, body: TapEdit):
-    d = load(nid)
+    d = load_for_edit(nid)
     n = _node(d, branch, node)
     if body.code is not None:
         try:
@@ -428,7 +439,7 @@ def set_coupler(nid: str, branch: int, node: int, body: CouplerEdit):
     A leading "-" swaps the legs: the through (low loss) leg goes to the
     branch and the tap (high loss) leg carries on downstream.
     """
-    d = load(nid)
+    d = load_for_edit(nid)
     n = _node(d, branch, node)
     through = n.through_leg
     if body.code is not None:
@@ -495,7 +506,7 @@ def set_coupler(nid: str, branch: int, node: int, body: CouplerEdit):
 
 @app.delete("/api/networks/{nid}/branches/{branch}")
 def delete_branch(nid: str, branch: int):
-    d = load(nid)
+    d = load_for_edit(nid)
     gone = d.remove_branch(branch)
     save(d)
     return {"removed": gone}

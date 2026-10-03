@@ -177,3 +177,89 @@ def test_the_pads_and_eqs_lode_picked_at_1_7():
                        params.return_high_mhz, params.return_low_mhz), levels))
         picked = choose_pads_eqs(fm332, at, params)
         assert [fm332.pad_eq[c][1][v].strip() for c, v in enumerate(picked)] == want, name
+
+
+def _new(url, name):
+    base = _set(name)
+    nid = _call(url, "POST", "/api/networks", {"name": "Untitled"})["id"]
+    files = [(base.name + ext, (base.parent / (base.name + ext)).read_bytes())
+             for ext in (".par", ".atv", ".tap", ".cpr", ".cbl")]
+    assert _call(url, "POST", f"/api/networks/{nid}/library/spec", files=files)["loaded"]
+    return nid
+
+
+def _row(screen, branch, node):
+    return next(r for r in screen["rows"] if r["branch"] == branch and r["node"] == node and not r["end"])
+
+
+def _levels(row):
+    return [f"{v:.2f}" for v in row["levels"]] + [f"{v:.2f}" for v in row["extra_levels"]]
+
+
+def test_pads_and_eqs_are_picked_as_the_amp_is_keyed_and_again_when_its_input_changes(server):
+    """The user's 1a and 1b (3 Oct): BH1GHzMid, 1.1 amp 71, 1.2 190 ft hc 2,
+    1.3 amp 11.  Keyed, the FM332's box reads Forward Pad Flag, Forward Eq
+    CS8, Return Pad Flag, Return Eq 2; 1.3's ftg 0 -> 900 and it reads 060
+    / 13 / 190 / 6 (Recalc changes nothing)."""
+    nid = _new(server, "BH1GHzMid")
+
+    def edit(n, **body):
+        _call(server, "PATCH", f"/api/networks/{nid}/nodes/1/{n}", body)
+    edit(1, amp_code="71")
+    _call(server, "POST", f"/api/networks/{nid}/branches/1/nodes", {"after": 0})
+    edit(2, ftg=190, hc=2)
+    _call(server, "POST", f"/api/networks/{nid}/branches/1/nodes", {"after": 0})
+    edit(3, amp_code="11")
+    s = _call(server, "GET", f"/api/networks/{nid}/screen")
+    r = _row(s, 1, 3)
+    assert _levels(r) == ["47.17", "36.59", "12.29", "11.30", "41.54", "45.55"]
+    box = r["amp_info"]
+    assert [box[k] for k in ("fwd_pad", "fwd_eq", "ret_pad", "ret_eq")] == ["Flag", "CS8", "Flag", "2"]
+    edit(3, ftg=900)
+    s = _call(server, "GET", f"/api/networks/{nid}/screen")
+    r = _row(s, 1, 3)
+    assert _levels(r) == ["24.31", "29.93", "18.41", "12.74", "25.16", "24.49"]
+    box = r["amp_info"]
+    assert [box[k] for k in ("fwd_pad", "fwd_eq", "ret_pad", "ret_eq")] == ["060", "13", "190", "6"]
+    assert [box[k] for k in ("aerial_prev", "total_start", "cascade")] == [1090.0, 1090.0, 1]
+
+
+def test_humb_keyed_on_its_own_spec(server):
+    """The user's 3a, 4a and 5 (3 Oct), keyed on HUMB1GHzMid itself: 1.5 a
+    0-ft line, 1.6 190 ft hc 2 /26/, 1.7 189 ft hc 5 <20> (FFT8-20 P, green),
+    1.8 100 ft hc 5 /12/ (FFT2-12P, the 2-port: HUMB has 12 only so; 5 homes
+    on 2 ports red), 1.9 amp 11.  Branch 2 behind 92: a 0 in a spec column is
+    0 dB, -48.00 37.00 11.00 11.00 | 44.50 49.00."""
+    nid = _new(server, "HUMB1GHzMid")
+
+    def edit(n, **body):
+        _call(server, "PATCH", f"/api/networks/{nid}/nodes/1/{n}", body)
+
+    def line():
+        _call(server, "POST", f"/api/networks/{nid}/branches/1/nodes", {"after": 0})
+    edit(1, amp_code="71")
+    for n in (2, 3, 4):
+        line()
+        _call(server, "PUT", f"/api/networks/{nid}/nodes/1/{n}/coupler", {"code": "92"})
+    line()
+    for n, ftg, hc, tap in ((6, 190, 2, "26"), (7, 189, 5, "20"), (8, 100, 5, "12")):
+        line()
+        edit(n, ftg=ftg, hc=hc)
+        _call(server, "PUT", f"/api/networks/{nid}/nodes/1/{n}/tap", {"code": tap})
+    line()
+    edit(9, amp_code="11")
+    s = _call(server, "GET", f"/api/networks/{nid}/screen")
+    want = {5: ["51.00", "37.00", "11.00", "11.00", "44.50", "49.00"],
+            6: ["46.17", "35.59", "12.29", "11.30", "41.04", "44.55"],
+            7: ["39.57", "33.90", "13.88", "11.91", "36.70", "38.73"],
+            8: ["34.43", "32.36", "15.36", "13.27", "33.68", "34.29"],
+            9: ["31.73", "31.36", "16.46", "14.67", "32.08", "31.89"]}
+    for n, lv in want.items():
+        assert _levels(_row(s, 1, n)) == lv, n
+    r7, r8 = _row(s, 1, 7), _row(s, 1, 8)
+    assert (r7["taps"], r7["tap_severity"]) == (["<20>"], [""])
+    assert [f"{v:.2f}" for v in r7["tap_levels"][0]] == ["19.57", "13.90", "33.88", "31.91"]
+    # the cursor on it is yellow: 22.43 at 1002 is over its window
+    assert (r8["taps"], r8["tap_severity"], r8["hc_severity"]) == (["/12/"], ["yellow"], "red")
+    assert [f"{v:.2f}" for v in r8["tap_levels"][0]] == ["22.43", "20.36", "27.36", "25.27"]
+    assert _levels(_row(s, 2, 1)) == ["-48.00", "37.00", "11.00", "11.00", "44.50", "49.00"]

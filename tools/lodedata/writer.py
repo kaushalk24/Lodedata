@@ -55,6 +55,12 @@ THROUGH_VALUE = 4                       # +131 on the branch taking the through 
 
 # the preamble of a 12.11 design (offsets from the start of the file)
 PREAMBLE_END = 44807                    # where branch 1 starts
+# A network joined to others by a PCD (Power Connecting Device) lists
+# them before branch 1: the u32 at 44803 is non-zero and a table follows
+# -- in Bullhead's H043A_MID and H043B_MID one byte, then per network its
+# file name char[261] and two u32 (1, 1): H043A_MID, H043B_MID, branch 1
+# 539 bytes on.  Kept as the file has it.
+P_PCDS = 44803
 P_FTG = 1817                            # u32 feet aerial, underground
 P_FTG_CABLE = 1825                      # u32 [100 cable index][10 series]
 P_HOMES = 5825                          # u32 homes a/u, tap ports a/u, homes a/u
@@ -85,7 +91,10 @@ HOUSING_SLOTS = range(1, 15)
 P_PARTS = 36201             # (u16 aerial, u16 UG) at +4 x k:
 PARTS_TAPS, PARTS_COUPLERS, PARTS_SPLITTERS, PARTS_INLINE = 0, 1, 2, 3
 PARTS_LINE_EXTENDERS, PARTS_AMPLIFIERS = 4, 5
-PARTS_ONE = 12              # 1 in every file, the empty one included
+# 1 in every file the program wrote but H043A_MID, which has it at k = 6:
+# not decoded, so kept as the file has it (an empty network's is 1)
+PARTS_ONE = 12
+PCD_RECORD = 999            # a branch head's coupler record for a PCD (ID 1000)
 PARTS_SUPPLIES = 56         # + power supply type
 SUPPLY_TYPES = range(0, 26)
 # Not decoded yet, left as the file has them (0 in an empty network):
@@ -296,7 +305,8 @@ def build(source: RawNetwork, branches: list, name: str | None = None,
     """
     if not branches or not branches[0].nodes:
         raise WriteError("a network needs branch 1 with at least one line")
-    if len(source.header) + len(source.preamble) != PREAMBLE_END:
+    size = len(source.header) + len(source.preamble)
+    if size != PREAMBLE_END and not (size > PREAMBLE_END and _u32(source.header + source.preamble, P_PCDS)):
         raise WriteError("the file this network came from is not laid out as "
                          "a Design 12.11 file: nothing written")
     records = {} if fresh else source.records()
@@ -354,7 +364,7 @@ def build(source: RawNetwork, branches: list, name: str | None = None,
             parent_id = ids[number[pb]][pn - 1]
         struct.pack_into("<IIH", head, B_PARENT, parent_id, ids[k][0], len(br.nodes))
         if br.coupler_record >= 0:
-            head[N.B_COUPLER] = br.coupler_record & 0xFF
+            struct.pack_into("<H", head, N.B_COUPLER, br.coupler_record)
         head[N.B_THROUGH] = THROUGH_VALUE if br.through else 0
         out += head
 
@@ -617,7 +627,10 @@ def tallies(plain, info: SpecInfo | None = None) -> dict:
                 t[P_POWER_STOPS] += 1
             t[P_PARTS + 4 * PARTS_TAPS + 2 * u] += len(nd.taps)
             if nd.branches:
-                recs = [net.branches[b].coupler_record for b in nd.branches if b in net.branches]
+                # a PCD is no coupler: H043A_MID and H043B_MID count one
+                # aerial coupler, their 1.1 PCDs left out
+                recs = [net.branches[b].coupler_record for b in nd.branches
+                        if b in net.branches and net.branches[b].coupler_record != PCD_RECORD]
                 if len(recs) == 2 and recs[0] == recs[1]:
                     t[P_PARTS + 4 * PARTS_SPLITTERS + 2 * u] += 1
                 else:
@@ -646,6 +659,10 @@ def tallies(plain, info: SpecInfo | None = None) -> dict:
                 return True
             return g == 0 and br.number != 1 and not groups[0][0].ftg
 
+        # a PCD's branch: one connector, counted on its line's cable (H043A_MID
+        # and H043B_MID one more on cable 0, the PCD's line and 1.1 both on 0)
+        if br.coupler_record == PCD_RECORD and br.nodes:
+            t[P_CONNECTORS + 4 * (br.nodes[0].cable % 100)] += 1
         for g, lines in enumerate(groups):
             if not lines[0].ftg:
                 continue
@@ -674,13 +691,12 @@ def tallies(plain, info: SpecInfo | None = None) -> dict:
                 fits = [number for number, least in info.housings if total and least <= total]
                 if fits and fits[-1] in HOUSING_SLOTS:
                     t[P_HOUSINGS + 4 * fits[-1] + 2] += 1
-    t[P_PARTS + 4 * PARTS_ONE] = 1
     return t
 
 
 def _more_totals(out: bytearray, info: SpecInfo | None) -> None:
     """Rewrite the totals ``tallies`` rebuilds; the rest is left."""
-    pairs = [PARTS_TAPS, PARTS_COUPLERS, PARTS_SPLITTERS, PARTS_INLINE, PARTS_ONE]
+    pairs = [PARTS_TAPS, PARTS_COUPLERS, PARTS_SPLITTERS, PARTS_INLINE]
     pairs += [PARTS_SUPPLIES + k for k in SUPPLY_TYPES]
     if info is not None:
         pairs += [PARTS_LINE_EXTENDERS, PARTS_AMPLIFIERS]

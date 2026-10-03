@@ -76,7 +76,8 @@ def text_len(data: bytes, at: int) -> int:
 
 # branch record fields, relative to its id
 B_HEAD, B_COUNT = 4, 8
-B_COUPLER = 126              # coupler file record + 1, 0 = none yet
+B_COUPLER = 126              # coupler file record + 1, 0 = none yet: a u16 --
+                             # a PCD's is 999 (Bullhead's H043A_MID 91, H043B_MID 24)
 B_THROUGH = 131              # non-zero: this branch takes the through leg
 
 PORTS_BY_CODE = {0: 2, 1: 4, 2: 6, 3: 8}
@@ -236,7 +237,7 @@ def read_network(plain: bytes) -> NtwNetwork:
         count = r.u16(b + B_COUNT)
         head_size = BRANCH_RECORD + text_len(plain, b + B_TEXT)
         branch = NtwBranch(number=r.u32(b + head_size + N_PREV), offset=b,
-                           coupler_record=r.u8(b + B_COUPLER),
+                           coupler_record=r.u16(b + B_COUPLER),
                            through=bool(r.u8(b + B_THROUGH)), head_size=head_size)
         p = b + head_size
         for _ in range(count):

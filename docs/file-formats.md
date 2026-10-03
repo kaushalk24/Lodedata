@@ -160,26 +160,30 @@ parameters 97 / 95 / 97 / 95. Every file of the five sets is a layout
 already checked against Lode (`tests/test_spec_sets.py`); a set with another
 version or size is reported by the tool. What no file explains yet:
 
-* **Taps.** Byte +4 of each row (1–4: WV750 4 on most rows, 1 on 17, 2 on
-  the AN-WIFI rows); in each port slot, after the two loss blocks, the port
-  code (0–3, redundant), a byte 1 on a few rows (WVEXT862's two AN-WIFI
-  taps that feed branches), and four bytes FF FF FF FF (KERMIT's 6-port
-  rows 08 08 08 08); bytes 580 (35.0 in WV750 and WVEXT862, 0 in the others)
-  and 640 (1) of the file.
-* **Actives** (most of it placed 2 Oct from the user's recording of
-  NBERN1GHz's Actives window, every tab: 3.3, 3.4d). Still unknown: where
-  the Actives tab's **Out/Loss** columns are kept (every row of the
-  recording reads `0 Out`); the two figures after the power steps (+163,
-  +167) and after In F6 (+187, +191) — R3/R4? — and the three bytes before
-  the Configuration Table; the Configuration Table's **Quantity** columns
-  (Plugin 1 is +10 of each slot); the Plug-Ins / Plug-Ins Powering figures
-  (only the names are placed), Bridgers, Feedermakers and the 12.1 file's 24
-  boosters — empty in every file sent, so drawn empty as Lode draws them for
-  NBERN1GHz.
+* **Taps** (3.4, placed 3 Oct from the user's recording of the Taps
+  window): byte +4 is the Tap Selection Group, the slot's tail Swap Opt.,
+  Active, Self-Term. and the four Pad/EQ banks; 512–639 Active Taps.
+  Still unknown: bytes 580 (35.0 in WV750 and WVEXT862) and 640 (1).
+* **Actives** (3.3, 3.4d; the user's recordings of NBERN1GHz's and
+  BH1GHzMid's Actives windows). Out/Loss: set to Loss on row 1's Out - F1
+  it is byte **518** of the file (TEST_OL.atv: the only data byte that
+  changed; 0 in every file); which byte the other rows and columns use is
+  not known. R3 / R4 In (+187, +191) and Out (+211, +215): no file has a
+  figure there. The two figures after the power steps (+163, +167) and
+  the three bytes before the Configuration Table. The Configuration
+  Table's **Quantity**: 1 beside every plug-in named, 0 beside none (13c–
+  13h), no 1 stored in the slot. The Plug-Ins / Plug-Ins Powering figures
+  (only the names are placed, 31 rows), Bridgers, Feedermakers and the
+  12.1 file's 24 boosters — empty in every file sent. Saving a 11.1 file,
+  Lode writes it as 12.1 with 24 records of 461 bytes added at the end.
 * **Couplers.** The code at +1, shown as the coupler's ID (`100`, `12`, `2`);
-  how it packs a family and a value (408, 612, 216) is not known.
-* **Cables.** The second loss block (equal to the first in every file) and
-  the five flags (all 1).
+  how it packs a family and a value (408, 612, 216) is not known. Optical
+  (byte 111 or 112: set in no real record). The NIU tables after the 998
+  records.
+* **Cables.** The second loss block (equal to the first in every file).
+  The five figures at +144 are the Connectors tab's Line Extender,
+  Amplifier, Equalizer, Tap and Coupler (1 Pin-Type, 0 Feed-Thru); +114
+  the Feed-Thru Part #, +129 the Pin-Type Part # (the user's 16a).
 * **Parameters.** Four fixed figures that no tab shows (1082: the tap
   windows again; 2972: 7777; 3900 / 3905: 100/30, 101/30).
 
@@ -368,7 +372,27 @@ and is the single highest-value thing to pin down (see open questions).
 | 30 | i32[10] | **Tap** leg loss block |
 | 70 | i32[10] | **Thru** leg loss block |
 | 110 | u8 | tap legs, stored as the count minus one |
-| 113 | u8 | internal-coupler flag |
+| 111–112 | u8 | not set in any real record (one of them the window's Optical) |
+| 113 | u8 | internal-coupler flag (the window's Internal, 1 - Yes) |
+
+A block is F1, F2, F3–F6, R1, R2, R3, R4. **Each column is taken as it
+stands: a 0 is 0 dB, a negative figure a gain.** BH1GHzMid's FMT Split
+(62, internal, two legs: the FM902T's own output split) holds -9.00 at
+1002, 102, 550 and 860 and 0 at the return; Lode's Couplers tab shows the
+-9.00 (the user's Q15 recording of HUMB1GHzMid, which holds the same
+record). Every active behind one in H043A_MID and H043B_MID holds pads
+and EQs for a forward level 18 dB above, and a return need 9 dB below,
+what a 9 dB loss on both would give: +9 forward, 0 return, 30 actives to
+the cent. HUMB's 92 (99 at 1002, 0 elsewhere): branch 2 behind it reads
+-48.00 37.00 11.00 11.00 | 44.50 49.00 (the user's 4a). The cable file's
+return figures are stored negative and shown positive (they stay a loss).
+
+The **Couplers window** (Spec Edit → Couplers): Couplers — It..., Part
+Number, Coupler ID (+1), Optical, Internal, Tap and Thru at F1 F2 R1 R2,
+Tap Legs, Tap at F3–F6 R3 R4, Thru at F3–F6 R3 R4; 998 records. Base NIUs,
+NIU Power Requirements, NIU Arrays and Meta NIUs: every row Lode showed is
+empty; they follow the 998 coupler records, layout not decoded. A PCD's
+branch names record 999 - 1 = 998, just past the table.
 
 Same loss-block layout as the cable file — the manual describes "four columns to
 the right of the Thru label … at the forward high, forward low, return high, and
@@ -400,14 +424,25 @@ family+value for the rest (`RLDC12-8` → 408, `GNA INT DC-12` → 612,
 record 10 is ID 92 with no name (every loss 0 but the tap leg's 99 at
 1002, the internal flag set): the user keyed 92 at 1.2–1.4 and Lode drew
 `92<2>` … in green, the levels going on through it unchanged. LKMac1GHz,
-GEFD1GHz and others hold such records too (99 at F1 and F2). What the
-branch behind one starts at is not seen yet (QUESTIONS 4).
+GEFD1GHz and others hold such records too (99 at F1 and F2). On HUMB the
+node split is 99; 92 was keyed in error, but Lode's figures behind it
+settled the zeros (above).
+
+**An internal coupler away from an active is drawn red**: it must sit at
+an active's place — the lines from the last one with footage to the
+0-ft lines after it, a branch's 0-ft first line being at its coupler's
+place. S3's MULTI OUT (WV750's 100) on 1.2, 100 ft from the Ripple, red;
+moved to a 0-ft line under it, green (the user's 7a/7b: "a node's leg
+coupler, 0 ft only"). No coupler on AL004, SN001, the older AL004,
+AL002, AL003 or H043A/B turns red.
 
 ### 3.3 `.atv` — actives: amplifiers, line extenders, nodes (362 bytes)
 
 | offset | type | field |
 |---|---|---|
 | 1–4 | u8 ×4 | the Pads/EQs Banks less one: forward EQ, return EQ, forward pad, return pad (the Actives tab's Fwd Pad / Ret Pad / Fwd EQ / Ret EQ) |
+| 171 | i32 ×6 | In at F3, F4, F5, F6, R3, R4 (the Actives tab after Ret EQ, the user's Q11 recording: BH's FM332 12.20 12.90) |
+| 195 | i32 ×6 | Out at F3–F6, R3, R4 (FM332 45.00 50.00; R3 and R4 set in no file, so their places are not proven) |
 | 5 | char[25] | **Part Number**, e.g. `BLE-7-750PSS`, `BTN NODE-12`, `FM902B` |
 | 30 | char[25] | **Ret. Mod. Part Number** (Reserve Gain tab): Buckhannon's item 42 `RA-KIT-40L`, KERMIT's `RA-KIT\40`; NUL-ended, what follows the NUL is left from an older entry (an earlier reading split it into two "option parts") |
 | 55 | u32 | **Custom Cascading** (below) |
@@ -513,10 +548,32 @@ offset 641. A row is one **Tap ID** with a part for each port count:
 | 341 | 8-port part | `<26>` |
 
 Each part slot is 112 bytes: the part number, then two ten-slot loss blocks in
-the same layout as cables and couplers — **Tap Value** (toward the ports) at
-+25 and **Tap Losses** (insertion) at +65. An all-zero insertion block marks a
-terminating tap: nothing continues past it and the screen shows 0.00 on the
-line below.
+the same layout as cables and couplers (F1 F2 F3–F6 R1 R2 R3 R4) — **Tap
+Value** (toward the ports) at +25 and **Tap Losses** (insertion) at +65 —
+then, from the user's recording of BH1GHzMid's Taps window (Q14):
+
+| slot offset | field (Taps window) |
+|---|---|
+| +105 | Swap Opt. (Tap Swap Options) as a port code: 2 Port 0 … 8 Port 3 |
+| +106 | Active (0 - No / 1 - Yes) |
+| +107 | **Self-Term.** (BH's 8-port 12, 9812: 1 - Yes, its losses -0.00) |
+| +108–111 | F-Pad, R-Pad, F-EQ, R-EQ banks less one (FF shows 0) |
+
+The row's byte +4 is its **Tap Selection Group** less one (BH: rows 1–17
+group 1, from 18 on group 2). The 128 bytes before the rows (512–639) are
+**Active Taps**: four rows (2/4/6/8 Port Taps) of Min. Voltage, Amperage 1,
+Voltage 2 … Amperage 4 (all 0.00 there). A terminating tap is Self-Term.;
+in all but 85 of the 10,004 named parts of the regions' current-format
+files that is the same as an all-zero insertion block. The 85 are WiFi
+and RF devices with no loss that are not Self-Term. (SHINSTON's
+AN-WIFI-208): the levels go on through them. In the older layout the
+all-zero rule stays (its flags' places are not known).
+
+The **Taps window**: Tap IDs/PartNumbers (It..., Tap ID, the four part
+numbers, Tap Selection Group in grey), 2/4/6/8 Port Taps (Tap ID, Part
+Number, Active, Self-Term., Value and Loss at F1 F2 R1 R2 F3–F6 R3 R4),
+Active Taps, Tap Swap Options (each port count's ID — the Tap ID, in grey —
+and Swap Opt.), 2/4/6/8 Port Pad/EQ Banks; all 512 rows.
 
 **A row with a Tap ID and no part for a port count is still that tap.**
 HUMB1GHzMid's row 6 is Tap ID 21 with every slot empty; the user keyed 21
@@ -814,8 +871,17 @@ next node, or the end line's id on the last.
 **Branch head** (1966 bytes): laid out like a node record less its own id.
 +0 is the id of the node carrying its coupler (0 on branch 1), +4 the first
 node's id, +8 the u16 node count and +10 four empty tap slots. +126 is the
-coupler record + 1 and +131 is 4 on the branch taking the through leg. Branch
-numbers are the file order, 1…n; no number is stored.
+coupler record + 1, a u16, and +131 is 4 on the branch taking the through
+leg. Branch numbers are the file order, 1…n; no number is stored.
+
+**A PCD** (Power Connecting Device, keyed as coupler 1000) starts a branch
+whose head holds 999 at +126 (E7 03; the only heads with a high byte):
+H043A_MID's 91 and H043B_MID's 24, from 1.1 (fixed), one 0-ft line on cable
+0. Lode draws a PCD with the network and line it connects to (LK002's 1.5:
+`LK265 1.5`; its box "PCD branch connected to Network:  LK265 1.5", the
+status bar "No Feeder"); where the file names that line is not decoded.
+The PCD counts one connector on its line's cable (both files one more on
+cable 0 than their spans give).
 
 **End** (48 bytes): 4 zero bytes, the end line's id, the last node's id, zeros.
 
@@ -899,11 +965,12 @@ Rebuilt from nothing, these are the bytes Lode Data wrote:
 | 35723 + 4·i | u16 connectors on cable file index i: one at each end of a span (a line with footage) that meets a device — the location it runs from or to holds a tap, coupler, active, in-line device or supply, or it is a branch's start at its coupler (a branch whose first line is 0 ft still starts there) |
 | 36121, 36125, 36129 | (u16 aerial, u16 UG) three counts — **not decoded** (AL004: 58/1, 0/1, 28/4; 0 on an empty network) |
 | 36141 + 4·n | (u16 aerial, u16 UG) Underground Housing n, one per underground location: its equipment points (Parameters: amplifier or line extender, tap or 8-port tap, coupler — a splitter feeding two branches is one — equalizer for an in-line device, power supply) reach the housing's Minimum Size |
-| 36201 + 4·k | (u16 aerial, u16 UG): 0 taps, 1 couplers, 2 splitters (both branches of a line off one coupler record), 3 in-line devices, 4 line extenders — actives table items 1 – 12, 5 all other actives, 12 always 1 (the empty network too), 56 + t supplies of type t |
+| 36201 + 4·k | (u16 aerial, u16 UG): 0 taps, 1 couplers (a PCD is not one: H043A/B count one aerial coupler, their 1.1 PCDs left out), 2 splitters (both branches of a line off one coupler record), 3 in-line devices, 4 line extenders — actives table items 1 – 12, 5 all other actives, 12 is 1 in every file but H043A_MID, which has its 1 at k = 6 (not decoded: kept as the file has it; the empty network's is 1), 56 + t supplies of type t |
 | 41401 | u16 41, u8 1, u8 1, u32 branch count, the id counter |
 | 41425 | u32 branch, u32 line, u8 1: where the program's cursor was (AL005: 12, 25; else 1, 1) |
 | 42366 + 261·k | the 8 files it was saved with: Parameters, Actives, Taps, Couplers, Cables, Prices, Performance, Map Grid (the program's "Spec File Mismatch" box lists them in this order) |
 | 44542 | the file name it was saved as, without `.ntw`. Opening a file under another name, the program warns "Filename AL004 has changed to AL004_T2_insert. Setting all PCDs to open." |
+| 44803 | u32: 0, or — in a network joined to others by a **PCD** (Power Connecting Device) — non-zero, and a table of those networks follows before branch 1: in H043A_MID and H043B_MID (both list H043A_MID, H043B_MID) one byte, then per network char[261] its file name and two u32 (1, 1); branch 1 then starts 539 bytes on. Read and written as the file has it |
 
 The writer rewrites the decoded totals, the branch count and the id counter.
 Everything not decoded is left as the file had it. Every total above is

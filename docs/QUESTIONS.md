@@ -1,135 +1,69 @@
 # Questions for the user
 
-Every question still open, first to last, in priority order (3 Oct). Each
-says what to do in Lode Data, what to send, what it settles, and what the
-app does now. A screenshot means the whole Lode window, info box showing.
-"BH" = BH1GHzMid, "HUMB" = HUMB1GHzMid (the 7-29-2025 sets), "BH network"
-and "HUMB network" = the two networks of the 2 Oct screenshots (1.1 amp
-71; 1.2-1.4 coupler 99 or 92 to branches 2-4; 1.5 190 ft hc 2 tap 26; 1.6
-189 ft hc 5 tap 21; 1.7 amp 11) — key them again that way if you did not
-save them. Answers so far and where they came from: `EVIDENCE.md`; the
-answered sets are at the end of this file.
+Updated 3 Oct, evening. Part A is what is still open from the morning's
+list (its numbers kept); part B the new questions today's answers raised —
+for after part A, as you asked. Each says what to do in Lode Data, what to
+send, what it settles and what the app does now. A screenshot means the whole
+Lode window, info box showing. Where answers came from: `EVIDENCE.md`.
 
-## Priority 1 — what the app computes (levels, colours, Test lines)
+## Answered 3 Oct (the morning's 1–24)
 
-1. **When does Lode pick an amplifier's pads and EQs?** *Do:* spec BH, File
-   → New; 1.1 amp 71; Insert a line 1.2, ftg 190, hc 2; Insert a line 1.3,
-   amp 11. Put the cursor on 1.3's amp cell and take a screenshot before
-   pressing anything else; press 8 (Recalc), screenshot; press 5 (Test),
-   Esc, screenshot. *Settles:* whether Lode picks them when the amp is
-   keyed, on Recalc or on Test. *App now:* never picks for a keyed amp —
-   the box reads Forward Pad 000, Forward Eq CS10, Return Pad 000, Return
-   Eq 0, where your BH screenshot reads Flag / CS2 / Flag / 3. (On AL004's
-   4.2, 28 Sep, Lode showed 0 / SCS6 / 0 / 0: nothing picked.)
-2. **The Test lists of the BH and HUMB networks.** *Do:* open (or key)
-   each, press 5 (Test). *Send:* the Test Results window, every line
-   (scroll if needed). *Settles:* the slope and tap-window checks on the
-   two regions' specs.
-   *App now:* BH — no lines. HUMB — six: "Fslope too low to equalize at
-   1.1.", "Rslope too low to equalize at 1.1.", "Tap(1002) 12.57 over window
-   at 1.6.", "Tap(102)  9.90 over window at 1.6.", "Tap(85) 12.12 below
-   window at 1.6.", "Tap(5) 14.09 below window at 1.6.".
-3. **HUMB 1.6's yellow `<21>`.** *Do:* HUMB network, cursor on 1.6's tap1
-   cell. *Send:* screenshot with its box. *Settles:* how Lode reads a tap
-   row that has an ID (21) but no part for any port count. *App now:* part
-   number blank, tap value 0 and insertion 0, so the port reads the line
-   (39.57 at 1002), 12.57 over its 10 dB window: yellow.
-4. **HUMB's branch 2, behind coupler 92.** *Do:* HUMB network, double-click
-   `92<2>` on 1.2. *Send:* screenshot of branch 2. *Settles:* whether Lode
-   takes a 0 in a spec column as 0 dB. Coupler 92's tap leg is 99 at 1002
-   and 0 at every other column. *App now:* 2.1 reads -48.00 5.41 39.83 17.99
-   | 44.50 49.00 (it fills the 0 columns from the 99). If Lode reads -48.00
-   37.00 11.00 11.00 | 44.50 49.00, the app takes each column as it is —
-   that changes only AL004 opened with KERMIT's spec among the samples.
-5. **A tap ID keyed with a port count its row does not have.** HUMB has tap
-   12 only as a 2-port. *Do:* HUMB network, Insert a line under 1.7, ftg
-   100, hc 5, key 12 in tap1. *Send:* screenshot with the tap's box.
-   *Settles:* `<12>` (the empty 8-port slot, as 21 at 1.6) or `/12/` (the
-   2-port). *App now:* `/12/`.
-6. **An excluded active in the middle of a cascade.** *Do:* AL004 with
-   WV750-2026, File → Save Network As… AL004_X.ntw; 4.20 has no active
-   (it lies between the bridgers on 4.13 and 4.24): key 70 (Ripple) in its
-   amp cell. *Send:* screenshots with the cursor on 4.20's amp and on
-   4.24's amp (boxes showing). *Settles:* whether an active marked Exclude
-   in Custom Cascading counts in Cascade Position. *App now:* Cascade
-   Position 0 at 4.20 and 2 at 4.24; if Lode says 3 at 4.24, it counts.
-7. **S3's red coupler.** *Do:* open your S3.ntw as it is now, File → Save
-   Network As… S3_A2.ntw; cursor on 1.2's coupler. *Send:* S3_A2.ntw and the
-   screenshot. *Settles:* why Lode draws `100<2>` red. *App now:* green.
-8. **Crossover spacing (yes / no).** In the Test list Lode writes the
-   crossover figure seven characters wide, "Crossover of    3.85 at 3.5."
-   (your 2 Oct list of AL004_SETA); the app writes it five wide,
-   "Crossover of  3.85 at 3.5.". *Answer:* yes = write it as Lode does
-   (only the spacing of the Crossover lines changes, on every network);
-   no = leave it.
-9. **Empty tap slots in networks opened with another spec set (keep /
-   undo).** Since 2 Oct a tap ID whose row has no part (HUMB's 21) is drawn
-   and passes the levels at 0 dB, as Lode draws it, and a stored pad on a
-   bank's Flag row shows `FLAG`. Side effect: 32 of the 70 sample pairings
-   changed — all networks opened with a spec set other than their own,
-   which now draw such taps where the app left them out (e.g. AL002's 32.3
-   with WVEXT862: `/24/`). No pairing checked against Lode changed, and no
-   saved byte. *Answer:* keep or undo.
-10. **Reserve gain.** *Do:* spec BH, Spec Edit → Actives → Reserve Gain,
-    rows 1–28. *Send:* screenshot. Then: does Reserve Gain change any level
-    or Test line in your work (yes / no / don't know)? *Settles:* the app
-    reads Fwd Reserve Gain 2.00 on BH's FM332 rows and uses it nowhere.
+1. **Pads and EQs** — picked as the amp is keyed (1a: Flag / CS8 / Flag / 2)
+   and again whenever its input changes (1b, ftg 900: 060 / 13 / 190 / 6;
+   6b: AL00419 FLAG / SCS6 / 20 / 0 after the Ripple). Recalc changes
+   nothing. With "Allow Over Equalization" unticked the return EQ does not
+   over-equalize either (1b's 6, not 7). The app now does all of it.
+2. **Test lists** — H043B's (2a), two lines: the app's are the same two.
+   1c ("Not enough taps at node 1.2.") is a check the app does not make
+   yet (part B, N12).
+3. **HUMB `<21>`** — keyed on BH, then HUMB loaded (a mismatch). Keyed on
+   HUMB, 3a: every figure and `<20>`'s box are the app's.
+4. **0 in a spec column** — 0 dB (4a: -48.00 37.00 11.00 11.00 | 44.50
+   49.00). With H043A/H043B it also showed a negative coupler figure is a
+   gain (BH's FMT Split, -9). The app now reads couplers so.
+5. **`/12/`** — as the app draws it, yellow, hc 5 red; every figure of 5.
+6. **Ripple mid-cascade** — Cascade Position 1 (the actives before it),
+   AL00419 2; its line shows the levels arriving, the return red. The app
+   now does the same.
+7. **S3's red coupler** — WV750's MULTI OUT is an internal coupler (a node's
+   leg coupler) and must sit at an active's place: 100 ft away it is red,
+   under the Ripple green (7a/7b). The app now draws it so.
+8. **Crossover** — printed seven wide, as Lode does (done).
+9. **Mismatched spec sets** — they do not matter; Lode's way is kept.
+10. **Reserve Gain** — every BH row 0.00 (10a/10b), as the app reads it.
+11. **Actives tab scrolled right** — In and Out at F3–F6, R3, R4 with their
+    Out/Loss: now in the app's window, row for row.
+12. **Out/Loss** — one byte changed in TEST_OL.atv (518); which byte other
+    rows use needs one more test (part B, N6).
+13. **Plug-Ins / Configuration Table** — 31 plug-in rows; Quantity 1 beside
+    each plug-in named (now shown).
+14. **Taps window** — built from your recording: all eleven tabs.
+15. **Couplers window** — built: Couplers (-9.00 on FMT Split, as Lode
+    shows it) and the four NIU tabs (empty in every file).
+16. **Connectors, Series/Colors** — built (16a, 16c).
+17. **RA-KIT-40L** — confirmed at row 42.
+18. **Bridgers / Feedermakers** — not used: left empty.
+19. **Old formats** — you still use them; NPG550's windows recorded (19a–f).
+    Reading the oldest actives is the next work item (part B, N11).
+20. **LK002's 1.5** — a PCD: Lode writes the network and line it connects to,
+    `LK265 1.5` (20.png); PCDs are part B, N3–N4.
+21. **BH_TEST.ntw** — see part B, N8.
+23. **AL002 / AL003 / AL005** — WVEXT862 (the same files as the pack's) and
+    Beckley750 (new): AL005 opens with it, every part resolved, all 22
+    actives' pads and EQs matching.
+24. **"ntw map AL004"** — a file named in the first sessions; you don't know
+    it, so dropped.
 
-## Priority 2 — spec file fields not read yet
+## Part A — still open from the morning's list
 
-11. **The Actives tab, scrolled right.** *Do:* spec BH, Spec Edit → Actives
-    → Actives tab; drag the bottom scroll bar fully right. *Send:*
-    screenshot, rows 1–28. *Settles:* every column after "In - F5" (In F6,
-    Out at 550 / 860, …); the app's window shows only up to In - F5.
-12. **Out/Loss.** *Do:* Spec Edit → Actives on any spec; File → Save As a
-    new name (e.g. TEST_OL); on row 1 set the Out/Loss next to "Out - 1002"
-    to Loss; File → Save. *Send:* TEST_OL.atv. *Settles:* where Out/Loss is
-    kept (every row of your recording reads 0 Out; the app shows 0 Out).
-13. **Plug-Ins and the Configuration Table.** *Do:* spec WV750-2026, Spec
-    Edit → Actives. *Send:* the Plug-Ins tab at the top (rows 1–20) and
-    scrolled to its last row; the Configuration Table scrolled to rows
-    20/0–20/7 and 30/0–30/7. *Settles:* how many plug-in rows there are
-    (31 or 32), that rows 4–17 are SWAP BR TO LE … SWAP FMB TO FMT, and
-    the Quantity columns. *App now:* 68N–68B take Plugin 1 = 8 9 10 11 16
-    (NEW FMB … SWAP FMT TO FMB), quantities 0.
-14. **The Taps window.** *Do:* spec BH, Spec Edit → Taps. *Send:* every tab,
-    scrolled right where it scrolls. *Settles:* the app's Taps window (a
-    plain list now) and the tap bytes no reader explains.
-15. **The Couplers window.** *Do:* spec HUMB, Spec Edit → Couplers. *Send:*
-    every tab (rows 1–30 showing, including 92). *Settles:* the app's
-    Couplers window (a plain list now).
-16. **The Cables window's other tabs.** *Do:* spec WVEXT862, Spec Edit →
-    Cables. *Send:* the Connectors tab and the Series/Colors tab. *Settles:*
-    those two tabs (the app says "not seen yet").
-17. **Ret. Mod. Part Number.** *Do:* spec BUCH1GHzMid (Buckhannon), Spec
-    Edit → Actives → Reserve Gain, rows 35–50. *Send:* screenshot.
-    *Settles:* that row 42 reads RA-KIT-40L (the text the app reads there).
-18. **Bridgers, Feedermakers, Boosters (yes / no).** Every spec you sent
-    has these tabs empty. *Answer:* do you ever fill them in? If yes, send
-    one spec where they are filled, with screenshots of those tabs.
-19. **The oldest spec formats (yes / no).** Do you still open networks with
-    Bossier's bymac862, Georgetown's gefd862 / jarr625, Bullhead's npg550 /
-    npg750 / npg860 or Beckley's steph870? If yes: their Spec Edit →
-    Actives, Cables and Couplers tabs and the Parameters' Frequencies tab
-    (one spec is enough to start). *App now:* cannot read them.
+22. **WVBeck750 (yes / no).** You sent it on 29 Sep. May it go into the test
+    samples? 34 tests use it.
 
-## Priority 3 — networks and files to send
+### Priority 4 — couplers, branches and taps on the Design screen
 
-20. **LK002.ntw** (with LKMac862). *Send:* the file. *Settles:* your third
-    screenshot: `LK265 1.5` in the cplr column at 1.5, the white `01` in
-    tap2 at 1.1, the gutter marks, branch 1 of 73.
-21. **The BH network saved.** *Do:* File → Save Network As… BH_TEST.ntw.
-    *Send:* the file. *Settles:* that the app writes a network with two
-    extra frequencies byte for byte as Lode does.
-22. **WVBeck750 (yes / no).** You sent it on 29 Sep. May it go into the
-    test samples? 34 tests use it.
-23. **The spec sets AL002, AL003 and AL005 were designed with.** *Send:*
-    them if you have them (AL002 and AL003 name "WVEXT862", AL005
-    "Beckley750"; the WVEXT862 you sent may be a later one). *Settles:*
-    checking those networks as AL004 is checked.
-24. **The "ntw map AL004" file** mentioned early on — still wanted?
-
-## Priority 4 — couplers, branches and taps on the Design screen
+No answer to 25–28 is recorded anywhere in the docs or in this session's
+history (it starts 29 Sep); if you answered them in an earlier chat,
+please send the answers again.
 
 25. **Two-branch coupler.** *Do:* AL004 + WV750, line 4.14 (`3-<11><12>`):
     press `.` then `←`, and `.` then `→`; double-click the second bracket
@@ -149,7 +83,7 @@ answered sets are at the end of this file.
     cursor on such a tap and key 0. *Send:* before and after screenshots.
     *App now:* the branch stays, fed by nothing (starts at 0.00).
 
-## Priority 5 — the expanded display (`/`)
+### Priority 5 — the expanded display (`/`)
 
 29. **The block on a 0-ft first line.** *Do:* AL004 + WV750, `/` on, at any
     of 5.25, 9.2, 10.4, 14.5, 20.18, 25.2, 29.3, 29.7, 36.2, 37.2. *Send:*
@@ -167,7 +101,7 @@ answered sets are at the end of this file.
     MODIFIED": 3 Restore, 7 Save, 9 Switch). *Send:* a screenshot if it
     appears again, and what brought it up.
 
-## Priority 6 — what Lode writes when saving
+### Priority 6 — what Lode writes when saving
 
 34. **TSG, Map, Loc and address.** *Do:* on a copy of AL004, Save As
     TSG_A.ntw; on 4.24 set TSG 2, Map 7, Loc 12 and an address; Save As
@@ -186,7 +120,7 @@ answered sets are at the end of this file.
 38. **AL004_NOTES.ntw** (optional). Open it with WV750-2026; check `..+` on
     2.1 and 4.13 shows the notes the app wrote.
 
-## Priority 7 — later work (when we get there)
+### Priority 7 — later work (when we get there)
 
 39. **The design commands.** A short recording of each screen-menu command
     on a copy of AL004: 6 WillWrk, 7 AutoCpl, 8 Recalc, 9 Toggle, .7 SetMDU,
@@ -199,6 +133,57 @@ answered sets are at the end of this file.
     `docs/file-formats.md` and `tools/lodedata/header.py` quote licence
     and user ids from file headers (removed from the current files).
     Rewrite the branch's history to remove them?
+
+## Part B — new questions from today's answers (after part A)
+
+N1. **88 on AL004 4.2.** On 28 Sep, 88 (FML1G7J ALC LE) keyed on 4.2 kept
+    0 / SCS6 / 0 / 0, where every other active keyed today was picked at
+    once. *Do:* AL004 with WV750-2026, Save As AL004_88.ntw, key 88 on 4.2,
+    screenshot with the cursor on it; then change 4.1's ftg 476 → 477,
+    screenshot again. *Settles:* whether an ALC line extender is never
+    picked or the 28 Sep box was taken before the pick. *App now:* 20 / SCS2
+    / 19 / 2 at once.
+N2. **H043A's Test list.** *Do:* open H043A_MID with BH1GHzMid, press 5.
+    *Send:* every line. *App now:* 12 lines: 2.25 (two), 15.44, 33.6, 38.6,
+    38.9, 64.3, 64.5, 66.3, 67.1, 74.2, 89.2.
+N3. **H043B's PCD.** *Do:* open H043B_MID, cursor on 1.1's cplr cell.
+    *Send:* screenshot of branch 1 lines 1.1–1.8 with the box. *Settles:*
+    which network and line it names, and the levels on 1.1 and 1.2 (the app:
+    0.00, nothing feeding the first line). *App now:* draws `<24>`.
+N4. **H043A's PCD.** The same on H043A_MID's 1.1.
+N5. **Underground housings.** *Do:* H043B_MID, press `/`, go to 1.6, 1.13,
+    2.9, 3.7, 13.1 and 7.1. *Send:* a screenshot at each. *Settles:* which
+    housing each place takes: Lode's file counts 82 / 11 / 4 / 2 of housings
+    1 / 3 / 4 / 5, the app 83 / 10 / 5 / 1 (it gives all five FM902T places
+    housing 4 and only 7.1's supply housing 5).
+N6. **Out/Loss, a second test.** *Do:* open BH1GHzMid.atv in Spec Edit →
+    Actives, Save As TEST_OL2; set row 1's Out/Loss beside "Out - 102" to
+    Loss and row 2's beside "Out - 1002" to Loss; Save. *Send:* TEST_OL2.atv.
+    *Settles:* where every row's and column's Out/Loss is kept (row 1 Out -
+    1002 is byte 518).
+N7. **The EQ, OP and DEV drop-downs** on the toolbar. *Send:* a screenshot of
+    each list open. *Settles:* what EQ "Auto" can be switched to (the pick
+    above happens under Auto).
+N8. **BH_TEST.ntw.** It has the same size and branches as H043B_MID — is it
+    H043B saved under another name? The file wanted was Q1's keyed network
+    (1.1 amp 71, 1.2 190 ft hc 2, 1.3 amp 11) saved: *Do:* key it again,
+    File → Save Network As… BH_KEYED.ntw. *Send:* the file. *Settles:* that
+    the app writes a new network with two extra frequencies as Lode does.
+N9. **Beckley750's Parameters.** *Do:* Spec Edit → Parameters with
+    Beckley750. *Send:* all six tabs. *Settles:* its file version (7.0),
+    read now as the older layout but not checked against Lode.
+N10. **AL005's Test list** with Beckley750. *Send:* every line. *App now:* 51
+     lines, beginning "Fslope too low to equalize at 1.1.".
+N11. **A network on an old spec.** *Send:* one .ntw designed with NPG550 (or
+     bymac862, gefd862, jarr625, npg750, npg860, steph870) and its Test list.
+     *Settles:* the oldest actives' reading (decoded next from 19a), checked
+     on a real network.
+N12. **"Not enough taps at node 1.2."** (1c: 2 homes, no tap). *Do:* AL004
+     with WV750-2026, Save As AL004_HC.ntw; set hc 5 on 4.27 (`[17]`, 4-port)
+     and hc 3 on 4.29 (`/ 4/`, 2-port); press 5. *Send:* the Test list, every
+     line. *Settles:* the line's wording, colour and place in the list, and
+     that it is homes against all the line's tap ports (the rule hc turns
+     red by). *App now:* hc red, no Test line.
 
 ---
 

@@ -263,6 +263,9 @@ table.sw-t th:first-child{z-index:3}
 table.sw-t.plain td:first-child{position:static;background:#fff}
 table.sw-t.plain th:first-child{position:sticky}
 table.sw-t td.cur{background:#0078d7;color:#fff}
+table.sw-t td.group{background:#c0c0c0}
+table.sw-t td.id{background:#f0f0f0}
+table.sw-t td.series{background:#000}
 .sw-unseen{padding:30px;color:#555}
 .sw-bottom{display:flex;justify-content:flex-end;gap:6px;padding:6px 6px 5px;flex:none}
 .sw-bottom button{width:94px;height:26px;font:inherit;background:#e1e1e1;border:1px solid #adadad;
