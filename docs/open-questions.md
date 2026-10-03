@@ -347,7 +347,7 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
     * set A (the user's screenshots, 1-2 Oct) settled the brackets, the
       cascade position, the red 64 (no active at 11.18) and the Test lines;
       set A2 (2 Oct, AL004_SETA.ntw and 14 screenshots) the rest of it --
-      see the points below. Still open from them (set A3 in QUESTIONS.md):
+      see the points below. Still open from them (QUESTIONS 6-8):
       whether an excluded active in the middle of a cascade counts; why
       Lode draws S3's 1.2 coupler red; the crossover lines' spacing (Lode
       prints the figure seven wide, "Crossover of    3.85"; the app five,

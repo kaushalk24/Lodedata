@@ -401,7 +401,7 @@ record 10 is ID 92 with no name (every loss 0 but the tap leg's 99 at
 1002, the internal flag set): the user keyed 92 at 1.2–1.4 and Lode drew
 `92<2>` … in green, the levels going on through it unchanged. LKMac1GHz,
 GEFD1GHz and others hold such records too (99 at F1 and F2). What the
-branch behind one starts at is not seen yet (QUESTIONS S2-4).
+branch behind one starts at is not seen yet (QUESTIONS 4).
 
 ### 3.3 `.atv` — actives: amplifiers, line extenders, nodes (362 bytes)
 

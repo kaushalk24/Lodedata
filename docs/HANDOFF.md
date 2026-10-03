@@ -4,8 +4,10 @@ Everything a new session needs to carry on without losing anything: the
 goal, how the user works, the rules learned, where the evidence is, what is
 done and what comes next. Then read, in this order:
 
-1. `docs/QUESTIONS.md` — every question still open, grouped in sets, with
-   what the user sends for each. **Set S2 is next** (in its order).
+1. `docs/QUESTIONS.md` — every question still open, one numbered list in
+   priority order (Priority 1–7), each with what to do in Lode, what to
+   send, what it settles and what the app does now. **Questions 1–10 are
+   next** (in order).
 2. `docs/open-questions.md` — each rule with its evidence, and the list
    "Still to confirm" at the end.
 3. `docs/EVIDENCE.md` — every file, screenshot and recording the user sent,
@@ -70,8 +72,9 @@ build's "as if downloaded" start checks it every time.
   regression check below; if a change would alter what an existing file
   shows or writes, **ask first**, with the evidence.
 * "Iterate one set of questions at a time; after fixing everything, the
-  next set." Group questions in sets (QUESTIONS.md), send one set, fix
-  everything it shows, then the next.
+  next set." QUESTIONS.md is one numbered list in priority order (the
+  user asked for it so, 3 Oct): send the top questions, fix everything
+  the answers show, renumber, then the next.
 * "Analyze everything in depth." Check every number on every screenshot,
   not just the one asked about. Zoom into screenshots; measure colours and
   character positions when layout matters.
@@ -95,7 +98,7 @@ build's "as if downloaded" start checks it every time.
   `git add -f`). Screenshots and recordings are never committed either.
 * **Never write licence numbers or user ids** from the files' 512-byte
   headers into docs, tests, code or commit messages (the current files are
-  clean; QUESTIONS 26 asks whether to scrub old history — unanswered).
+  clean; QUESTIONS 42 asks whether to scrub old history — unanswered).
 * Test `.ntw` files for the user go by SendUserFile from the scratchpad.
 
 ## Git
@@ -119,7 +122,7 @@ build's "as if downloaded" start checks it every time.
    (e.g. the scratchpad); `docs/EVIDENCE.md` indexes it.
 3. `python -m pytest -q`. Expected with the samples zip in place and
    Playwright/Chromium present: **all pass, 34 skipped** — the 34 need the
-   **WVBeck750** spec set, which no pack has (QUESTIONS 23). The browser
+   **WVBeck750** spec set, which no pack has (QUESTIONS 22). The browser
    tests use `/opt/pw-browsers/chromium` (or `CHROMIUM_PATH`).
 4. `python tools/regression.py snapshot /tmp/base.json`, then
    `python tools/regression.py diff samples/regression-baseline.json /tmp/base.json`
@@ -208,7 +211,7 @@ asked about before pushing. Add every new sample the user sends to
   (the app now keeps the five files with the network; `GET
   /api/networks/{id}/specs/atv|cbl|par`, `app/hfc/specwindow.py`). Shown
   only — nothing edits a spec file yet. Taps and Couplers still open the
-  plain list until their windows are seen (S2-9).
+  plain list until their windows are seen (QUESTIONS 14, 15).
 * **Keys and mouse:** Design screen menu digits, `0` Alter, `.`-moves,
   Insert, Delete, Amplifier Definition, Notes, Select Tap, double-click a
   coupler to enter its branch, **mouse wheel** moves the cursor within the
@@ -217,11 +220,13 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-**Set S2** in `docs/QUESTIONS.md`, in its order: when Lode picks pads and
-EQs (S2-1), the Test lists of the BH / HUMB screens (S2-2), HUMB's yellow
-`<21>` and its branch 2 (S2-3, S2-4: whether a 0 in a spec column is taken
-as 0), a tap ID keyed with a port count its row lacks (S2-5), then the
-Spec Edit tabs still unseen (S2-6 … S2-11), LK002.ntw (S2-12).
+**Questions 1–10** in `docs/QUESTIONS.md` (Priority 1), in order: when
+Lode picks pads and EQs (1), the Test lists of the BH / HUMB networks (2),
+HUMB's yellow `<21>` and its branch 2 (3, 4: whether a 0 in a spec column
+is taken as 0), a tap ID keyed with a port count its row lacks (5), an
+excluded active mid-cascade (6), S3's red coupler (7), the crossover
+spacing (8), empty tap slots on mismatched specs (9), reserve gain (10).
+Then Priority 2 (the Spec Edit tabs still unseen, 11–19) and on.
 
 **Done 2 Oct, evening** (the user's BH / HUMB / LK002 screenshots and the
 recording of NBERN1GHz's Actives window; `EVIDENCE.md`):
@@ -244,7 +249,7 @@ recording of NBERN1GHz's Actives window; `EVIDENCE.md`):
   AL003 / AL005, whose own sets are not in the pack): taps on empty slots
   now drawn, and stored pads pointing at a bank's FLAG row shown `FLAG`.
   Every pairing checked against Lode is unchanged, and nothing a save
-  writes. Asked as S2-15.
+  writes. Asked as QUESTIONS 9.
 * `samples/regions/` (local only) holds BH1GHzMid, HUMB1GHzMid and
   NBERN1GHz of 29 Jul 2025 for `test_keyed_regions.py` and
   `test_spec_windows.py`; the pack the user holds does not have them yet —
@@ -263,7 +268,7 @@ regression check with it in samples/.
 formats (actives 2.20/3.0/5.0) not readable — file-formats "The regions'
 spec sets".
 
-**Question set A3** (what set A2 raised) follows set S: an excluded active
+**What set A2 raised** (now QUESTIONS 6–8): an excluded active
 (a Ripple) put in the middle of a cascade on a copy of AL004, S3's red
 coupler (the file and the window), and the crossover spacing (yes/no,
 asked twice now).
@@ -320,7 +325,7 @@ with others' spec sets.
   levels — no current spec set has F3 on (values at +171 / +195 look like
   them); F4–F6 and R3–R4 (no spec set has them on).
 
-After set A3: sets B–G of QUESTIONS.md, one at a time.
+After questions 1–10: the rest of QUESTIONS.md, in its order.
 
 **Later topics the user named, not started:** the design engine itself
 (what Recalc, AutoCpl and the other screen-menu commands do — "the main
