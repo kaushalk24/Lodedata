@@ -48,8 +48,15 @@ def _ports_for_houses(houses: int) -> list:
     return fits + [p for p in reversed(TAP_PORT_COUNTS) if p not in fits]
 
 
-def resolve_tap(lib: Library, code: str, houses: int = 0) -> TapType | None:
-    """`2.23` -> the 2-port 23 tap.  Returns None for a clear."""
+def resolve_tap(lib: Library, code: str, houses: int = 0, tap_types: list = ()) -> TapType | None:
+    """`2.23` -> the 2-port 23 tap.  Returns None for a clear.
+
+    With no port count typed, the Parameters' Tap Selection (``tap_types``,
+    port count by house count) says which; a part of another port count
+    comes next.  Failing both, a tap row with that ID and no part for the
+    port count is taken as it is: HUMB1GHzMid's 21, keyed at 1.6 with 5
+    homes, is drawn <21> and takes nothing off the levels (the user's
+    screenshot)."""
     code = (code or "").strip()
     if code in ("", "0"):
         return None
@@ -65,13 +72,18 @@ def resolve_tap(lib: Library, code: str, houses: int = 0) -> TapType | None:
             raise EntryError(f"'{code}' is not a tap: type ports.value, like 4.23")
         value = float(code)
         wanted = _ports_for_houses(houses)
+        if 0 < houses < len(tap_types) and tap_types[houses] in TAP_PORT_COUNTS:
+            wanted = [tap_types[houses]] + [p for p in wanted if p != tap_types[houses]]
 
     for ports in wanted:
         for tap in lib.taps.values():
-            if tap.ports == ports and _same_value(tap, value):
+            if tap.name and tap.ports == ports and _same_value(tap, value):
                 return tap
+    for tap in lib.taps.values():
+        if not tap.name and tap.ports == wanted[0] and tap.tap_id and abs(tap.tap_id - value) < 0.001:
+            return tap
     have = sorted({int(t.tap_id or t.tap_value_db) for t in lib.taps.values()
-                   if t.ports == wanted[0]})
+                   if t.name and t.ports == wanted[0]})
     raise EntryError(
         f"no {wanted[0]}-port {value:g} tap in the spec set"
         + (f" — it has {', '.join(str(v) for v in have)}" if have else ""))

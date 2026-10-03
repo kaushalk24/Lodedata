@@ -165,8 +165,15 @@ class Branch:
 
 
 def _parameters(d: dict) -> DesignParameters:
-    """Stored parameters, ignoring settings this version no longer has."""
+    """Stored parameters, ignoring settings this version no longer has.  One
+    stored before F4-F6 held a single third frequency: f3_mhz, its levels and
+    tap window."""
     known = DesignParameters.__dataclass_fields__
+    d = dict(d)
+    if d.get("f3_mhz") and "extra_mhz" not in d:
+        d["extra_mhz"] = [d["f3_mhz"]]
+        d["extra_levels"] = [d.get("f3_levels") or []]
+        d["extra_tap_windows"] = [d.get("f3_tap_window", 0.0)]
     return DesignParameters(**{k: v for k, v in d.items() if k in known})
 
 
@@ -313,7 +320,8 @@ class Design:
         g = cls(id=d.get("id", ""), name=d.get("name", "lode-1"),
                 imported_from=d.get("imported_from", ""),
                 parameters=_parameters(d.get("parameters") or {}),
-                library=Library.from_dict(d.get("library") or {}),
+                library=Library.from_dict(d.get("library") or {},
+                                          (d.get("parameters") or {}).get("f3_mhz") or 0.0),
                 source_dbmv=d.get("source_dbmv", 46.0),
                 source_tilt_db=d.get("source_tilt_db", 10.0),
                 supply_volts=d.get("supply_volts", 60.0))

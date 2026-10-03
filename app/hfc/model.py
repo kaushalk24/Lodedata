@@ -47,6 +47,12 @@ def interpolate_sqrt(points: list[tuple[float, float]], mhz: float) -> float:
     return lo[1] + t * (hi[1] - lo[1])
 
 
+def extra_at(entries: list, mhz: float):
+    """The entry for ``mhz`` among a part's figures at the extra forward
+    frequencies ([MHz, ...] each), or None."""
+    return next((e for e in entries if e and e[0] == mhz), None)
+
+
 # ==========================================================================
 # library parts
 # ==========================================================================
@@ -61,16 +67,18 @@ class CableType:
     notes: str = ""
     source: str = "manual"
     cable_index: int = -1                      # 0-99 in the spec file; the screen shows series*100 + this
-    # [MHz, dB per 100 ft] at the third forward frequency, when there is one:
-    # the spec's own figure, kept apart from the points interpolated above
-    f3: list = field(default_factory=list)
+    # [[MHz, dB per 100 ft], ...] at the extra forward frequencies (F3-F6)
+    # the Parameters have on: the spec's own figures, kept apart from the
+    # points interpolated above
+    extra: list = field(default_factory=list)
     # series 0-9 (the hundreds of the cable number): [colour "#rrggbb", name],
     # from the cable file's Series/Colors tab
     series: list = field(default_factory=list)
 
     def loss_db(self, mhz: float, feet: float) -> float:
-        if self.f3 and mhz == self.f3[0]:
-            return self.f3[1] * feet / 100.0
+        e = extra_at(self.extra, mhz)
+        if e:
+            return e[1] * feet / 100.0
         return interpolate_sqrt([tuple(p) for p in self.attenuation], mhz) * feet / 100.0
 
     def resistance_ohms(self, feet: float) -> float:
@@ -99,17 +107,19 @@ class TapType:
     power_passing: bool = True
     self_terminating: bool = False
     source: str = "manual"
-    f3: list = field(default_factory=list)                # [MHz, tap value, insertion] at F3
+    extra: list = field(default_factory=list)             # [[MHz, tap value, insertion], ...] at F3-F6
 
     def through_db(self, mhz: float, reverse: bool = False) -> float:
-        if self.f3 and mhz == self.f3[0]:
-            return self.f3[2]
+        e = extra_at(self.extra, mhz)
+        if e:
+            return e[2]
         pts = self.return_through_loss if (reverse and self.return_through_loss) else self.through_loss
         return interpolate_sqrt([tuple(p) for p in pts], mhz)
 
     def tap_db(self, mhz: float) -> float:
-        if self.f3 and mhz == self.f3[0]:
-            return self.f3[1]
+        e = extra_at(self.extra, mhz)
+        if e:
+            return e[1]
         if self.tap_value:
             return interpolate_sqrt([tuple(p) for p in self.tap_value], mhz)
         return self.tap_value_db
@@ -131,15 +141,16 @@ class PassiveType:
     leg_losses: list = field(default_factory=list)
     record: int = -1                           # coupler file record, as a design refers to it
     internal: bool = False                     # an amplifier's own output split
-    f3_legs: list = field(default_factory=list)  # [MHz, [dB per leg, as leg_losses]] at F3
+    extra_legs: list = field(default_factory=list)  # [[MHz, [dB per leg, as leg_losses]], ...] at F3-F6
 
     @property
     def ports(self) -> int:
         return len(self.port_losses)
 
     def port_db(self, port: int, mhz: float | None = None) -> float:
-        if mhz is not None and self.f3_legs and mhz == self.f3_legs[0]:
-            legs = self.f3_legs[1]
+        e = extra_at(self.extra_legs, mhz) if mhz is not None else None
+        if e:
+            legs = e[1]
             return legs[min(port, len(legs) - 1)] if port > 0 else legs[0]
         if mhz is not None and self.leg_losses:
             legs = self.leg_losses
@@ -190,9 +201,9 @@ class ActiveType:
     out_forward_low: float = 39.0
     out_return_high: float = 40.0
     out_return_low: float = 40.0
-    # in and out at the third forward frequency, when the Parameters have one
-    in_f3: float = 0.0
-    out_f3: float = 0.0
+    # [[MHz, in, out], ...] at the extra forward frequencies (F3-F6) the
+    # Parameters have on
+    extra_levels: list = field(default_factory=list)
     # Custom Cascading: bit 0 Cust. Casc. (Yes), bit 1 Exclude, bit k + 1
     # Casc. k Valid (lodedata.specs.ActiveSpec)
     cascading: int = 0
@@ -342,14 +353,27 @@ class Library:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Library":
+    def from_dict(cls, d: dict, f3_mhz: float = 0.0) -> "Library":
+        """``f3_mhz``: a library stored before F4-F6 kept one F3 figure per
+        part; its MHz is the stored parameters' f3_mhz."""
         lib = cls(name=d.get("name", "New library"),
                   imported_from=d.get("imported_from", ""))
         for attr, klass in cls._TABLES.items():
             for k, v in (d.get(attr) or {}).items():
+                v = dict(v)
                 if attr == "actives" and not isinstance(v.get("active_id", ""), str):
-                    v = dict(v, active_id=str(v["active_id"] or ""))
-                getattr(lib, attr)[k] = klass(**v)
+                    v["active_id"] = str(v["active_id"] or "")
+                if "f3" in v:
+                    old = v.pop("f3")
+                    v.setdefault("extra", [old] if old else [])
+                if "f3_legs" in v:
+                    old = v.pop("f3_legs")
+                    v.setdefault("extra_legs", [old] if old else [])
+                if "in_f3" in v or "out_f3" in v:
+                    old = [f3_mhz, v.pop("in_f3", 0.0), v.pop("out_f3", 0.0)]
+                    v.setdefault("extra_levels", [old] if f3_mhz else [])
+                known = klass.__dataclass_fields__
+                getattr(lib, attr)[k] = klass(**{a: b for a, b in v.items() if a in known})
         return lib
 
 
@@ -373,13 +397,27 @@ class DesignParameters:
     # a "Crossover".  Both marginal (yellow).
     tap_windows: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.0])
     max_crossover_db: float = 0.0
-    # the third forward frequency (F3), 0 when the Parameters have it off
-    # (WVEXT862: 550): its Min per lv (System Levels) and its tap window.
-    # Lode draws its column after the cplr columns and tests its tap ports
-    # between F2's and R1's
-    f3_mhz: float = 0.0
-    f3_levels: list = field(default_factory=list)
-    f3_tap_window: float = 0.0
+    # the extra forward frequencies (F3-F6) the Parameters have on, in their
+    # order -- WVEXT862's 550, BH1GHzMid's 550 and 860 -- and per frequency
+    # its Min per lv (System Levels) and its tap window.  Lode draws their
+    # columns after the two cplr[branch] columns, F3 first, and tests a
+    # tap's ports at them between F2's and R1's
+    extra_mhz: list = field(default_factory=list)
+    extra_slots: list = field(default_factory=list)     # which F each is: 3-6
+    extra_levels: list = field(default_factory=list)
+    extra_tap_windows: list = field(default_factory=list)
+    # what Lode heads the level columns with: the Parameters' own labels, F1
+    # F2 R1 R2 and then the extra ones ("1002 102 85 5 550 860"; LKMac862's
+    # "high low Rh Rl").  Lode keeps no MHz, only these; empty, the MHz
+    labels: list = field(default_factory=list)
+    # General Parameters' "Allow Over Equalization" (WV750 ticked, BH1GHzMid
+    # and HUMB1GHzMid not)
+    allow_over_equalization: bool = True
+    # Tap Selection: the tap's port count for each house count 0-32, through
+    # the tab's Homes -> Number of Ports and Ports -> Tap Type tables (1-2
+    # homes 2-port, 3-4 4-port, 5 and up 8-port in WV750, BH1GHzMid and
+    # HUMB1GHzMid: the user's hc 2 /26/ and hc 5 <21>); empty, not known
+    tap_types: list = field(default_factory=list)
     # Underground Housings: [housing number, Minimum Size in points], and the
     # points each kind of equipment takes (Parameters, General tab)
     housings: list = field(default_factory=list)
@@ -398,6 +436,15 @@ class DesignParameters:
     supply_volts: float = 90.0
     min_device_volts: float = 42.0
     temperature_f: float = 68.0
+
+    def label(self, mhz: float) -> str:
+        """The Parameters' label of a design frequency, as Lode heads its
+        column and names it in the Test list."""
+        order = [self.forward_high_mhz, self.forward_low_mhz, self.return_high_mhz,
+                 self.return_low_mhz, *self.extra_mhz]
+        if mhz in order and order.index(mhz) < len(self.labels):
+            return self.labels[order.index(mhz)]
+        return f"{mhz:g}"
 
     @property
     def forward_freqs(self) -> tuple[float, float]:

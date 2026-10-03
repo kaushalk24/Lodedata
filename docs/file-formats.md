@@ -166,17 +166,16 @@ version or size is reported by the tool. What no file explains yet:
   taps that feed branches), and four bytes FF FF FF FF (KERMIT's 6-port
   rows 08 08 08 08); bytes 580 (35.0 in WV750 and WVEXT862, 0 in the others)
   and 640 (1) of the file.
-* **Actives.** The pair before the power steps (+71 / +91: 0 everywhere —
-  the Reserve Gain tab?); In and Out at F4–F6 and R3–R4 (after F3's;
-  the WIFI units hold 44.5 four bytes after Out F3's); the Configuration
-  Table's slots beyond the ID (+10: 4–17 on the plug-in variants); a table
-  of 18 names after the banks (SWAP BR TO LE, NEW LE, UPGRADE LE, MOVE LE,
-  NEW FMB … — the same in every file); a 24 × 461-byte table only the 12.1
-  file has (empty); and where the tabs EQs Bank 9–16, Plug-Ins, Plug-Ins
-  Powering, Bridgers, Feedermakers, Boosters and Booster Powering keep
-  theirs (nothing in the samples fills them). The power-step room: six in
-  the older record (+79 up to In F3), nine in the current (+99 up to +171;
-  KERMIT uses seven).
+* **Actives** (most of it placed 2 Oct from the user's recording of
+  NBERN1GHz's Actives window, every tab: 3.3, 3.4d). Still unknown: where
+  the Actives tab's **Out/Loss** columns are kept (every row of the
+  recording reads `0 Out`); the two figures after the power steps (+163,
+  +167) and after In F6 (+187, +191) — R3/R4? — and the three bytes before
+  the Configuration Table; the Configuration Table's **Quantity** columns
+  (Plugin 1 is +10 of each slot); the Plug-Ins / Plug-Ins Powering figures
+  (only the names are placed), Bridgers, Feedermakers and the 12.1 file's 24
+  boosters — empty in every file sent, so drawn empty as Lode draws them for
+  NBERN1GHz.
 * **Couplers.** The code at +1, shown as the coupler's ID (`100`, `12`, `2`);
   how it packs a family and a value (408, 612, 216) is not known.
 * **Cables.** The second loss block (equal to the first in every file) and
@@ -195,8 +194,8 @@ list) without an error. By what the readers make of them:
 | sets | what |
 |---|---|
 | 135 | every value read (names, losses, levels, steps, tap IDs, frequencies all sensible) |
-| 11 | the same, but the Parameters name the frequencies `high`, `low`, `Rh`, `Rl` instead of MHz (all in old-spec folders): the app takes 750 / 54 / 42 / 5 for them, so each column still gets its own figures but is headed with a number |
-| 11 | the same, but the actives file holds a table no reader uses: New Bern's 1 GHz set (all six dates) and its old 750 (rows `2&4 PORT` with CS12 … CS03, EQ02 … EQ16, RP02 …: plug-ins for taps?), and one each of Tyler, Bullhead, Narrows and a Beverly-Elkins "don't use" set |
+| 11 | the same, but the Parameters name the frequencies `high`, `low`, `Rh`, `Rl` instead of MHz (all in old-spec folders): Lode heads the columns with those names (LK002 on LKMac862, the user's screenshot), and so does the app; it takes 750 / 54 / 42 / 5 inside, which only keeps the columns apart |
+| 11 | the same, but the actives file fills EQs Banks 9–16 (3.4d; New Bern's `2&4 PORT` and `8 PORT` banks, the user's recording): New Bern's 1 GHz set (all six dates) and its old 750, and one each of Tyler, Bullhead, Narrows and a Beverly-Elkins "don't use" set |
 | 7 | old formats not yet readable, all in old-spec folders: actives 2.20, 3.0 and 5.0 (Bossier's bymac862, Bullhead's npg550 / npg750 / npg860, Georgetown's gefd862 / jarr625, Beckley Stephenson's steph870), with their cables and couplers 2.10 and Parameters 2.10 of 2162 bytes where present |
 
 Every current set (89, outside the old-spec and "don't use" folders) loads
@@ -216,6 +215,16 @@ the extra levels (14 / 17). The current record's In / Out at F3 (+171 /
 +195) is borne out on all the 1 GHz specs (In 15.3 / 12.9 / 10.3 and Out 52
 / 50 / 38 at 1002 / 862 / 102 on their LEs). The app draws one extra
 column (F3) only: an F4 column and its tap tests are not built.
+
+**Now drawn (2 Oct, the user's screenshots).** Every extra forward frequency
+the Parameters have on gets its column after the two cplr[branch] columns,
+in F order, headed with its label, carried through cables, couplers, taps,
+in-line devices and actives at its own slot, its tap ports tested against
+its Min and tap window: BH1GHzMid keyed in Lode (1.1 amp 71, three 99
+couplers, 190 ft /26/, 189 ft <21>, amp 11) reads 1002 102 85 5 … 550 860,
+and every one of its 64 figures is the app's; HUMB1GHzMid (550 870) the
+same (`tests/test_keyed_regions.py`). **Column heads are the Parameters'
+labels**, whatever they say: LK002 on LKMac862 is headed `high low Rh Rl`.
 
 ### 3.0 Older spec files (WVEXT862, Lode 4)
 
@@ -387,23 +396,36 @@ The code at +1 is exactly the dB value in the part number for the simple parts
 family+value for the rest (`RLDC12-8` → 408, `GNA INT DC-12` → 612,
 `MGDCH-2116F` → 216) — **splitting rule unconfirmed**.
 
+**A record with an ID and no part number is a coupler.** HUMB1GHzMid's
+record 10 is ID 92 with no name (every loss 0 but the tap leg's 99 at
+1002, the internal flag set): the user keyed 92 at 1.2–1.4 and Lode drew
+`92<2>` … in green, the levels going on through it unchanged. LKMac1GHz,
+GEFD1GHz and others hold such records too (99 at F1 and F2). What the
+branch behind one starts at is not seen yet (QUESTIONS S2-4).
+
 ### 3.3 `.atv` — actives: amplifiers, line extenders, nodes (362 bytes)
 
 | offset | type | field |
 |---|---|---|
-| 5 | char[13] | model, e.g. `BLE-7-750PSS`, `BTN NODE-12`, `FM902B` |
-| 18 | char[2] | housing code, e.g. `S` |
-| 20 | char[10] | (blank in samples) |
-| 30 | char[10] | option/kit part, e.g. `RA-KIT\40` |
-| 40 | char[5] | second option part, e.g. `T\40` |
-| 45 | char[10] | (blank in samples) |
-| 59 | i32[4] | **In** — level required at forward High, forward Low, return Rh, return Rl. The manual's own column headings read `In - 860 | In - 54 | In - 42 | In - 5`, matching the frequencies derived independently from the cable ratios |
-| 75 | i32[4] | **Out** — level produced at the same four frequencies |
+| 1–4 | u8 ×4 | the Pads/EQs Banks less one: forward EQ, return EQ, forward pad, return pad (the Actives tab's Fwd Pad / Ret Pad / Fwd EQ / Ret EQ) |
+| 5 | char[25] | **Part Number**, e.g. `BLE-7-750PSS`, `BTN NODE-12`, `FM902B` |
+| 30 | char[25] | **Ret. Mod. Part Number** (Reserve Gain tab): Buckhannon's item 42 `RA-KIT-40L`, KERMIT's `RA-KIT\40`; NUL-ended, what follows the NUL is left from an older entry (an earlier reading split it into two "option parts") |
 | 55 | u32 | **Custom Cascading** (below) |
-| 91 | i32[2] | zero in every sample |
-| 99 | i32[2]×9 | **Power Steps**: (volts, amps) pairs, ends at a zero entry; room for nine (KERMIT uses seven) |
-| 171, 195 | i32 | **In** and **Out** at F3 |
-| 214 | 8 × 18 | Configuration Table: the Active ID 5 bytes into each slot |
+| 59 | i32[4] | **In** — level required at F1, F2, R1, R2 (the Actives tab's `In - 1002 … In - 5`) |
+| 75 | i32[4] | **Out** — level produced at the same four |
+| 91, 95 | i32 | **Fwd Reserve Gain**, **Ret Reserve Gain** (BH1GHzMid's FM332s 2.00 forward; 0 elsewhere) |
+| 99 | i32[2]×8 | **Power Steps**: "Min. Voltage", "Amperage 1" … "Voltage 8", "Amperage 8" — eight, as the tab has them (NBERN1GHz's FM332 45 V 0.73 A … 90 V 0.32 A) |
+| 171 | i32[4] | **In** at F3, F4, F5, F6 (`In - 750` 13.90 on NBERN1GHz's FM332; BH1GHzMid's 12.2 / 12.9 at 550 / 860) |
+| 195 | i32[4] | **Out** at F3–F6 (BH1GHzMid's FM332 45.0 / 50.0: the screenshot's 550 and 860 at 1.2–1.4; WV750's WIFI units 44.5 at F5) |
+| 214 | 8 × 18 | **Configuration Table**: the Active ID 5 bytes into each slot, **Plugin 1** at +10 (the Plug-Ins row: WV750's `68N` 8 NEW FMB … `68B` 16 SWAP FMT TO FMB) |
+
+The older record: name char[15], Ret. Mod. Part Number char[15] at +20,
+Custom Cascading +35, levels +39, six power steps +79, In F3–F6 +127, Out
+F3–F6 +151, the Configuration Table +170.
+
+Every one of the 250 records is a row of the Actives window, named or not:
+NBERN1GHz's 11H–33H, 62 and 64–70 have an Active ID and no part number, and
+the recording shows them so (`tests/test_spec_windows.py`).
 
 Confirmed by the manual: the actives file holds "the signal levels required at
 the forward and return inputs, as well as the forward and return outputs
@@ -496,6 +518,16 @@ the same layout as cables and couplers — **Tap Value** (toward the ports) at
 terminating tap: nothing continues past it and the screen shows 0.00 on the
 line below.
 
+**A row with a Tap ID and no part for a port count is still that tap.**
+HUMB1GHzMid's row 6 is Tap ID 21 with every slot empty; the user keyed 21
+with 5 homes at 1.6 and Lode drew `<21>` in yellow, the levels going on
+unchanged (1.7 = 1.6). Read as what the file holds — no part number, tap
+value 0, insertion 0 — the port reads the line's level, 12.57 dB over its
+10 dB window at 1002, which is yellow; having no part it is not a
+terminating tap. The port count comes from the Parameters' Tap Selection
+(homes → ports → tap type: 5 homes → 8-port in all three specs), as the
+user's hc 2 `/26/` and hc 5 `<21>` show.
+
 A design stores a tap as **(row, port code)**, port code 0/1/2/3 = 2/4/6/8
 ports. Confirmed on AL004: rows 3, 5, 7, 9, 10 and 11 of WV750-2026 are Tap IDs
 20, 17, 14, 11, 8 and 4, and its Design screen shows exactly `[20]`, `/17/`,
@@ -527,10 +559,12 @@ AN-WIFI 104–124, RMT1 204–235, RMT2 404–426.
 
 ### 3.4b `.atv` in-line devices (Q1, Q2 …)
 
-The Actives file's Bridgers/Feedermakers/Inline Eqs page: 69-byte records from
-offset 169372 (the file is a fixed 273200 bytes), record n = Qn. Name, then at
-+29 the losses at the four design columns F1, F2, R1, R2, then F3 (the
-older AL004's LEQ-PEA-8: 3.1 at 550 on 6.9 and 7.6, as Lode's screens). WV750: Q1 LEQ-PEA-8,
+The Actives window's Inline EQs tab: 24 rows, `EQ` then Q2–Q24 (the user's
+recording of NBERN1GHz) — 69-byte records from offset 169372, record n = Qn,
+n = 1–24 (what follows the 24th is another table). Name, then at +29 ten
+losses in the order the tab heads them: F1, F2, R1, R2, F3, F4, F5, F6, R3,
+R4 (NBERN1GHz's EQ FFE-8-85/RP+8P 1.60 8.90 9.70 9.00 2.90; the older
+AL004's LEQ-PEA-8: 3.1 at 550 on 6.9 and 7.6, as Lode's screens). WV750: Q1 LEQ-PEA-8,
 Q2 LEQ-PEA-0 (1.2 / 1.0 / 1.2 / 0.7), Q3 FFE-8-120-85/RP-R, Q5 EXIST SPLICE,
 Q6 NEW SPLICE, Q10–Q13 REMOVE/MOVE LE/BR markers. Placed in the amp column the
 device's loss applies before the node's taps; on AL004 6.8 that gives exactly
@@ -541,6 +575,19 @@ FFE-8-120-85/RP) read EQ while 5.5 reads Q8, 5.6 Q6 and AL004's 6.8 Q2. The
 manual's amp column holds "in-line equalisers and Q numbers"; both spec sets
 keep an equaliser in record 1. Nothing in the device record or the line
 record marks it otherwise.
+
+### 3.4d The rest of the actives file (the recording's other tabs)
+
+| offset | what |
+|---|---|
+| 93884 | Pads/EQs Banks 1–8 (3.4c) |
+| 164412 | **Plug-Ins**: 32 records of 155 bytes, the **Plugin Module Part #** char[15] at +140; record 0 is "no plug-in". WV750: 4 SWAP BR TO LE, 5 NEW LE, 6 UPGRADE LE, 7 MOVE LE, 8 NEW FMB … 17 SWAP FMB TO FMT — exactly the plug-ins its Configuration Table's variants name (68N–68B on the FM902B, 69N–69T on the FM902T, 78N–78S on the FML332). The Atten. columns, AGC/Step Down and the Plug-Ins Powering steps: where in the 140 bytes is not known (zero in every file) |
+| 169372 | Inline EQs, 25 × 69 (3.4b) |
+| 171097 | 9 records of 103 bytes, records 1–8 the **Feedermakers** rows (BH1GHzMid and HUMB1GHzMid hold −1 at +51 of each; nothing else in any file) |
+| 172024 | **EQs Bank 9 – 16**: 8 banks of 128 rows of 88 bytes — the bank's **Prefix** char[11] (repeated on every row: NBERN1GHz's 9 `2&4 PORT`, 10 `8 PORT`), the **Part Number** from +11, ten losses at +48 in the loss block's order F1–F6, R1–R4 (`CS12` 14.30 0.40 9.50 … 0.30 0.10). Ends at 262136, the 11.1 file's end |
+| 262136 | the 12.1 file only: 24 × 461 bytes, **Boosters** B1–B24 (empty in every file) |
+
+The Bridgers tab (BR1, BR2) is not placed (empty in every file).
 
 ### 3.4c `.atv` Pads/EQs Banks 1–8
 
@@ -556,7 +603,12 @@ char[11] each — forward pad, return pad, forward EQ, return EQ.
 | 58 | char[5] | forward EQ label |
 | 63 | char[5] | return EQ label |
 
-Row 0 is `VOID`; a column ends at a row labelled `FLAG`. A design stores
+Row 0 is `VOID`; a column ends at its row labelled `FLAG` (`Flag` in the
+1 GHz specs), and that row is a choice like the others: its pad is 21 dB,
+one past the largest, and Lode picks it when no pad is large enough —
+"Forward Pad: Flag", "Return Pad: Flag" on 1.7 of the user's BH1GHzMid and
+HUMB1GHzMid screenshots; a stored value that points at it shows `FLAG`
+(AL003's 52.7 return pad 21, which the app showed as "21"). A design stores
 row − 1 in the node's pad bytes (network 112–123), so AL00416's forward EQ 16
 is row 17, `"  12"` — what its info box shows. The expanded display names the
 part as prefix + label: WV750 bank 1 is `SPB-`, `SPB-`, `SEQ-750-`,
@@ -579,6 +631,13 @@ AL004, 108 stored values:
 * Pad: the largest that still leaves, after it and the EQ's loss, the input
   at or above In-750 and In-54 (forward), or the active's Out-40 and Out-5
   at or above the levels needed here (return).
+* **With "Allow Over Equalization" unticked** (General Parameters; BH1GHzMid
+  and HUMB1GHzMid, not WV750) the forward EQ is the nearest of those that
+  leave no more tilt than the active's own In tilt. BH1GHzMid's FM332 at
+  1.7: 39.67 / 33.70 in, In 15.3 / 10.3 — CS1 would leave 5.18 against 5.00,
+  so Lode shows CS2 (4.48); HUMB1GHzMid's (39.57 / 33.90, In 14.3 / 9.3)
+  CS1. Applied always, the rule would change 16 of AL004's 27 — so it is the
+  setting. The return EQ: no case yet where the two would differ.
 
 A spec saved from the editor after the Design screen has shown a pad or EQ
 writes that label trimmed (`"  16"` → `"16"`) — on AL004, exactly 34.6's

@@ -57,7 +57,7 @@ def cmd_spec(args):
         print(f"     {c.name:<18} code {c.code:8.2f}")
     print(f"  actives  : {len(spec.actives)}")
     for a in spec.actives:
-        print(f"     {a.name:<18} {' '.join(a.option_parts)}")
+        print(f"     {a.name:<18} {a.return_module}")
     print(f"  taps     : {len(spec.taps)}")
     for t in spec.taps:
         print(f"     {t.parts}")

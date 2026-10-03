@@ -38,9 +38,11 @@ function columns() {
   const f = (S.scr && (S.scr.labels || S.scr.frequencies)) || [];
   const lvl = f.map((mhz, i) => ({ key: 'lvl:' + i, head: String(mhz).replace('.0', ''),
                                    cls: '', edit: false }));
-  // the Parameters' third forward frequency (WVEXT862's 550): Lode draws its
-  // column after the two cplr[branch] columns (the older AL004's screens)
-  const xlv = ((S.scr && S.scr.extra_frequencies) || []).map((mhz, i) => (
+  // the Parameters' extra forward frequencies (WVEXT862's 550; BH1GHzMid's
+  // 550 and 860): Lode draws their columns after the two cplr[branch]
+  // columns, headed with the Parameters' labels
+  const xf = (S.scr && (S.scr.extra_labels || S.scr.extra_frequencies)) || [];
+  const xlv = xf.map((mhz, i) => (
     { key: 'xlv:' + i, head: String(mhz).replace('.0', ''), cls: '', edit: false }));
   const common = [
     { key: 'ftg', head: 'ftg', edit: true },
@@ -683,6 +685,10 @@ function moveToNextField() {
 
 // ---------------------------------------------------------------- keyboard
 document.addEventListener('keydown', async ev => {
+  if (SW.data) {                        // a Spec Edit window has the keys
+    if (ev.key === 'Escape') closeSpecWin();
+    return;
+  }
   if (!$('#modal').hidden) {            // Esc closes a window, as in the program
     if (ev.key === 'Escape') closeModal();
     return;
@@ -1329,8 +1335,8 @@ const MENU_ACTIONS = {
            ['Maps', NYI('Global Change Maps')], ['Map Grid', NYI('Global Change Map Grid')],
            ['TSG', NYI('Global Change TSG')]],
   spec: [
-    ['Parameters...', NYI('Parameters editor')], ['Actives...', viewLibrary],
-    ['Taps...', viewLibrary], ['Couplers...', viewLibrary], ['Cables...', viewLibrary],
+    ['Parameters...', () => specEdit('par')], ['Actives...', () => specEdit('atv')],
+    ['Taps...', viewLibrary], ['Couplers...', viewLibrary], ['Cables...', () => specEdit('cbl')],
     ['Pricing...', NYI('Pricing editor')], ['Performance...', NYI('Performance editor')],
     ['Control...', NYI('Control editor')],
   ],
@@ -1587,6 +1593,247 @@ function fmtLib(p, c) {
   }
   return '';
 }
+// ---------------------------------------------------------------- Spec Edit
+// Spec Edit > Parameters, Actives, Cables: the program's own windows, tab for
+// tab and column for column (the user's recording of NBERN1GHz's Actives
+// window, WV750's six Parameters tabs, WVEXT862's Cables tab), filled from
+// the network's spec file itself, every record of it.  Shown as they are:
+// nothing here edits a spec file, so Load and Cancel both close the window.
+const SW = { data: null, tab: 0, sub: {}, note: '' };
+
+async function specEdit(ext) {
+  if (!S.nid) return;
+  let w;
+  try { w = await api(`/api/networks/${S.nid}/specs/${ext}`); }
+  catch (e) {
+    let text = e.message;
+    try { text = JSON.parse(text).detail; } catch (_) {}
+    msg(text); return;
+  }
+  SW.data = w; SW.tab = 0; SW.sub = {}; SW.note = '';
+  renderSpecWin();
+}
+function closeSpecWin() {
+  const el = $('#specwin'); if (el) el.remove();
+  SW.data = null;
+}
+const SW_ICONS = [
+  // New, Open, Save, Print, as the window's toolbar draws them
+  '<svg viewBox="0 0 18 18"><path d="M4 2h7l3 3v11H4z" fill="#fff" stroke="#333"/><path d="M11 2v3h3" fill="none" stroke="#333"/><path d="M3 1l1.5 2M1 4h2.5M5.5 1l-.5 2" stroke="#e0b000"/><path d="M6 8h6M6 10h6M6 12h6" stroke="#888"/></svg>',
+  '<svg viewBox="0 0 18 18"><path d="M1 5h5l1 1h8v9H1z" fill="#f2c94c" stroke="#7a5a00"/><path d="M3 15l2-6h12l-2 6z" fill="#f7dc80" stroke="#7a5a00"/></svg>',
+  '<svg viewBox="0 0 18 18"><rect x="2" y="2" width="14" height="14" fill="#222"/><rect x="5" y="3" width="8" height="5" fill="#fff"/><rect x="5" y="11" width="8" height="5" fill="#666"/></svg>',
+  '<svg viewBox="0 0 18 18"><rect x="5" y="2" width="8" height="5" fill="#fff" stroke="#333"/><rect x="2" y="7" width="14" height="6" fill="#ccc" stroke="#333"/><rect x="5" y="11" width="8" height="5" fill="#fff" stroke="#333"/></svg>',
+];
+
+// a tab control with more tabs than fit: rows, each filled out to the
+// width, and the row holding the chosen tab drawn last, next to the page
+// (NBERN1GHz's Actives window: "Actives ... EQs Bank 13" under "EQs Bank
+// 14 ... Booster Powering" until a tab of that row is picked)
+let swCanvas = null;
+function textWidth(t) {
+  swCanvas = swCanvas || document.createElement('canvas').getContext('2d');
+  swCanvas.font = '11px "Microsoft Sans Serif", Tahoma, Arial, sans-serif';
+  return swCanvas.measureText(t).width;
+}
+function tabRows(names, width, sel) {
+  const rows = [[]];
+  let used = 0;
+  names.forEach((n, i) => {
+    const w = Math.ceil(textWidth(n)) + 18;
+    if (used + w > width && rows[rows.length - 1].length) { rows.push([]); used = 0; }
+    rows[rows.length - 1].push(i); used += w;
+  });
+  const at = rows.findIndex(r => r.includes(sel));
+  return rows.slice(at + 1).concat(rows.slice(0, at + 1));
+}
+
+function swGrid(g, cls, plain) {
+  const cols = g.cols;
+  const total = cols.reduce((a, c) => a + c.w, 0);
+  return `<div class="sw-gridbox${cls ? ' ' + cls : ''}"><table class="sw-t${plain ? ' plain' : ''}" style="width:${total}px">` +
+    `<colgroup>${cols.map(c => `<col style="width:${c.w}px">`).join('')}</colgroup>` +
+    `<thead><tr>${cols.map(c => `<th>${esc(c.head)}</th>`).join('')}</tr></thead><tbody>` +
+    g.rows.map(r => `<tr>${r.map(v => `<td>${esc(v)}</td>`).join('')}</tr>`).join('') +
+    '</tbody></table></div>';
+}
+
+function renderSpecWin() {
+  const w = SW.data; if (!w) return;
+  let el = $('#specwin');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'specwin'; el.className = 'specwin';
+    document.body.appendChild(el);
+  }
+  const tab = w.tabs[SW.tab] || w.tabs[0];
+  const names = w.tabs.map(t => t.name);
+  const rows = tabRows(names, Math.max(300, window.innerWidth - 8), SW.tab);
+  el.innerHTML =
+    `<div class="sw-title"><span class="sw-ico"></span><span class="sw-name">${esc(w.title)}</span>` +
+    `<span class="sw-wb"><span>&#x2014;</span><span>&#x2610;</span><span class="x" id="swX">&#x2715;</span></span></div>` +
+    `<div class="sw-menu">${w.menus.map(m => `<span>${esc(m)}</span>`).join('')}</div>` +
+    `<div class="sw-tools">${SW_ICONS.map(s => `<span>${s}</span>`).join('')}</div>` +
+    `<div class="sw-tabs">${rows.map(r => `<div class="sw-tabrow${rows.length === 1 ? ' single' : ''}">${r.map(i =>
+      `<span class="sw-tab${i === SW.tab ? ' sel' : ''}" data-tab="${i}">${esc(names[i])}</span>`).join('')}</div>`).join('')}</div>` +
+    `<div class="sw-page" id="swPage">${swPage(w, tab)}</div>` +
+    `<div class="sw-bottom"><button class="def" id="swLoad">Load</button><button id="swCancel">Cancel</button></div>` +
+    `<div class="sw-status" id="swStatus">${esc(SW.note)}</div>`;
+  el.querySelectorAll('.sw-tabs .sw-tab').forEach(t => t.onclick = () => {
+    SW.tab = +t.dataset.tab; SW.note = SW.data.tabs[SW.tab].note || ''; renderSpecWin();
+  });
+  el.querySelectorAll('.sw-subtabs .sw-tab').forEach(t => t.onclick = () => {
+    SW.sub[SW.tab] = +t.dataset.sub; renderSpecWin();
+  });
+  el.querySelectorAll('.sw-menu span, .sw-tools span').forEach(m => m.onclick = () => {
+    $('#swStatus').textContent = 'Shown only: editing and saving spec files is not done yet.';
+  });
+  $('#swX').onclick = $('#swLoad').onclick = $('#swCancel').onclick = closeSpecWin;
+  // a cell clicked is the cursor's, as the program marks it
+  el.querySelectorAll('table.sw-t tbody').forEach(tb => tb.onclick = e => {
+    const td = e.target.closest('td'); if (!td || td.cellIndex === 0) return;
+    el.querySelectorAll('td.cur').forEach(c => c.classList.remove('cur'));
+    td.classList.add('cur');
+  });
+}
+
+function swPage(w, tab) {
+  if (tab.unseen) {
+    return `<div class="sw-unseen">${esc(tab.name)}: not seen in Lode yet — a screenshot of this tab will show what it holds.</div>`;
+  }
+  if (w.kind === 'par') return parPage(tab.name, w.values);
+  if (tab.sub) {
+    const k = SW.sub[SW.tab] || 0, s = tab.sub[k];
+    return `<div class="sw-subtabs">${tab.sub.map((t, i) =>
+      `<span class="sw-tab${i === k ? ' sel' : ''}" data-sub="${i}">${esc(t.name)}</span>`).join('')}</div>` +
+      `<div class="sw-subpage"><div class="sw-prefix">Prefix: <input readonly value="${esc(s.prefix)}"></div>` +
+      swGrid(s.grid, 'prefixed') + '</div>';
+  }
+  if (tab.prefix !== undefined) {
+    return `<div class="sw-prefix">Prefix: <input readonly value="${esc(tab.prefix)}"></div>` +
+      swGrid(tab.grid, 'prefixed');
+  }
+  return swGrid(tab.grid);
+}
+
+// The Parameters tabs: each field where WV750's screenshots have it.  Those
+// are at 125 %: x, y there, less the page's top (117), times 0.8.
+function parPage(name, v) {
+  const X = x => Math.round(x * 0.8), Y = y => Math.round((y - 117) * 0.8);
+  // a group box's line is at its title's middle: y is that line
+  const box = (x, y, x2, y2, title, inner = '') =>
+    `<fieldset style="left:${X(x)}px;top:${Y(y) - 7}px;width:${X(x2 - x)}px;height:${X(y2 - y) + 7}px">` +
+    `<legend>${esc(title)}</legend></fieldset>${inner}`;
+  const lab = (x, y, t, right) => right
+    ? `<span class="lb r" style="right:calc(100% - ${X(x)}px);top:${Y(y) - 8}px">${esc(t)}</span>`
+    : `<span class="lb" style="left:${X(x)}px;top:${Y(y) - 8}px">${esc(t)}</span>`;
+  const inp = (x, y, x2, val, off) =>
+    `<input class="sw-in${off ? ' off' : ''}" readonly style="left:${X(x)}px;top:${Y(y) - 10}px;width:${X(x2 - x)}px" value="${esc(val)}">`;
+  const ck = (x, y, t, on, kind = 'checkbox', after = true) =>
+    `<label class="ck" style="left:${X(x)}px;top:${Y(y) - 8}px">${after ? '' : esc(t)}` +
+    `<input type="${kind}" ${on ? 'checked' : ''} onclick="return false">${after ? esc(t) : ''}</label>`;
+  const grid = (x, y, x2, y2, cols, rows) =>
+    `<div style="position:absolute;left:${X(x)}px;top:${Y(y)}px;width:${X(x2 - x)}px;height:${X(y2 - y)}px">` +
+    swGrid({ cols: cols.map(([head, w]) => ({ head, w: X(w) })), rows }, '', true) + '</div>';
+  let h = '';
+  if (name === 'General Parameters') {
+    h += box(27, 143, 264, 340, 'Display Options');
+    h += box(38, 177, 252, 215, 'Distance Units') + ck(55, 199, 'Ftg', v.distance_units === 'Ftg', 'radio') +
+      ck(118, 199, 'm', v.distance_units === 'm', 'radio') + ck(182, 199, 'dM', v.distance_units === 'dM', 'radio');
+    h += box(38, 234, 252, 272, 'Signal Display') + ck(55, 253, 'dBmv', v.signal_display === 'dBmV', 'radio') +
+      ck(182, 253, 'dBuv', v.signal_display === 'dBuV', 'radio');
+    h += ck(55, 308, 'Show Count Types', v.show_count_types);
+    h += box(277, 143, 524, 340, 'Strand/Trench Types');
+    for (let k = 0; k < 6; k++) h += ck(305, 164 + 24.4 * k, `${k}00 Series`, v.strand_series.includes(k));
+    for (let k = 6; k < 10; k++) h += ck(421, 164 + 24.4 * (k - 6), `${k}00 Series`, v.strand_series.includes(k));
+    h += box(537, 143, 860, 340, 'NIU Settings');
+    [['System Penetration %:', 'system_penetration', 169], ['Offhook %:', 'offhook', 205],
+     ['Ring %:', 'ring', 242], ['Additional Line %:', 'additional_line', 279],
+     ['Offhook Limit:', 'offhook_limit', 316]].forEach(([t, k, y]) => {
+      h += lab(715, y, t, true) + inp(719, y, 791, v.niu[k] ?? '0.00');
+    });
+    h += box(27, 368, 264, 514, 'Inline Equalization') + lab(173, 393, 'Max. Crossover:', true) +
+      inp(179, 393, 252, v.max_crossover) + lab(173, 431, 'Max Return Crossover:', true) +
+      inp(179, 431, 252, v.max_return_crossover);
+    h += box(38, 463, 252, 501, 'Default EQ Placement') + ck(55, 485, 'EQ+', v.eq_placement === 'EQ+', 'radio') +
+      ck(118, 485, 'EQ-', v.eq_placement === 'EQ-', 'radio') + ck(182, 485, 'EQe', v.eq_placement === 'EQe', 'radio');
+    h += box(277, 368, 424, 514, 'Replacement Cables') + lab(357, 393, 'Backfeed:', true) +
+      inp(366, 393, 408, v.replacement_cables.backfeed ?? 0) + lab(357, 431, 'Fwd. Feed:', true) +
+      inp(366, 431, 408, v.replacement_cables.fwd_feed ?? 0);
+    h += box(438, 368, 746, 514, 'Miscellaneous Part Numbers') + lab(551, 393, 'HTH Connectors:', true) +
+      inp(555, 393, 742, v.misc_parts.hth_connectors || '') + lab(551, 431, 'Splices:', true) +
+      inp(555, 431, 742, v.misc_parts.splices || '') + lab(551, 469, 'Terminators:', true) +
+      inp(555, 469, 742, v.misc_parts.terminators || '');
+    h += lab(873, 393, 'Lines per Form:', true) + inp(879, 393, 921, v.lines_per_form) +
+      lab(873, 431, 'Max. Tap Cascade:', true) + inp(879, 431, 921, v.max_tap_cascade) +
+      lab(873, 469, 'Max. LE Cascade:', true) + inp(879, 469, 921, v.max_le_cascade);
+    h += ck(757, 503, 'Allow Over Equalization ', v.allow_over_equalization, 'checkbox', false);
+  } else if (name === 'System Levels') {
+    h += lab(18, 147, 'Tap Margin:') + inp(99, 147, 171, v.tap_margin);
+    h += lab(18, 182, 'Forward Tap Window:') + grid(20, 203, 187, 950, [['Frequency', 95], ['Window', 72]], v.forward_windows);
+    h += lab(215, 182, 'Return Tap Window:') + grid(230, 203, 397, 950, [['Frequency', 95], ['Window', 72]], v.return_windows);
+    const w = [54, 86, 74, 80, 67, 86, 74, 74, 73, 85, 85, 128, 120, 120, 114];
+    h += lab(413, 182, 'Levels:') + grid(413, 203, 1910, 950, v.level_cols.map((c, i) => [c, w[i]]), v.level_rows);
+  } else if (name === 'Tap Selection') {
+    h += box(18, 139, 226, 193, 'Optimization') + ck(37, 167, 'OP-', v.optimization === 'OP-', 'radio') +
+      ck(100, 167, 'OP+', v.optimization === 'OP+', 'radio') + ck(163, 167, 'OFf', v.optimization === 'OFf', 'radio');
+    h += ck(253, 167, 'Enforce Tap Window', v.enforce_tap_window) + ck(452, 167, 'Enforce Tap Tilt', v.enforce_tap_tilt) +
+      ck(638, 167, 'Flag Hi/Lo Tilt', v.flag_hi_lo_tilt);
+    h += grid(20, 210, 248, 950, [['Homes', 60], ['Number of Ports', 143]], v.ports_by_homes.map(r => r.map(String)));
+    h += grid(283, 210, 511, 950, [['Ports', 45], ['Tap Type', 85]], v.tap_type_by_ports.map(r => r.map(String)));
+  } else if (name === 'Powering') {
+    // its screenshot was taken 5 px higher than the other five: + 5
+    const P = y => y + 5;
+    h += box(18, P(128), 168, P(258), 'Power Interpolation') +
+      ck(37, P(163), 'Step', v.power_interpolation === 'step', 'radio') +
+      ck(37, P(194), 'Linear', v.power_interpolation === 'linear', 'radio') +
+      ck(37, P(225), 'Constant Wattage', v.power_interpolation === 'constant_wattage', 'radio');
+    h += box(18, P(274), 168, P(371), 'Overvoltage Check') + ck(37, P(307), 'Off', !v.overvoltage_check, 'radio') +
+      ck(37, P(340), 'On', v.overvoltage_check, 'radio');
+    h += box(180, P(128), 375, P(371), 'Maximum Amperage Through');
+    [['Power Inserter:', 'power_inserter', 162], ['Amplifier:', 'amplifier', 199], ['Bridger Port:', 'bridger_port', 236],
+     ['Coupler:', 'coupler', 272], ['Line Extender:', 'line_extender', 308], ['Tap:', 'tap', 345]].forEach(([t, k, y]) => {
+      h += lab(280, P(y), t, true) + inp(292, P(y), 364, v.max_amps_through[k] ?? '0.00');
+    });
+    h += box(18, P(393), 375, P(480), 'Pre Load/Test Attached Networks') + ck(37, P(416), 'Off', !v.pre_load, 'radio') +
+      ck(37, P(448), 'On', v.pre_load, 'radio');
+    h += lab(387, P(128), 'Transformers:') + grid(387, P(148), 704, 950, [['ID #', 67], ['Part Number', 190], ['Voltage', 60]],
+      v.transformers.map(r => r.map(String)));
+    h += lab(715, P(128), 'Power Supplies:') + grid(716, P(148), 1910, 950,
+      [['ID #', 68], ['Part Number', 188], ['Voltage Rating', 131], ['Current Rating', 127], ['% Capacity', 97]],
+      v.supplies.map(r => r.map(String)));
+  } else if (name === 'Underground Housings') {
+    h += box(18, 133, 227, 421, 'Equipment Size - Point Values');
+    [['Amplifier:', 'amplifier', 166], ['Line Extender:', 'line_extender', 205], ['2, 4, 6 Port Tap:', 'tap', 242],
+     ['8 Port Tap:', 'tap_8_port', 281], ['Coupler:', 'coupler', 320], ['Power Suppy:', 'power_supply', 358],
+     ['Equalizer:', 'equalizer', 397]].forEach(([t, k, y]) => {
+      h += lab(128, y, t, true) + inp(139, y, 211, v.points[k] ?? 0);
+    });
+    h += grid(243, 127, 1910, 950, [['Housing Number', 147], ['Part Number', 189], ['Minimum Size (Points)', 191]],
+      v.housings.map(r => r.map(String)));
+  } else if (name === 'Frequencies') {
+    h += box(18, 141, 204, 380, 'Forward Frequencies') + lab(107, 172, 'High:', true) + inp(117, 172, 189, v.forward[0][0]) +
+      lab(107, 208, 'Low:', true) + inp(117, 208, 189, v.forward[1][0]);
+    v.forward.slice(2).forEach(([t, on], i) => {
+      const y = 243 + 37 * i;
+      h += ck(34, y, `Freq. ${i + 3}:`, on) + inp(117, y, 189, t, !on);
+    });
+    h += box(217, 141, 403, 380, 'Return Frequencies') + lab(306, 172, 'High:', true) + inp(316, 172, 388, v.return[0][0]) +
+      lab(306, 208, 'Low:', true) + inp(316, 208, 388, v.return[1][0]);
+    v.return.slice(2).forEach(([t, on], i) => {
+      const y = 243 + 37 * i;
+      h += ck(233, y, `Freq. ${i + 3}:`, on) + inp(316, y, 388, t, !on);
+    });
+    h += box(418, 141, 617, 380, 'Freqs. for Active EQ Selection');
+    [['Fwd High:', 'fwd_high', 170], ['Fwd. Low:', 'fwd_low', 206], ['Ret. High:', 'ret_high', 242],
+     ['Ret. Low:', 'ret_low', 278]].forEach(([t, k, y]) => {
+      h += lab(505, y, t, true) +
+        `<select class="sw-in" tabindex="-1" onmousedown="return false" style="left:${X(516)}px;top:${Y(y) - 10}px;width:${X(85)}px">` +
+        `<option>${esc(v.eq_selection[k] || '')}</option></select>`;
+    });
+  }
+  return `<div class="sw-form">${h}</div>`;
+}
+
 function importNtw() {
   modal(`<h2>Import a .ntw network file</h2>
     <p>A .ntw refers to its equipment by position in the spec files. Pick the

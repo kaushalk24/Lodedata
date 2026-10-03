@@ -74,19 +74,20 @@ def layout(kind: str, data: bytes) -> tuple:
     elif kind == "atv":
         if classic:
             start, stride, count, levels, config = 1021, 318, S.CLASSIC_ATV_RECORDS, 39, 170
-            f = [(1, 4, "banks"), (5, 15, "name"), (35, 4, "custom cascading"),
-                 (levels, 32, "in/out levels")]
+            f = [(1, 4, "banks"), (5, 15, "name"), (20, 15, "Ret. Mod. Part Number"),
+                 (35, 4, "custom cascading"), (levels, 32, "in/out levels")]
             banks, nbanks = S.CLASSIC_BANKS, S.CLASSIC_BANK_COUNT
             inline, istride, islots, iat = S.CLASSIC_INLINE
         else:
             start, stride, count, levels, config = 849 + 362 * S.ATV_INDEX_BASE, 362, 251, 59, 214
-            f = [(1, 4, "banks"), (5, 25, "name, housing"), (30, 15, "option parts"),
-                 (55, 4, "custom cascading"), (levels, 32, "in/out levels")]
+            f = [(1, 4, "banks"), (5, 25, "name"), (30, 25, "Ret. Mod. Part Number"),
+                 (55, 4, "custom cascading"), (levels, 32, "in/out levels"),
+                 (S.ATV_RESERVE_GAIN[0], 8, "reserve gain")]
             banks, nbanks = S.ATV_BANKS, S.ATV_BANK_COUNT
             inline, istride, islots, iat = (S.ATV_INLINE, S.ATV_INLINE_STRIDE,
                                             S.ATV_INLINE_SLOTS, S.ATV_INLINE_LOSS)
         (steps_at, steps), f3 = (S.CLASSIC_ATV_STEPS, S.CLASSIC_ATV_F3) if classic else (S.ATV_STEPS, S.ATV_F3)
-        f += [(steps_at, 8 * steps, "power steps"), (f3[0], 4, "in F3"), (f3[1], 4, "out F3")]
+        f += [(steps_at, 8 * steps, "power steps"), (f3[0], 16, "in F3-F6"), (f3[1], 16, "out F3-F6")]
         f += [(config + S.ATV_CONFIG_STRIDE * k + 5, 5, f"config ID {k}")
               for k in range(S.ATV_CONFIG_SLOTS)]
         tables.append(_table(start, stride, count, f))
@@ -95,7 +96,7 @@ def layout(kind: str, data: bytes) -> tuple:
             b = banks + S.ATV_BANK_STRIDE * k
             tables.append(_table(b, S.ATV_BANK_ROW, S.ATV_BANK_ROWS, rows))
             other.append((b + S.ATV_BANK_ROW * S.ATV_BANK_ROWS, 44, f"bank {k + 1} prefixes"))
-        tables.append(_table(inline, istride, islots, [(0, min(iat, 20), "name"), (iat, 20, "losses")]))
+        tables.append(_table(inline, istride, islots, [(0, min(iat, 20), "name"), (iat, 40, "losses")]))
     elif kind == "tap":
         start, stride, _ = (S.CLASSIC_LAYOUT if classic else S.LAYOUT)["tap"]
         slots = S.CLASSIC_TAP_PORT_SLOTS if classic else S.TAP_PORT_SLOTS

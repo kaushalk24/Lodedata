@@ -95,21 +95,31 @@ CLASSIC_LAYOUT = {
     "tap": (641, 414, 5),
 }
 CLASSIC_ATV_RECORDS = 51
-CLASSIC_ATV_F3 = (127, 151)     # the older record's In and Out at F3
 # The actives table is 251 records in the current file, 51 in the older:
 # the Pads/EQs banks start one byte after the last (93884 = 3021 + 251 x 362
 # + 1; 17240 = 1021 + 51 x 318 + 1).  Records are read by that count, not
 # by whether their figures look likely.
 ATV_RECORDS = 251
 # Power Steps, (volts, amps) pairs: the older record six from +79 up to In
-# F3 at +127 (WVEXT862's LEs 42 V ... 90 V); the current one from +99 up to
-# its In F3 at +171, room for nine (KERMIT's MB-750D-H uses seven, 38 V ...
-# 90 V).  The pair before them (+71, +91) is 0 in every file: not read.
-CLASSIC_ATV_STEPS, ATV_STEPS = (79, 6), (99, 9)
-# the current record's In and Out at F3, 44 on from the older record's:
-# WV750's bridger 41 holds 10.1 / 43.0 there, as WVEXT862's FNB99 41 does at
-# +127 / +151; SHINSTON's FML332 12.9 / 45.0 (no current set has F3 on)
+# F3 at +127 (WVEXT862's LEs 42 V ... 90 V); the current one eight from +99,
+# as the Actives window's Power Steps tab has them: "Min. Voltage",
+# "Amperage 1" ... "Voltage 8", "Amperage 8" (NBERN1GHz's FM332 45 V 0.73 A
+# ... 90 V 0.32 A, the user's recording; KERMIT's MB-750D-H uses seven).
+CLASSIC_ATV_STEPS, ATV_STEPS = (79, 6), (99, 8)
+# The Reserve Gain tab: "Ret. Mod. Part Number", the only text after the
+# part number (Buckhannon's item 42 "RA-KIT-40L", KERMIT's "RA-KIT\40";
+# NUL-ended, what follows the NUL is left from an older entry), and "Fwd
+# Reserve Gain", "Ret Reserve Gain" (BH1GHzMid's FM332s 2.00 forward)
+ATV_RETURN_MODULE, ATV_RESERVE_GAIN = (30, 55), (91, 95)
+# In and Out at the extra forward frequencies F3-F6, four of each: the
+# current record's from +171 and +195, the older record's from +127 and
+# +151.  WV750's bridger 41 holds 10.1 / 43.0 at F3, as WVEXT862's FNB99 41
+# does in the older record; BH1GHzMid's FM332 12.2 / 45.0 at 550 (F3) and
+# 12.9 / 50.0 at 860 (F4) -- 45.00 and 50.00 under the user's screenshot's
+# 550 and 860 at 1.2-1.4; NBERN1GHz's 13.90 is its Actives tab's "In - 750"
 ATV_F3 = (171, 195)
+CLASSIC_ATV_F3 = (127, 151)
+EXTRA_FORWARD = 4                # F3, F4, F5, F6
 CLASSIC_TAP_PORT_SLOTS = {2: 5, 4: 107, 6: 209, 8: 311}
 
 
@@ -206,13 +216,18 @@ def read_couplers(data: bytes) -> list:
         if seg[0] != mark:
             continue
         name = _name(seg[5:5 + n])
-        if not name:
+        code = _fx(struct.unpack_from("<i", seg, 1)[0])
+        # a record with an ID and no part number is still a coupler:
+        # HUMB1GHzMid's 92 (record 10, every loss 0 but the tap leg's 99 at
+        # 1002) is drawn 92<2> in green on the user's screenshot, the levels
+        # going on through it unchanged
+        if not name and not code:
             continue
         out.append(CouplerSpec(
             slot=slot,
             name=name,
             alt_name=_name(seg[13:5 + n]),
-            code=_fx(struct.unpack_from("<i", seg, 1)[0]),
+            code=code,
             tap_legs=seg[85 + n] + 1,
             internal=bool(seg[88 + n]),
             values=[_fx(v) for v in struct.unpack_from("<20i", seg, 5 + n)],
@@ -231,8 +246,9 @@ class ActiveSpec:
     active_id: str = ""             # what the amp column shows
     config_ids: list = field(default_factory=list)   # base + plug-in variants
     config_slots: list = field(default_factory=list)  # the same by slot, "" for an empty one
-    housing: str = ""
-    option_parts: list = field(default_factory=list)
+    # the Reserve Gain tab: Ret. Mod. Part Number, [Fwd, Ret] Reserve Gain
+    return_module: str = ""
+    reserve_gain: list = field(default_factory=lambda: [0.0, 0.0])
     # levels required at, and produced by, the active at the four design
     # frequencies: forward high, forward low, return high, return low
     input_levels: list = field(default_factory=list)
@@ -242,13 +258,15 @@ class ActiveSpec:
     values: list = field(default_factory=list)
     # Pads/EQs Bank used for forward pad, return pad, forward EQ, return EQ
     banks: list = field(default_factory=lambda: [1, 1, 1, 1])
-    # in and out at the third forward frequency (F3): the older record's In
-    # at +127 (after the six power steps) and Out at +151 -- WVEXT862's LEs
-    # need 14.1 in and put out 43.0, the FNB99s 10.1 and 43.0, NC4000 0 and
-    # 41.1, HLN 3842 NODE 0 and 43.5, the WIFI OMNI 0 and 0 (43.1's end line
-    # reads 0.00 at 550; Lode's "550 input 20.98 to LE at 25.3." is 20.98 less
-    # its 10 pad under 14.1).  The current record's at +171 and +195 (ATV_F3);
-    # no current spec set has F3 on, so Lode has not shown those yet
+    # in and out at the extra forward frequencies F3-F6 (ATV_F3): the older
+    # record's In from +127 (after the six power steps) and Out from +151 --
+    # WVEXT862's LEs need 14.1 in and put out 43.0 at F3, the FNB99s 10.1 and
+    # 43.0, NC4000 0 and 41.1, HLN 3842 NODE 0 and 43.5, the WIFI OMNI 0 and 0
+    # (43.1's end line reads 0.00 at 550; Lode's "550 input 20.98 to LE at
+    # 25.3." is 20.98 less its 10 pad under 14.1)
+    extra_in: list = field(default_factory=lambda: [0.0] * EXTRA_FORWARD)
+    extra_out: list = field(default_factory=lambda: [0.0] * EXTRA_FORWARD)
+    # [in, out] at F3 alone
     f3_levels: list = field(default_factory=lambda: [0.0, 0.0])
     # the Actives window's Custom Cascading tab, one row per active: bit 0
     # "Cust. Casc." (1 Yes), bit 1 "Exclude" (left out of the count), bit k + 1
@@ -267,11 +285,12 @@ class ActiveSpec:
 def read_actives(data: bytes) -> list:
     out = []
     classic = _classic(data)
-    # the older record: name char[15], then 15 bytes (blank in WVEXT862, so
-    # its option parts are not placed), levels at +39 (current +59), the
+    # the older record: name char[15], then the Ret. Mod. Part Number's 15
+    # bytes (blank in WVEXT862), levels at +39 (current +59), the
     # Configuration Table at +170 (current +214); record 0 is index 0
     levels_at, config_at = (39, 170) if classic else (59, ATV_CONFIG_BASE)
-    (steps_at, steps), f3_at = (CLASSIC_ATV_STEPS, CLASSIC_ATV_F3) if classic else (ATV_STEPS, ATV_F3)
+    (steps_at, steps), (in_at, out_at) = (CLASSIC_ATV_STEPS, CLASSIC_ATV_F3) if classic else (ATV_STEPS, ATV_F3)
+    module = (20, 35) if classic else ATV_RETURN_MODULE
     first, count = (0, CLASSIC_ATV_RECORDS) if classic else (ATV_INDEX_BASE, ATV_RECORDS)
     for slot, off, seg in _records(data, "atv"):
         index = slot - first
@@ -284,7 +303,6 @@ def read_actives(data: bytes) -> list:
         name = _name(seg[5:20] if classic else seg[5:30])
         if not name:
             continue
-        parts = [] if classic else [x for x in (_name(seg[30:40]), _name(seg[40:45])) if x]
         levels = [round(_fx(v), 2) for v in struct.unpack_from("<8i", seg, levels_at)]
         table = []
         for volts, amps in zip(*[iter(struct.unpack_from(f"<{2 * steps}i", seg, steps_at))] * 2):
@@ -293,7 +311,10 @@ def read_actives(data: bytes) -> list:
         ids = [_name(seg[o + 5:o + 10]) for o in range(
             config_at, config_at + ATV_CONFIG_STRIDE * ATV_CONFIG_SLOTS,
             ATV_CONFIG_STRIDE)]
-        f3 = [round(_fx(struct.unpack_from("<i", seg, o)[0]), 2) for o in f3_at]
+        extra_in, extra_out = ([round(_fx(v), 2) for v in struct.unpack_from(f"<{EXTRA_FORWARD}i", seg, o)]
+                               for o in (in_at, out_at))
+        gains = [] if classic else [round(_fx(struct.unpack_from("<i", seg, o)[0]), 2)
+                                    for o in ATV_RESERVE_GAIN]
         # the four bytes before the levels: Cust. Casc., Exclude, Casc. 1-19
         cascading = struct.unpack_from("<I", seg, levels_at - 4)[0]
         out.append(ActiveSpec(
@@ -303,15 +324,17 @@ def read_actives(data: bytes) -> list:
             active_id=ids[0],
             config_ids=[i for i in ids if i],
             config_slots=ids,
-            housing=_name(seg[18:20]),
-            option_parts=parts,
+            return_module=_name(seg[module[0]:module[1]]),
+            reserve_gain=gains or [0.0, 0.0],
             input_levels=levels[0:4],
             output_levels=levels[4:8],
             power_draw=table,
             values=[_fx(v) for v in struct.unpack_from("<24i", seg, levels_at)],
             banks=[seg[ATV_PAD_BANKS] + 1, seg[ATV_PAD_BANKS + 1] + 1,
                    seg[ATV_EQ_BANKS] + 1, seg[ATV_EQ_BANKS + 1] + 1],
-            f3_levels=f3,
+            extra_in=extra_in,
+            extra_out=extra_out,
+            f3_levels=[extra_in[0], extra_out[0]],
             cascading=cascading,
         ))
     return out
@@ -327,7 +350,9 @@ class TapPort:
     part: str
     tap_value: list = field(default_factory=list)   # [High, Low, Rh, Rl] dB
     insertion: list = field(default_factory=list)   # [High, Low, Rh, Rl] dB
-    # the same two at the third forward frequency (slot 2 of each block)
+    # the same two at F3-F6 (slots 2-5 of each block): [[value, insertion], ...]
+    extra: list = field(default_factory=list)
+    # at F3 alone
     f3: list = field(default_factory=lambda: [0.0, 0.0])
 
 
@@ -354,9 +379,10 @@ def _loss4(seg: bytes, base: int) -> list:
             for i in (0, 1, 6, 7)]
 
 
-def _loss_f3(seg: bytes, base: int) -> float:
-    """Slot 2 of a ten-slot loss block: the third forward frequency."""
-    return round(_fx(struct.unpack_from("<i", seg, base + 8)[0]), 3)
+def _loss_extra(seg: bytes, base: int) -> list:
+    """Slots 2-5 of a ten-slot loss block: the extra forward frequencies
+    F3-F6."""
+    return [round(_fx(v), 3) for v in struct.unpack_from(f"<{EXTRA_FORWARD}i", seg, base + 8)]
 
 
 def read_taps(data: bytes) -> list:
@@ -372,18 +398,33 @@ def read_taps(data: bytes) -> list:
             if not part:
                 continue
             value, insertion = o + TAP_VALUE_BLOCK - 25 + width, o + TAP_INSERTION_BLOCK - 25 + width
+            extra = [list(x) for x in zip(_loss_extra(seg, value), _loss_extra(seg, insertion))]
             ports[count] = TapPort(
                 ports=count,
                 part=part,
                 tap_value=_loss4(seg, value),
                 insertion=_loss4(seg, insertion),
-                f3=[_loss_f3(seg, value), _loss_f3(seg, insertion)],
+                extra=extra,
+                f3=extra[0],
             )
         if not ports:
             continue
         tap_id = round(_fx(struct.unpack_from("<i", seg, TAP_ID_OFFSET)[0]))
         out.append(TapSpec(slot=slot, tap_id=tap_id, ports=ports,
                            parts={str(k): v.part for k, v in ports.items()}))
+    return out
+
+
+def read_tap_ids(data: bytes) -> dict:
+    """Row -> Tap ID for every row that has one, whether or not it has a part
+    for any port count.  HUMB1GHzMid's row 6 is Tap ID 21 with every part
+    empty; the user keyed an 8-port 21 there (1.6 on the screenshot) and
+    Lode drew it <21>, the levels going on through it unchanged (1.7 = 1.6)."""
+    out = {}
+    for slot, off, seg in _records(data, "tap"):
+        tap_id = round(_fx(struct.unpack_from("<i", seg, TAP_ID_OFFSET)[0]))
+        if tap_id:
+            out[slot] = tap_id
     return out
 
 
@@ -458,8 +499,11 @@ def read_frequencies(data: bytes) -> dict:
 # [F1, F2, R1, R2].  WV750: Q2 LEQ-PEA-0 = 1.2 / 1.0 / 1.2 / 0.7, exactly what
 # it costs on AL004's Design screen at 6.8.  The fifth is F3, unlike the
 # cable and coupler blocks: WVEXT862's LEQ-PEA-8 (1.8 8.3 1.2 0.7 3.1) takes
-# 3.1 at 550 on the older AL004's 6.9 and 7.6.
-ATV_INLINE, ATV_INLINE_STRIDE, ATV_INLINE_SLOTS = 169372, 69, 40
+# 3.1 at 550 on the older AL004's 6.9 and 7.6.  The Actives window's Inline
+# EQs tab lists 24 -- "EQ", then Q2-Q24 (the user's recording of NBERN1GHz)
+# -- with ten Loss columns in the order stored: F1, F2, R1, R2, F3-F6, R3,
+# R4.  What follows the 24th record is another table.
+ATV_INLINE, ATV_INLINE_STRIDE, ATV_INLINE_SLOTS = 169372, 69, 25
 ATV_INLINE_LOSS = 29
 
 
@@ -469,6 +513,7 @@ class InlineSpec:
     name: str
     losses: list         # dB at F1, F2, R1, R2
     f3: float = 0.0      # dB at F3
+    extra: list = field(default_factory=list)   # dB at F3-F6
 
 
 # the older .atv: 25 records of 59 bytes from 57464, name char[15], losses at +19
@@ -481,12 +526,13 @@ def read_inline(data: bytes) -> list:
         ATV_INLINE, ATV_INLINE_STRIDE, ATV_INLINE_SLOTS, ATV_INLINE_LOSS)
     for k in range(1, slots):
         o = base + stride * k
-        if o + at + 16 > len(data):
+        if o + at + 40 > len(data):
             break
         name = _name(data[o:o + min(at, 20)])
-        losses = [round(_fx(v), 3) for v in struct.unpack_from("<5i", data, o + at)]
+        losses = [round(_fx(v), 3) for v in struct.unpack_from("<10i", data, o + at)]
         if name:
-            out.append(InlineSpec(number=k, name=name, losses=losses[:4], f3=losses[4]))
+            out.append(InlineSpec(number=k, name=name, losses=losses[:4], f3=losses[4],
+                                  extra=losses[4:8]))
     return out
 
 
@@ -498,8 +544,11 @@ def read_inline(data: bytes) -> list:
 # ("   8"), at +0, +5 (pads) and +58, +63 (EQs), and between them the
 # bank tabs' twelve numbers: forward pad dB Loss; forward EQ Loss at F1, F2,
 # F3-F6 (750, 54, 550, ...); return pad dB Loss; return EQ Loss at R1-R4
-# (40, 5, ...).  A column ends at a row labelled FLAG.  Row 0 is VOID; a design
-# stores row - 1, so AL004's AL00416,
+# (40, 5, ...).  A column ends at its row labelled FLAG ("Flag" in BH1GHzMid),
+# and that row is a choice like any other: the pad there is 21 dB, one past
+# the largest, and Lode picks it when no pad is large enough -- "Forward Pad:
+# Flag", "Return Pad: Flag" on 1.7 of the user's BH1GHzMid and HUMB1GHzMid
+# screenshots.  Row 0 is VOID; a design stores row - 1, so AL004's AL00416,
 # forward EQ 16, is row 17, "  12" -- what its info box shows.
 ATV_BANKS, ATV_BANK_COUNT, ATV_BANK_STRIDE = 93884, 8, 8816
 ATV_BANK_ROW, ATV_BANK_ROWS = 68, 129
@@ -536,9 +585,10 @@ def read_pad_eq_banks(data: bytes) -> list:
         rows = [data[base + ATV_BANK_ROW * r:base + ATV_BANK_ROW * (r + 1)]
                 for r in range(1, ATV_BANK_ROWS)]
         labels = []
-        for o in ATV_BANK_LABELS:       # each column ends at a FLAG row
+        for o in ATV_BANK_LABELS:       # each column ends at its FLAG row
             column = [_label(row[o:o + 5]) for row in rows]
-            labels.append(column[:column.index("FLAG")] if "FLAG" in column else
+            flag = next((i for i, x in enumerate(column) if x.strip().upper() == "FLAG"), None)
+            labels.append(column[:flag + 1] if flag is not None else
                           [x for x in column if x.strip()])
         out.append(PadEqBank(
             number=k + 1,

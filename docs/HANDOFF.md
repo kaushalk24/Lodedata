@@ -5,7 +5,7 @@ goal, how the user works, the rules learned, where the evidence is, what is
 done and what comes next. Then read, in this order:
 
 1. `docs/QUESTIONS.md` — every question still open, grouped in sets, with
-   what the user sends for each. **Set A is next.**
+   what the user sends for each. **Set S2 is next** (in its order).
 2. `docs/open-questions.md` — each rule with its evidence, and the list
    "Still to confirm" at the end.
 3. `docs/EVIDENCE.md` — every file, screenshot and recording the user sent,
@@ -196,6 +196,19 @@ asked about before pushing. Add every new sample the user sends to
   hc, cab or lv lights all four.
 * **Saving:** byte-for-byte round trips; Lode opened every file the app
   saved (seven edit tests, NEW_T1 keyed from scratch, Notes).
+* **Extra frequencies (2 Oct, evening):** F3–F6, every one the Parameters
+  have on, each its own column after the cplr columns, headed with the
+  Parameters' label (LKMac862: `high low Rh Rl`). The user's BH1GHzMid and
+  HUMB1GHzMid networks keyed through the app's API reproduce both
+  screenshots, every figure (`tests/test_keyed_regions.py`).
+* **Spec Edit windows (2 Oct, evening):** Spec Edit → Actives, Cables and
+  Parameters open the program's own windows (title, File/Edit menus,
+  toolbar, the multi-row tab strip, grids with `It...` numbers, Prefix
+  boxes, Load / Cancel, status bar), every record of the network's own file
+  (the app now keeps the five files with the network; `GET
+  /api/networks/{id}/specs/atv|cbl|par`, `app/hfc/specwindow.py`). Shown
+  only — nothing edits a spec file yet. Taps and Couplers still open the
+  plain list until their windows are seen (S2-9).
 * **Keys and mouse:** Design screen menu digits, `0` Alter, `.`-moves,
   Insert, Delete, Amplifier Definition, Notes, Select Tap, double-click a
   coupler to enter its branch, **mouse wheel** moves the cursor within the
@@ -204,31 +217,51 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-**The user's priority (2 Oct): the spec files first** — every region's spec
-set must load, the spec being the key to every value. **Question set S** in
-`docs/QUESTIONS.md` goes to the user next: every other spec set they have,
-and the Spec Edit tabs (Taps, Actives, Couplers, Cables) that show the
-fields still unexplained. `python tools/spec_coverage.py [base …]` measures
-what each file's bytes mean to the readers and lists the rest
-(file-formats "Decode status"); `tests/test_spec_sets.py` checks every set
-under samples/. When a new set arrives: run the tool on it first — a file
-of a version or size not seen is flagged — then the tests and the
+**Set S2** in `docs/QUESTIONS.md`, in its order: when Lode picks pads and
+EQs (S2-1), the Test lists of the BH / HUMB screens (S2-2), HUMB's yellow
+`<21>` and its branch 2 (S2-3, S2-4: whether a 0 in a spec column is taken
+as 0), a tap ID keyed with a port count its row lacks (S2-5), then the
+Spec Edit tabs still unseen (S2-6 … S2-11), LK002.ntw (S2-12).
+
+**Done 2 Oct, evening** (the user's BH / HUMB / LK002 screenshots and the
+recording of NBERN1GHz's Actives window; `EVIDENCE.md`):
+
+* Readers: power steps eight (the tab's); in-line devices 24 with all ten
+  losses (the reader ran on into the next table); In / Out at F3–F6 (+171 /
+  +195, the older +127 / +151); Ret. Mod. Part Number (+30) and reserve
+  gains (+91 / +95); a coupler record with an ID and no name (HUMB's 92);
+  the IDs of tap rows with no part (HUMB's 21); a bank column's Flag row,
+  any case, is its last choice; EQs Banks 9–16, the Plug-Ins names, the
+  Configuration Table's Plugin 1 (file-formats 3.3, 3.4b–d).
+* Engine: every extra forward frequency (model `extra_*` lists in place of
+  the single `f3` fields; networks stored before are converted on load);
+  labels as column heads and in Test lines; an empty tap slot is drawn and
+  passes the levels at 0 dB; keyed taps take the port count from the
+  Parameters' Tap Selection (named parts first); a new line's blank cab is
+  cable 0; the forward EQ pick honours "Allow Over Equalization".
+* The regression check against the last commit (48cb7b8) changes 32 of 70,
+  all networks opened with a spec set other than their own (or AL002 /
+  AL003 / AL005, whose own sets are not in the pack): taps on empty slots
+  now drawn, and stored pads pointing at a bank's FLAG row shown `FLAG`.
+  Every pairing checked against Lode is unchanged, and nothing a save
+  writes. Asked as S2-15.
+* `samples/regions/` (local only) holds BH1GHzMid, HUMB1GHzMid and
+  NBERN1GHz of 29 Jul 2025 for `test_keyed_regions.py` and
+  `test_spec_windows.py`; the pack the user holds does not have them yet —
+  without them those tests skip.
+
+**Earlier on 2 Oct, the spec files first** — every region's spec set must
+load, the spec being the key to every value. `python tools/spec_coverage.py
+[base …]` measures what each file's bytes mean to the readers and lists the
+rest (file-formats "Decode status"); `tests/test_spec_sets.py` checks every
+set under samples/. When a new set arrives: run the tool on it first — a
+file of a version or size not seen is flagged — then the tests and the
 regression check with it in samples/.
 
-Done for it on 2 Oct, no screen or saved byte changed: the actives table is
-read by its size (251 records, 51 in the older file — the banks start one
-byte after it), not by whether its figures look likely; the power steps by
-the record's room (six older, nine current); Custom Cascading as 32 bits
-(KERMIT's line extenders hold Casc. 15); In and Out at F3 in the current
-record (+171 / +195); the in-line table by its size.
-
 **The regions' spec sets (2 Oct):** 168 different sets from 20 markets, all
-164 complete ones load and open AL004 and SN001 without an error; 135 with
-every value read, 11 with frequencies named high/low/Rh/Rl, 11 with one
-actives table unread, 7 old formats (actives 2.20/3.0/5.0) not readable —
-file-formats "The regions' spec sets". The gap that matters most: 14 current
-1 GHz sets (Bullhead, Eureka) have a fourth forward frequency (F4) on, and
-the app draws only F3 — its figures checked by Spec Edit shots (S2), where Lode draws the column by a small keyed network (S9).
+164 complete ones load and open AL004 and SN001 without an error; 7 old
+formats (actives 2.20/3.0/5.0) not readable — file-formats "The regions'
+spec sets".
 
 **Question set A3** (what set A2 raised) follows set S: an excluded active
 (a Ripple) put in the middle of a cascade on a copy of AL004, S3's red

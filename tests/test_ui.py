@@ -1163,3 +1163,31 @@ def test_sn001_preview_box_and_node_box_as_lode_prints_them(page):
     assert info.split("Total Dist to Start of Network:")[1].split("\n")[0].strip() == "9856"
     assert info.split("Housecounts downstream:")[1].split("\n")[0].strip() == "2"
     assert not page.errors
+
+
+def test_spec_edit_actives_is_the_programs_window(page):
+    """Spec Edit > Actives... opens the Actives window on the network's own
+    .atv, every record a row (the user's recording of NBERN1GHz's); a tab of
+    the upper row moves its row down to the page; Esc closes it."""
+    page.click('.mi[data-menu="spec"]')
+    page.wait_for_timeout(200)
+    page.click('.dropdown .di:has-text("Actives...")')
+    page.wait_for_selector("#specwin", timeout=10000)
+    assert page.inner_text(".sw-title .sw-name") == "Design Assistant Actives Specs - WV750-2026.atv"
+    assert page.eval_on_selector_all(".sw-menu span", "s => s.map(x => x.textContent)") == ["File", "Edit"]
+    tabs = page.eval_on_selector_all(".sw-tabs .sw-tab", "s => s.map(x => x.textContent)")
+    assert len(tabs) == 28 and "Booster Powering" in tabs
+    head = page.eval_on_selector_all("table.sw-t th", "s => s.map(x => x.textContent)")
+    assert head[:4] == ["It...", "Active ID", "Part Number", "In - 750"]
+    rows = page.eval_on_selector_all("table.sw-t tbody tr", "s => s.length")
+    assert rows == 250
+    # the row holding the tab picked is drawn last, next to the page
+    page.click('.sw-tabs .sw-tab:text-is("Custom Cascading")')
+    page.wait_for_timeout(200)
+    last = page.eval_on_selector_all(".sw-tabs .sw-tabrow:last-child .sw-tab", "s => s.map(x => x.textContent)")
+    assert "Custom Cascading" in last
+    head = page.eval_on_selector_all("table.sw-t th", "s => s.map(x => x.textContent)")
+    assert head[-1] == "Casc. 19"
+    page.keyboard.press("Escape")
+    assert page.query_selector("#specwin") is None
+    assert not page.errors

@@ -9,6 +9,7 @@ import json
 import os
 import re
 import sqlite3
+import struct
 import tempfile
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from hfc.reports import level_report, bill_of_materials, powering_report, to_csv
 from hfc.importer import (library_from_spec_set, inspect_ntw, relink_library,
                           design_from_ntw)
 from hfc.exporter import export_ntw, ExportError
+from hfc.specwindow import window, WINDOWS
 
 WEB = Path(__file__).parent / "web"
 DB_PATH = Path(os.environ.get("LODEDATA_DB",
@@ -109,6 +111,23 @@ def keep_ntw_file(design_id: str, data: bytes) -> None:
     con.close()
 
 
+def spec_key(design_id: str, ext: str) -> str:
+    """Where a network keeps one of its spec files, as attached: the Spec
+    Edit windows show the file itself, every record of it."""
+    return f"spec:{design_id}{ext}"
+
+
+def keep_spec_files(design_id: str, files: dict) -> None:
+    """``files``: extension -> bytes, the set just attached (it replaces the
+    one kept before)."""
+    con = db()
+    con.execute("DELETE FROM ntw_files WHERE id LIKE ?", (f"spec:{design_id}.%",))
+    for ext, data in files.items():
+        con.execute("INSERT INTO ntw_files(id,data) VALUES(?,?)", (spec_key(design_id, ext), data))
+    con.commit()
+    con.close()
+
+
 def load(design_id: str) -> Design:
     con = db()
     row = con.execute("SELECT doc FROM designs WHERE id=?", (design_id,)).fetchone()
@@ -170,6 +189,7 @@ def delete_network(nid: str):
     con = db()
     con.execute("DELETE FROM designs WHERE id=?", (nid,))
     con.execute("DELETE FROM ntw_files WHERE id IN (?, ?)", (nid, layout_key(nid)))
+    con.execute("DELETE FROM ntw_files WHERE id LIKE ?", (f"spec:{nid}.%",))
     con.commit()
     con.close()
     return {"deleted": nid}
@@ -297,6 +317,12 @@ def insert_node(nid: str, branch: int, body: InsertNode):
                 else b.nodes[0] if b.nodes else None)
         if prev is not None:
             new.cab, new.cab_part = prev.cab, prev.cab_part
+    if new.cab_part is None:
+        # cab 0 is cable 0 of the spec set, a real cable, as when a .ntw is
+        # read: the user's BH1GHzMid lines keyed with the cab column blank
+        # lose 2.54 dB per 100 ft at 1002, cable 0's (190 ft: 52.00 -> 47.17)
+        new.cab_part = next((c.id for c in d.library.cables.values()
+                             if c.cable_index == new.cab % 100), None)
     b.nodes.insert(at, new)
     d.renumber(b)
     save(d)
@@ -358,7 +384,7 @@ def set_tap(nid: str, branch: int, node: int, body: TapEdit):
     n = _node(d, branch, node)
     if body.code is not None:
         try:
-            part = resolve_tap(d.library, body.code, n.hc)
+            part = resolve_tap(d.library, body.code, n.hc, d.parameters.tap_types)
         except EntryError as e:
             raise HTTPException(400, str(e))
     elif body.part_id is None:
@@ -509,13 +535,16 @@ async def attach_spec(nid: str, files: list[UploadFile] = File(...)):
     """
     d = load(nid)
     was = d.library.name or "Untitled"
+    uploaded = {}
     with tempfile.TemporaryDirectory() as tmp:
         base, have = None, set()
         for f in files:
             name = Path(f.filename).name
-            (Path(tmp) / name).write_bytes(await f.read())
+            data = await f.read()
+            (Path(tmp) / name).write_bytes(data)
             base = Path(tmp) / Path(name).stem
             have.add(Path(name).suffix.lower())
+            uploaded[Path(name).suffix.lower()] = data
         if base is None:
             raise HTTPException(400, "no files uploaded")
         whole = all(ext in have for _, ext in PROJECT_FILES if ext)
@@ -540,6 +569,7 @@ async def attach_spec(nid: str, files: list[UploadFile] = File(...)):
         else:
             relink_library(d, library_from_spec_set(base, d.parameters))
     save(d)
+    keep_spec_files(nid, uploaded)
     return {"library": d.library.to_dict(), "errors": errors, "loaded": True}
 
 
@@ -583,12 +613,15 @@ async def import_ntw(file: UploadFile = File(...),
         p.write_bytes(data)
         info = inspect_ntw(p)
         base = None
+        kept = {}
         for f in specs:
             name = Path(f.filename).name
             if Path(name).suffix.lower() not in SPEC_EXTS:
                 continue
-            (Path(tmp) / name).write_bytes(await f.read())
+            spec = await f.read()
+            (Path(tmp) / name).write_bytes(spec)
             base = Path(tmp) / Path(name).stem
+            kept[Path(name).suffix.lower()] = spec
         try:
             # with no spec files it opens as the program opens it: levels
             # 0.00 and the Spec File Mismatch box naming the set it needs
@@ -598,6 +631,8 @@ async def import_ntw(file: UploadFile = File(...),
     d.id = new_id("ntw")
     save(d)
     keep_ntw_file(d.id, data)
+    if base is not None:
+        keep_spec_files(d.id, kept)
     return {"imported": True, "id": d.id, "name": d.name, "report": report, **info}
 
 
@@ -633,6 +668,25 @@ def save_ntw(nid: str, filename: str | None = None):
     return Response(content=data, media_type="application/octet-stream", headers={
         "Content-Disposition": f'attachment; filename="{name}.ntw"',
         "X-Not-Written": json.dumps(report["not_written"])})
+
+
+@app.get("/api/networks/{nid}/specs/{ext}")
+def spec_window(nid: str, ext: str):
+    """Spec Edit > Actives / Cables / Parameters: the window for the file of
+    the network's spec set, every tab as Lode shows it."""
+    ext = "." + ext.lower().lstrip(".")
+    if ext not in WINDOWS:
+        raise HTTPException(404, f"no Spec Edit window for {ext} files yet")
+    data = ntw_file(spec_key(nid, ext))
+    if data is None:
+        raise HTTPException(404, "This network's spec files were attached before the app kept "
+                                 "them: attach the set again (File > Project Settings > Set All Files).")
+    d = load(nid)
+    par = ntw_file(spec_key(nid, ".par"))
+    try:
+        return window(ext, data, par, f"{d.library.name or 'Untitled'}{ext}")
+    except (ValueError, struct.error) as e:
+        raise HTTPException(400, f"cannot read this {ext} file: {e}")
 
 
 _REPORTS = {"levels": level_report, "bom": bill_of_materials,

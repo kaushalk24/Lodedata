@@ -208,3 +208,77 @@ table.grid td.xhousing{color:var(--white)!important;text-align:left}
   clip-path:polygon(50% 0,100% 100%,0 100%);padding-top:8px}
 .msgbox table.mismatch td{padding:1px 6px;border:0;white-space:nowrap}
 .msgbox table.mismatch td:first-child{text-align:right}
+
+/* Spec Edit windows (Actives, Cables, Parameters): the program's own,
+   maximized, as the user's recording of NBERN1GHz's Actives window and the
+   WV750 / WVEXT862 screenshots show them, at 100 % */
+.specwin{position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;background:#f0f0f0;
+  color:#000;font:11px "Microsoft Sans Serif",Tahoma,Arial,sans-serif}
+.sw-title{display:flex;align-items:center;height:30px;background:#fff;padding-left:6px;
+  font-size:12px;white-space:nowrap;overflow:hidden;flex:none}
+.sw-title .sw-ico{width:16px;height:12px;margin-right:6px;border:1px solid #555;
+  background:linear-gradient(#777 0 3px,#ddd 3px);flex:none}
+.sw-title .sw-name{overflow:hidden;text-overflow:ellipsis}
+.sw-title .sw-wb{margin-left:auto;display:flex;flex:none}
+.sw-title .sw-wb span{width:46px;height:30px;display:flex;align-items:center;justify-content:center;
+  font-size:14px;cursor:default}
+.sw-title .sw-wb span:hover{background:#e5e5e5}
+.sw-title .sw-wb span.x:hover{background:#e81123;color:#fff}
+.sw-menu{display:flex;background:#fff;padding:1px 2px 2px;border-bottom:1px solid #f0f0f0;flex:none}
+.sw-menu span{padding:1px 7px;cursor:default}
+.sw-menu span:hover{background:#cce8ff}
+.sw-tools{display:flex;gap:4px;padding:3px 5px;flex:none}
+.sw-tools span{width:22px;height:22px;display:flex;align-items:center;justify-content:center;cursor:default}
+.sw-tools svg{width:18px;height:18px}
+.sw-tabs{padding:6px 4px 0;flex:none}
+.sw-tabrow{display:flex}
+.sw-tabrow.single .sw-tab{flex:none}
+.sw-tab{flex:1 1 auto;text-align:center;white-space:nowrap;padding:2px 6px 2px;margin-top:2px;
+  border-top:1px solid #fff;border-left:1px solid #fff;border-right:1px solid #696969;
+  background:#f0f0f0;cursor:default;position:relative}
+.sw-tab.sel{margin-top:0;padding-bottom:4px;margin-bottom:-1px;z-index:2;background:#f0f0f0;
+  border-top:1px solid #fff;border-left:1px solid #fff;border-right:1px solid #696969}
+.sw-page{position:relative;flex:1;margin:0 4px;border-top:1px solid #fff;border-left:1px solid #fff;
+  border-right:1px solid #696969;border-bottom:1px solid #696969;min-height:0}
+.sw-subtabs{display:flex;padding:4px 6px 0}
+.sw-subtabs .sw-tab{flex:none}
+.sw-subpage{position:absolute;left:6px;right:6px;top:30px;bottom:6px;border-top:1px solid #fff;
+  border-left:1px solid #fff;border-right:1px solid #696969;border-bottom:1px solid #696969}
+.sw-prefix{position:absolute;left:12px;top:10px;display:flex;align-items:center;gap:4px}
+.sw-prefix input,.sw-in{height:20px;border:1px solid #7a7a7a;background:#fff;font:inherit;
+  padding:0 3px;box-sizing:border-box}
+.sw-prefix input{width:78px}
+.sw-gridbox{position:absolute;left:0;right:0;top:0;bottom:0;overflow:auto;background:#fff;
+  border:1px solid #828790}
+.sw-gridbox.prefixed{top:36px;left:6px;right:6px;bottom:6px}
+table.sw-t{border-collapse:collapse;table-layout:fixed;background:#fff;
+  font:11px "Microsoft Sans Serif",Tahoma,Arial,sans-serif}
+table.sw-t th{position:sticky;top:0;z-index:2;background:#f0f0f0;font-weight:400;text-align:left;
+  padding:0 3px;height:20px;border-right:1px solid #a0a0a0;border-bottom:1px solid #000;
+  white-space:nowrap;overflow:hidden;text-overflow:clip}
+table.sw-t td{padding:0 3px;height:21px;border:1px solid #000;white-space:nowrap;overflow:hidden}
+table.sw-t td:first-child,table.sw-t th:first-child{position:sticky;left:0;background:#f0f0f0;z-index:1;
+  border-left:0}
+table.sw-t th:first-child{z-index:3}
+table.sw-t.plain td:first-child{position:static;background:#fff}
+table.sw-t.plain th:first-child{position:sticky}
+table.sw-t td.cur{background:#0078d7;color:#fff}
+.sw-unseen{padding:30px;color:#555}
+.sw-bottom{display:flex;justify-content:flex-end;gap:6px;padding:6px 6px 5px;flex:none}
+.sw-bottom button{width:94px;height:26px;font:inherit;background:#e1e1e1;border:1px solid #adadad;
+  border-radius:0;color:#000}
+.sw-bottom button.def{border:2px solid #555}
+.sw-status{height:20px;line-height:20px;padding:0 4px;border-top:1px solid #d7d7d7;background:#f0f0f0;
+  flex:none;white-space:nowrap;overflow:hidden}
+/* the Parameters window's fields, where its screenshots have them */
+.sw-form{position:absolute;inset:0;overflow:auto}
+.sw-form fieldset{position:absolute;margin:0;padding:0;border:1px solid #d5dfe5;border-radius:3px}
+.sw-form legend{margin-left:6px;padding:0 2px;font-size:11px;white-space:nowrap}
+.sw-form .lb{position:absolute;white-space:nowrap}
+.sw-form .lb.r{text-align:right}
+.sw-form .sw-in{position:absolute}
+.sw-form .sw-in.off{color:#a0a0a0;background:#f0f0f0;border-color:#c0c0c0}
+.sw-form .ck{position:absolute;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.sw-form .ck input{margin:0}
+.sw-form .sw-gridbox{border:1px solid #828790}
+.sw-form select.sw-in{padding:0}

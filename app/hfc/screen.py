@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal, ROUND_HALF_UP
 
+from .model import extra_at
+
 from .plant import (Design, Branch, Node, TAP_BRACKETS, BRANCH_BRACKETS, BRANCH_NORMAL,
                     THROUGH_MARK, THROUGH_DOWNSTREAM, bracket)
 
@@ -167,10 +169,11 @@ class Row:
 class Screen:
     rows: list = field(default_factory=list)
     frequencies: list = field(default_factory=list)   # column order
-    extra_frequencies: list = field(default_factory=list)  # F3, drawn after cplr[branch]
-    # the level column heads: the frequencies, or with no spec set the
-    # program's own "high low Rh Rl"
+    extra_frequencies: list = field(default_factory=list)  # F3-F6, drawn after cplr[branch]
+    # the level column heads: the Parameters' labels ("1002 102 85 5"; LKMac862
+    # "high low Rh Rl"), with no spec set the program's own "high low Rh Rl"
     labels: list = field(default_factory=list)
+    extra_labels: list = field(default_factory=list)
     branches: list = field(default_factory=list)      # paging metadata
     problems: list = field(default_factory=list)
     totals: dict = field(default_factory=dict)
@@ -181,6 +184,7 @@ class Screen:
                 "frequencies": self.frequencies,
                 "extra_frequencies": self.extra_frequencies,
                 "labels": self.labels or [f"{f:g}" for f in self.frequencies],
+                "extra_labels": self.extra_labels or [f"{f:g}" for f in self.extra_frequencies],
                 "branches": self.branches,
                 "problems": self.problems, "totals": self.totals,
                 "tests": [{"severity": v, "message": m} for v, m in self.tests]}
@@ -205,10 +209,18 @@ def _freqs(p) -> list:
 
 
 def _extra_freqs(p) -> list:
-    """The third forward frequency when the Parameters have it on: Lode draws
-    its column after the two cplr[branch] columns (WVEXT862's 550 on the older
-    AL004: 35.20 at 4.1, 19.55 at 44.1, 0.00 on the line under it)."""
-    return [p.f3_mhz] if getattr(p, "f3_mhz", 0.0) else []
+    """The extra forward frequencies (F3-F6) the Parameters have on: Lode
+    draws their columns after the two cplr[branch] columns, F3 first
+    (WVEXT862's 550 on the older AL004: 35.20 at 4.1, 19.55 at 44.1, 0.00 on
+    the line under it; BH1GHzMid's 550 and 860, HUMB1GHzMid's 550 and 870)."""
+    return list(p.extra_mhz)
+
+
+def _extra_slot(p, f: float) -> int:
+    """Which F an extra frequency is, 3-6 (a network stored before F4-F6
+    knew only F3)."""
+    j = p.extra_mhz.index(f)
+    return p.extra_slots[j] if j < len(p.extra_slots) else 3 + j
 
 
 def _all_freqs(p) -> list:
@@ -229,6 +241,8 @@ def build(design: Design) -> Screen:
     extra, allf = _extra_freqs(p), _all_freqs(p)
     scr = Screen(frequencies=freqs, extra_frequencies=extra, problems=design.validate())
     lib = design.library
+    scr.labels = [p.label(f) for f in freqs]
+    scr.extra_labels = [p.label(f) for f in extra]
     if not design.has_specs:
         scr.labels = ["high", "low", "Rh", "Rl"]
     if not design.branches:
@@ -357,7 +371,8 @@ def build(design: Design) -> Screen:
                     levels[p.return_high_mhz] = part.in_return_high
                     levels[p.return_low_mhz] = part.in_return_low
                     for f in extra:
-                        levels[f] = part.out_f3
+                        e = extra_at(part.extra_levels, f)
+                        levels[f] = e[2] if e else 0.0
 
             # an in-line device in the amp column (Qn) comes before the taps.
             # The first is the in-line equaliser, drawn "EQ": SN001_MID's
@@ -571,18 +586,20 @@ def _active_checks(p, part, pads, row: Row, at: str) -> None:
 
     forward = [(p.forward_high_mhz, part.in_forward_high, 0),
                (p.forward_low_mhz, part.in_forward_low, 1)]
-    forward += [(f, part.in_f3, 2) for f in _extra_freqs(p)]
+    # Fk's In, and the forward EQ's loss at Fk
+    forward += [(f, (extra_at(part.extra_levels, f) or [f, 0.0])[1], _extra_slot(p, f) - 1)
+                for f in _extra_freqs(p)]
     for f, need, i in forward:
         have = as_shown(row.levels.get(f, 0.0))
         if need - (have - loss(0, 0) - loss(2, i)) > 0.005:
             row.level_severity[f] = "red"
-            row.active_notes.append(("red", f"{f:g} input {have:7.2f} to LE at {at}"))
+            row.active_notes.append(("red", f"{p.label(f)} input {have:7.2f} to LE at {at}"))
     for f, out, i in ((p.return_high_mhz, part.out_return_high, 0),
                       (p.return_low_mhz, part.out_return_low, 1)):
         needed = as_shown(row.levels.get(f, 0.0))
         if needed - (out - loss(1, 0) - loss(3, i)) > 0.005:
             row.level_severity[f] = "red"
-            row.active_notes.append(("red", f"{f:g} output {needed:7.2f} from LE at {at}"))
+            row.active_notes.append(("red", f"{p.label(f)} output {needed:7.2f} from LE at {at}"))
 
 
 def _active_kind(part) -> str:
@@ -627,13 +644,24 @@ def choose_pads_eqs(part, levels: dict, p) -> list:
     rh, rl = levels[p.return_high_mhz], levels[p.return_low_mhz]
     slack = 1e-9
 
-    def nearest(eqs, tilt):
-        return min(range(len(eqs)), key=lambda v: abs((eqs[v][1] - eqs[v][0]) - tilt), default=0)
+    def nearest(eqs, tilt, rows=None):
+        rows = range(len(eqs)) if rows is None else rows
+        return min(rows, key=lambda v: abs((eqs[v][1] - eqs[v][0]) - tilt), default=0)
 
     def largest(pads, fits):
         return max((v for v in range(len(pads)) if fits(pads[v][0])), default=0)
 
-    fe = nearest(feq, (part.in_forward_high - part.in_forward_low) - (hi - lo))
+    need = (part.in_forward_high - part.in_forward_low) - (hi - lo)
+    rows = None
+    if not getattr(p, "allow_over_equalization", True):
+        # "Allow Over Equalization" unticked: no forward EQ that leaves more
+        # tilt than the active's own In tilt.  BH1GHzMid's FM332 at 1.7 of
+        # the user's screenshot, 39.67 / 33.70 in against 15.3 / 10.3: CS1
+        # (0.80 of tilt off) would leave 5.18, CS2 (1.50) leaves 4.48 --
+        # Lode shows CS2; HUMB1GHzMid's, 39.57 / 33.90 against 14.3 / 9.3,
+        # CS1.  WV750 has it ticked: the nearest, all 27 of AL004's
+        rows = [v for v in range(len(feq)) if feq[v][1] - feq[v][0] <= need + slack] or None
+    fe = nearest(feq, need, rows)
     re_ = nearest(req, rh - rl)
     f_loss = feq[fe] if feq else [0.0, 0.0]
     r_loss = req[re_] if req else [0.0, 0.0]
@@ -891,16 +919,18 @@ def _tap_ports(p, freqs, levels: dict, tap) -> dict:
 
 def _limits(p, lv: int) -> tuple:
     """System Levels for the node's lv and the tap windows, by frequency.
-    F3's Min is a column of its own on the System Levels tab (WVEXT862: 15
-    on level 0, 18 on level 1), its window in the frequency table (12)."""
+    F3-F6's Mins are columns of their own on the System Levels tab (WVEXT862:
+    F3 15 on level 0, 18 on level 1), their windows in the frequency table
+    (12)."""
     rows = p.levels or [[0.0, 0.0, 99.0, 99.0]]
     k = lv if 0 <= lv < len(rows) and any(rows[lv]) else 0
     four = _freqs(p)
     lim = dict(zip(four, rows[k]))
     windows = dict(zip(four, getattr(p, "tap_windows", None) or []))
-    for f in _extra_freqs(p):
-        lim[f] = p.f3_levels[k] if k < len(p.f3_levels) else 0.0
-        windows[f] = p.f3_tap_window
+    for j, f in enumerate(_extra_freqs(p)):
+        mins = p.extra_levels[j] if j < len(p.extra_levels) else []
+        lim[f] = mins[k] if k < len(mins) else 0.0
+        windows[f] = p.extra_tap_windows[j] if j < len(p.extra_tap_windows) else 0.0
     return lim, windows
 
 
@@ -946,7 +976,7 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
             sev = "red" if out > p.tap_margin_db + 0.005 else "yellow"
             mark(i, sev)
             side = "below min" if _is_forward(p, f) else "above max"
-            errors.append((sev, f"Tap({f:g}) {out:5.2f} {side}"))
+            errors.append((sev, f"Tap({p.label(f)}) {out:5.2f} {side}"))
     for i, f in enumerate(freqs):
         if not windows.get(f):
             continue
@@ -956,7 +986,7 @@ def _tap_checks(p, lv: int, freqs, ports: dict) -> tuple:
             out, side = (lim[f] - windows[f]) - seen[f], "below window"
         if out > 0.005:
             mark(i, "yellow")
-            errors.append(("yellow", f"Tap({f:g}) {out:5.2f} {side}"))
+            errors.append(("yellow", f"Tap({p.label(f)}) {out:5.2f} {side}"))
     # Max. Crossover 0.00 is a limit like any other: WVEXT862 holds 0 and
     # Lode lists all five crossovers of the older AL004 (2.01 at 5.29 up)
     hi, lo = freqs.index(p.forward_high_mhz), freqs.index(p.forward_low_mhz)
@@ -1138,7 +1168,9 @@ def tap_candidates(design: Design, branch: int, node: int, slot: int) -> dict:
     current = b.nodes[node - 1].taps[slot].part_id \
         if b and slot < len(b.nodes[node - 1].taps) else None
     out = []
-    for tap in sorted(design.library.taps.values(), key=lambda t: (t.row, t.ports)):
+    # a tap row's empty slot (no part number) is not offered
+    for tap in sorted((t for t in design.library.taps.values() if t.name),
+                      key=lambda t: (t.row, t.ports)):
         ports = _tap_ports(p, freqs, levels, tap)
         _, errors = _tap_checks(p, row.lv, freqs, ports)
         sev = _worst([v for v, m in errors if not m.startswith("Crossover")])

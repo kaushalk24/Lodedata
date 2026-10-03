@@ -41,18 +41,26 @@ from .plant import (Design, Branch, Node, TapPlacement, CouplerPlacement,
 # The frequencies themselves live in the Parameters file, which is why import
 # takes the design's own parameters rather than assuming a frequency plan.
 BLOCK_HIGH, BLOCK_LOW, BLOCK_RH, BLOCK_RL = 0, 1, 6, 7
-BLOCK_F3 = 2
+BLOCK_F3 = 2            # F3-F6: slots 2-5, Fk at k - 1
 
 # Loop resistance 99 means "never power this" -- the convention for fibre and
 # anything else not meant to carry power.
 NON_POWERING_LOOP_RESISTANCE = 99.0
 
 
-def _f3(params: DesignParameters, *values) -> list:
-    """[MHz, dB ...] at the third forward frequency when the Parameters have
-    it on, else empty.  Kept apart from the four points the other columns
-    interpolate between, so they come out exactly as before."""
-    return [params.f3_mhz, *(round(abs(v), 4) for v in values)] if params.f3_mhz else []
+def _extra_slots(params: DesignParameters) -> list:
+    """(MHz, k) of each extra forward frequency Fk (k = 3-6) the Parameters
+    have on.  A network stored before F4-F6 knew only F3."""
+    slots = list(params.extra_slots) + [3 + i for i in range(len(params.extra_slots), len(params.extra_mhz))]
+    return list(zip(params.extra_mhz, slots))
+
+
+def _extra(params: DesignParameters, at) -> list:
+    """[[MHz, dB ...], ...] at the extra forward frequencies the Parameters
+    have on, ``at(k)`` giving the figures at Fk.  Kept apart from the four
+    points the other columns interpolate between, so they come out exactly
+    as before."""
+    return [[mhz, *(round(abs(v), 4) for v in at(k))] for mhz, k in _extra_slots(params)]
 
 
 def _four_points(four: list, params: DesignParameters) -> list:
@@ -108,7 +116,17 @@ def parameters_from_spec_set(base: str | Path,
     params.forward_low_mhz = num("F2", params.forward_low_mhz)
     params.return_high_mhz = num("R1", params.return_high_mhz)
     params.return_low_mhz = num("R2", params.return_low_mhz)
-    params.f3_mhz = num("F3", 0.0)
+    # the extra forward frequencies on: BH1GHzMid's F3 550 and F4 860
+    params.extra_mhz, params.extra_slots = [], []
+    for k in range(3, 7):
+        mhz = num(f"F{k}", 0.0) if f"F{k}" in f else 0.0
+        if mhz:
+            params.extra_mhz.append(mhz)
+            params.extra_slots.append(k)
+    # the column heads are the Parameters' labels, whatever they say
+    # (LKMac862: high low Rh Rl)
+    main = [f.get(k, "") for k in ("F1", "F2", "R1", "R2")]
+    params.labels = main + [f[f"F{k}"] for k in params.extra_slots] if all(main) else []
     if spec.levels and any(any(r) for r in spec.levels):
         params.levels = spec.levels
         params.tap_margin_db = spec.tap_margin
@@ -120,8 +138,12 @@ def parameters_from_spec_set(base: str | Path,
         params.power_interpolation = par["power_interpolation"]
         w = par["tap_windows"]
         params.tap_windows = [w["F1"], w["F2"], w["R1"], w["R2"]]
-        params.f3_tap_window = w["F3"] if params.f3_mhz else 0.0
-        params.f3_levels = [lv[0] for lv in par["extra_levels"]] if params.f3_mhz else []
+        # System Levels' Min. F3-F6 come first in each level's extra six
+        params.extra_tap_windows = [w[f"F{k}"] for k in params.extra_slots]
+        params.extra_levels = [[lv[k - 3] for lv in par["extra_levels"]] for k in params.extra_slots]
+        params.allow_over_equalization = par["allow_over_equalization"]
+        ports, types = par["ports_by_homes"], par["tap_type_by_ports"]
+        params.tap_types = [0] + [types.get(ports[h], 0) for h in range(1, 33)]
         params.max_crossover_db = par["max_crossover"]
         params.housings = [[h["number"], h["min_points"]] for h in par["housings"]]
         params.equipment_points = dict(par["points"])
@@ -130,8 +152,8 @@ def parameters_from_spec_set(base: str | Path,
 
 # where each column's losses sit among a bank row's twelve values: a pad's dB
 # Loss, an EQ's Loss at the high and low design frequency of its direction
-# (and a forward EQ's at F3)
-_BANK_LOSSES = ((0,), (7,), (1, 2, 3), (8, 9))
+# (and a forward EQ's at F3-F6)
+_BANK_LOSSES = ((0,), (7,), (1, 2, 3, 4, 5, 6), (8, 9))
 
 
 def _pad_eq(bank, column: int) -> list:
@@ -172,7 +194,7 @@ def library_from_spec_set(base: str | Path,
             kind="drop" if "RG" in c.name.upper() else "hardline",
             loop_resistance_ohm_per_1000ft=loop,
             attenuation=_loss_points(c.forward_coeffs, params),
-            f3=_f3(params, c.forward_coeffs[BLOCK_F3]),
+            extra=_extra(params, lambda k: [c.forward_coeffs[k - 1]]),
             cable_index=c.index,
             series=c.series,
             notes="; ".join(
@@ -204,9 +226,24 @@ def library_from_spec_set(base: str | Path,
                 # a zero insertion loss marks a terminating tap: nothing
                 # continues past it (the screen shows 0.00 on the next line)
                 self_terminating=not any(abs(v) for v in port.insertion),
-                f3=_f3(params, *port.f3),
+                extra=_extra(params, lambda k: port.extra[k - 3]),
                 source=f"lodedata:{base.name}.tap",
             ))
+
+    # A row with a Tap ID and no part for a port count is still that tap:
+    # HUMB1GHzMid's row 6 is Tap ID 21 with every part empty, and the user's
+    # 8-port 21 keyed at 1.6 is drawn <21> with the levels going on through
+    # it unchanged (1.7 reads as 1.6).  No part number, no losses, and --
+    # having no part -- not a terminating tap
+    tap_file = base.with_suffix(".tap")
+    have = {(t.slot, n) for t in spec.taps for n in t.ports}
+    for row, tap_id in (ld_specs.read_tap_ids(tap_file.read_bytes()).items()
+                        if tap_file.exists() else ()):
+        for ports in (2, 4, 6, 8):
+            if (row, ports) not in have:
+                lib.add(TapType(id=new_id("tap"), name="", ports=ports, tap_id=tap_id,
+                                row=row, tap_value_db=0.0,
+                                source=f"lodedata:{base.name}.tap"))
 
     for p in spec.couplers:
         # "the Tap leg columns come first, then the Thru leg columns"
@@ -225,8 +262,8 @@ def library_from_spec_set(base: str | Path,
                         + [round(abs(tap_leg[BLOCK_HIGH]), 2)] * legs,
             power_passing=[True] * (legs + 1),
             leg_losses=[thru_pts] + [tap_pts] * legs,
-            f3_legs=[params.f3_mhz, [round(abs(thru_leg[BLOCK_F3]), 4)]
-                     + [round(abs(tap_leg[BLOCK_F3]), 4)] * legs] if params.f3_mhz else [],
+            extra_legs=[[mhz, [round(abs(thru_leg[k - 1]), 4)] + [round(abs(tap_leg[k - 1]), 4)] * legs]
+                        for mhz, k in _extra_slots(params)],
             record=p.slot + 1,
             internal=p.internal,
             source=f"lodedata:{base.name}.cpr",
@@ -251,7 +288,9 @@ def library_from_spec_set(base: str | Path,
             in_return_high=ins[2], in_return_low=ins[3],
             out_forward_high=outs[0], out_forward_low=outs[1],
             out_return_high=outs[2], out_return_low=outs[3],
-            in_f3=a.f3_levels[0], out_f3=a.f3_levels[1], cascading=a.cascading,
+            extra_levels=[[mhz, a.extra_in[k - 3], a.extra_out[k - 3]]
+                          for mhz, k in _extra_slots(params)],
+            cascading=a.cascading,
             power_draw=a.power_draw,
             current_draw_a=next((amps for v, amps in a.power_draw
                                  if abs(v - 60.0) < 6), 0.0),
@@ -265,7 +304,7 @@ def library_from_spec_set(base: str | Path,
             id=new_id("inl"), name=q.name, number=q.number,
             losses=[[params.forward_high_mhz, q.losses[0]], [params.forward_low_mhz, q.losses[1]],
                     [params.return_high_mhz, q.losses[2]], [params.return_low_mhz, q.losses[3]]]
-                   + ([[params.f3_mhz, q.f3]] if params.f3_mhz else []),
+                   + [[mhz, q.extra[k - 3]] for mhz, k in _extra_slots(params)],
             source=f"lodedata:{base.name}.atv"))
 
     for sup in spec.supplies:
@@ -495,7 +534,8 @@ def relink_library(design, new_lib: Library, threshold: float = FUZZY_THRESHOLD)
     for table, (old_table, new_table) in tables.items():
         by_tokens = {}
         for part in new_table.values():
-            by_tokens.setdefault(_tokens(part.name), part.id)
+            if part.name:       # a tap row's empty slot has no part number to go by
+                by_tokens.setdefault(_tokens(part.name), part.id)
         for old_id, part in old_table.items():
             want = _tokens(part.name)
             hit = by_tokens.get(want)

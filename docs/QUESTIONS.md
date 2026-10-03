@@ -5,64 +5,98 @@ one list, with what to send for each. Kept up to date as answers come in;
 the details behind each item are in `open-questions.md` and
 `file-formats.md`.
 
-Status: **set A2 answered** (the user's screenshots and AL004_SETA.ntw of
-2 Oct, all 14 read). **The user's priority (2 Oct): decode the spec files
-first, so the app loads every region's spec set — the spec is the key to
-every value.** So **set S below is next**, then set A3. Answered so far:
-every question of the AL004, WVEXT862 and SHINSTON sets up to and including
-set A2. Where each answer came from: `EVIDENCE.md`.
+Status: **set S answered in part (2 Oct, evening)**: the user's three
+Design screenshots (BH1GHzMid and HUMB1GHzMid keyed, LK002 on LKMac862) and
+the recording of NBERN1GHz's Actives window, every tab. Every figure on the
+two keyed screens is now the app's, the 550 / 860 / 870 columns included;
+the Actives, Parameters and Cables windows are Lode's (file-formats 3.3,
+3.4b–d). **Next: set S2 below, in its order** — the first five decide what
+the app computes, the rest finish the Spec Edit windows. Then set A3.
+Where each answer came from: `EVIDENCE.md`.
 
-## S. The spec files (next set)
+## S2. After the BH / HUMB / LK002 screens and the NBERN recording (next)
 
-What no spec file explains yet is listed in file-formats.md ("Decode
-status"); `tools/spec_coverage.py` measures it. Cables and Parameters are
-placed whole, couplers but one field, actives all but a few fields and
-empty tabs; taps hold the most not yet known.
+For each: what to do in Lode, what to send, and what it settles.
 
-S1. **Every other spec set — answered 2 Oct** (168 sets from 20 markets):
-    all 164 complete sets load; file-formats "The regions' spec sets".
-The user has few networks for these specs (2 Oct) but can send Spec Edit
-screenshots: those show the values the files hold, so each one checks the
-readers field by field. A screenshot is the whole window, every column
-showing (scroll right and send a second shot if needed), the spec's name in
-the title bar. In the order they matter:
+S2-1. **When does Lode pick an amplifier's pads and EQs?** On your BH and
+    HUMB screens 1.7's box shows Forward Pad Flag, Forward Eq CS2 (HUMB:
+    CS1), Return Pad Flag, Return Eq 3 — exactly what the app's rule picks
+    — but on AL004 the 88 you placed on 4.2 (28 Sep) showed 0 / SCS6 / 0 /
+    0, nothing picked. *Do:* File → New with BH1GHzMid; key 71 on 1.1, a
+    190-ft line with hc 2, and 11 on the line below. *Send:* the box of
+    that 11 straight away; then again after 8 (Recalc); then after 5
+    (Test). *Settles:* when the picking happens — the app never picks yet,
+    so its 1.7 box says 000 / CS10 / 000 / 0.
+S2-2. **The Test list of both screens.** *Do:* 5 (Test) on the BH and the
+    HUMB network of your screenshots. *Send:* both Test lists. *Settles:*
+    the app's lines: for BH none; for HUMB "Fslope / Rslope too low to
+    equalize at 1.1" and four tap-window lines at 1.6 (Tap(1002) 12.57 over
+    window …) — and how lines at 550 / 860 are worded.
+S2-3. **HUMB's yellow `<21>` at 1.6.** Row 21 of HUMB1GHzMid's taps has no
+    part at all. *Send:* the window with the cursor on 1.6's tap (its box
+    showing). *Settles:* the app's reading — no part number, tap value 0,
+    so the port is over its window (yellow) — against Lode's box.
+S2-4. **HUMB's branch 2, behind coupler 92.** Record 92 has no part number
+    and a tap leg of 99 dB at 1002 only. *Do:* double-click `92<2>` on 1.2.
+    *Send:* the window on branch 2. *Settles:* what Lode does with a spec
+    column that holds 0 next to one that does not: the app now takes 99 at
+    1002 and fills the empty columns from it (31.59 at 102, 28.83 at 85);
+    Lode probably takes the columns as they are (0). Only two pairings in
+    the samples would change (AL004 opened with KERMIT's spec).
+S2-5. **Same tap ID, other port counts.** HUMB1GHzMid has tap 12 only as a
+    2-port. *Do:* on a line with hc 5 key 12 in tap1. *Send:* the line and
+    the tap's box. *Settles:* whether Lode then takes the empty 8-port slot
+    (`<12>`, as 21 at 1.6) or falls back to the 2-port (`/12/`) — the app
+    falls back.
+S2-6. **The Actives tab scrolled right** (NBERN1GHz or BH1GHzMid). *Send:*
+    the columns after `In - F5`, rows 1–28. *Settles:* In F6, Out at F3–F6
+    and whatever else the tab has; then the app's window shows them too.
+S2-7. **Out/Loss.** *Do:* on a copy of a spec (Save As, a new name), set
+    one active's `Out/Loss` to Loss and save. *Send:* that .atv. *Settles:*
+    where Out/Loss is kept (every row of the recording reads 0 Out).
+S2-8. **Plug-Ins and the Configuration Table** (WV750-2026). *Send:* the
+    Plug-Ins tab (rows 1–20) and scrolled to its last row; the
+    Configuration Table at rows 20/0–20/7 and 30/0–30/7. *Settles:* that
+    the plug-ins are WV750's NEW LE … SWAP FMB TO FMT at rows 4–17, how many
+    rows there are (31 or 32), and the Quantity columns.
+S2-9. **The Taps window and the Couplers window** (any spec, BH1GHzMid
+    best). *Send:* every tab of each, scrolled right where it scrolls.
+    *Settles:* the app's Spec Edit → Taps and Couplers windows (they still
+    show a plain list), and the bytes no reader explains yet (a byte on
+    every tap row, four on every port count).
+S2-10. **The Cables window's Connectors and Series/Colors tabs**
+    (WVEXT862). *Send:* both. *Settles:* the last two tabs of the app's
+    Cables window (it says "not seen yet").
+S2-11. **Reserve Gain** (Buckhannon's BUCH1GHzMid, rows 40–45; or
+    KERMIT750, rows 1–12). *Send:* the tab. *Settles:* that Ret. Mod. Part
+    Number is the text at +30 (`RA-KIT-40L`); and BH's Fwd Reserve Gain
+    2.00 — does reserve gain change any level or Test line?
+S2-12. **LK002.ntw** with LKMac862. *Send:* the file. *Settles:* the rest
+    of your third screenshot — `LK265 1.5` in the cplr column at 1.5 (a
+    link to the network LK265?), the white `01` in tap2 at 1.1, branch 1
+    of 73.
+S2-13. (optional) **The BH network of screenshot 1 saved** (Save Network
+    As… BH_TEST.ntw). *Settles:* that the app writes a network with two
+    extra frequencies as Lode does.
+S2-14. **Only if networks are still opened with the oldest specs:**
+    Bossier's bymac862, the Actives tab; Georgetown's gefd862, the Actives,
+    Cables and Couplers tabs; Bullhead's npg550, those three and the
+    Parameters frequencies tab. *Settles:* the old layouts (actives 2.20 /
+    3.0 / 5.0, cables and couplers 2.10), so they can be read.
+S2-15. **A decision, no screenshot:** reading HUMB's empty tap row and
+    unnamed coupler as Lode does also draws such taps in networks opened
+    with a spec set other than their own (e.g. AL002's 32.3 with WVEXT862,
+    row 0: `/24/`), which the app used to leave out. No pairing checked
+    against Lode changes (AL004 + WV750, the older AL004 + WVEXT862, SN001 +
+    SHINSTON, S1–S3), and nothing a save writes. *Answer:* keep, or ask
+    for it to be undone.
 
-S2. **Bullhead's BH1GHzMid** (F3 = 550 and F4 = 860 on): Parameters, the
-    frequencies tab and the System Levels tab; Cables, Actives and Taps,
-    each scrolled to show the 550 and 860 columns. *Settles:* that the app
-    reads every F3 and F4 figure right (In +175 / Out +199 for F4, the
-    loss blocks' slot 3, Min F4).
-S3. **WV750-2026, the Actives window:** the Actives tab scrolled all the
-    way right (rows 1–42: 41 BRIDGER, 85/86 WIFI); then one shot each of
-    Reserve Gain, Power Steps, Configuration Table, Plug-Ins, Plug-Ins
-    Powering, Bridgers, Feedermakers, Boosters, Booster Powering and EQs
-    Bank 9. *Settles:* In and Out at every frequency (the WIFI units'
-    44.5), the pair before the power steps, how many steps fit, the
-    plug-in bytes, the table of names (SWAP BR TO LE …).
-S4. **WV750-2026, the Taps window:** every tab, rows 1–12 and an AN-WIFI
-    row showing. *Settles:* a byte on every tap row, a flag and four bytes
-    on every port count, the 35.0 at the top of the file.
-S5. **WV750-2026, the Couplers window** (every tab, DC and splitter rows
-    showing) **and the Cables window's Connectors tab.** *Settles:* the
-    coupler code (408, 612, 216 …), the cable's second loss block and its
-    five flags.
-S6. **NBERN1GHz, the Actives window:** the tab that lists `2&4 PORT` /
-    CS12 / EQ02 / RP02 … *Settles:* what New Bern's extra table is.
-S7. **Lake Charles' LKMac862 (old):** Parameters, the frequencies tab, and
-    the Cables tab (its column heads). *Settles:* what Lode calls the
-    columns when the frequencies are named high / low / Rh / Rl.
-S8. **Only if networks are still opened with the oldest specs:** Bossier's
-    bymac862, the Actives tab; Georgetown's gefd862, the Actives, Cables
-    and Couplers tabs; Bullhead's npg550, those three and the Parameters
-    frequencies tab. *Settles:* the old layouts (actives 2.20 / 3.0 / 5.0,
-    cables and couplers 2.10), so they can be read.
-S9. (optional, needs no file of yours) **A small network keyed with
-    BH1GHzMid:** File → New, the spec set BH1GHzMid, a node, two lines and
-    a tap; the Design screen and its Test list, and the file saved (e.g.
-    BH_TEST.ntw). *Settles:* where Lode draws the second extra column and
-    where its tap lines go — the one thing a Spec Edit screen cannot show.
-S10. (optional) KERMIT750-2026's Custom Cascading tab. *Settles:* its line
-    extenders Valid at Casc. 15.
+Answered by the screenshots and the recording (2 Oct): S2 of the old list
+(BH1GHzMid's F3 / F4: every figure), S6 (New Bern's `2&4 PORT` table is
+EQs Bank 9), S7 (Lode heads LKMac862's columns `high low Rh Rl`), most of
+S3 (the Actives window's tabs: Reserve Gain, Power Steps, Pads/EQs, EQs
+Banks, Plug-Ins, Configuration Table, Bridgers, Feedermakers, Inline EQs,
+Custom Cascading, Boosters), and S10 (Casc. 1–19 on the tab).
 
 "Older AL004" below means AL004.ntw opened with the WVEXT862 spec set;
 "AL004" the newer one with WV750-2026. A screenshot means the whole Lode
