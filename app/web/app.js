@@ -635,39 +635,70 @@ function renderMenu() {
 const EDIT_ORDER = ['ftg', 'hc', 'cab', 'lv'];
 
 // Keying is faster than the round trip, so every change to a network -- a
-// typed value, a picker's choice, Insert, Delete, a coupler -- is queued and
-// the changes run strictly in order.  The cursor moves at once, on the
-// keystroke, and a single refresh follows once the queue drains -- otherwise
-// "300 . 4 . 2" races itself and lands the wrong values in the wrong columns.
-// Each change keeps the network it was keyed in (``nid``, taken as it is
-// queued): one still waiting when another network is opened goes into its
-// own.  ``what`` names the change; one the server did not take is said at
-// once and again by the next Save of that network, which is without it.
+// typed value, a picker's choice, Insert, Delete, a coupler, Network
+// Initialization, a spec set -- is queued and the changes run strictly in
+// order.  The cursor moves at once, on the keystroke, and a single refresh
+// follows once the queue drains -- otherwise "300 . 4 . 2" races itself and
+// lands the wrong values in the wrong columns.  Each change keeps the network
+// it was keyed in (``nid``, taken as it is queued): one still waiting when
+// another network is opened goes into its own.
 let saveChain = Promise.resolve();
 let pendingSaves = 0;
-const failedEdits = {};                  // network id -> changes not made
 
-function queueSave(work, what, nid = S.nid) {
+// A change the server did not take stays owed until it is settled: keyed
+// again and taken (the same field of the same line), sent again with Retry,
+// or dropped with Discard -- every Save of its network says so meanwhile, and
+// the network stays modified.  ``key`` names what a change sets: the line by
+// its numbers and the field ("4.1 ftg"), or "@..." for the network as a
+// whole.  Line numbers mean the same line only until lines are renumbered or
+// another spec set is read (``epochs``): a change owed from before can then
+// only be dropped, never settled or sent again by its old numbers.
+const failedEdits = {};                  // network id -> [{ key, what, detail, epoch, work, structural }]
+const epochs = {};                       // network id -> renumberings and spec sets so far
+const owed = nid => (failedEdits[nid] || []).length > 0;
+
+function queueSave(work, what, nid = S.nid, opts = {}) {
+  const key = opts.key || what, structural = !!opts.structural;
   pendingSaves += 1;
   let ok = false;
-  saveChain = saveChain.then(() => work(nid)).then(() => { ok = true; }, err => {
-    let detail = err.message;
-    try { detail = JSON.parse(detail).detail || detail; } catch (_) {}
-    if (typeof detail !== 'string') detail = JSON.stringify(detail);
-    (failedEdits[nid] = failedEdits[nid] || []).push(`${what}: ${detail}`);
-    msg(detail);
+  saveChain = saveChain.then(async () => {
+    const epoch = opts.epoch ?? (epochs[nid] || 0);
+    try {
+      if ((epochs[nid] || 0) !== epoch)
+        throw new Error('not sent again: lines were renumbered or another spec set read since');
+      await work(nid);
+    } catch (err) {
+      let detail = err.message;
+      try { detail = JSON.parse(detail).detail || detail; } catch (_) {}
+      if (typeof detail !== 'string') detail = JSON.stringify(detail);
+      const list = failedEdits[nid] = (failedEdits[nid] || [])
+        .filter(f => !(f.key === key && f.epoch === epoch));
+      list.push({ key, what, detail, epoch, work, structural });
+      if (nid === S.nid) S.modified = true;
+      msg(detail);
+      return;
+    }
+    ok = true;
+    if (failedEdits[nid])                // what this change sets is settled
+      failedEdits[nid] = failedEdits[nid].filter(f => !(f.key === key && (key[0] === '@' || f.epoch === epoch)));
+    if (structural) epochs[nid] = epoch + 1;
   }).then(() => {
     pendingSaves -= 1;
     if (pendingSaves === 0) return doRefresh();
   }).catch(err => msg(err.message)).then(() => ok);
   return saveChain;                      // true once the change is made
 }
+// Retry: the change sent again as it was keyed, if its numbers still hold
+function retryChange(nid, f) {
+  const again = () => queueSave(f.work, f.what, nid, { key: f.key, structural: f.structural, epoch: f.epoch });
+  return f.structural ? restructure(async () => { await again(); await syncScreen(doRefresh); }) : again();
+}
 
 // A change that renumbers lines or branches (Insert, Delete, a coupler put on
-// or taken off) and opening another network leave the screen's numbers stale
-// until it is read again.  Meanwhile keys and screen-menu clicks wait and
-// then run in the order given, on the new screen, so none is aimed by a
-// number that now means another line; the grid ignores the mouse.
+// or taken off), another spec set and opening another network leave the
+// screen stale until it is read again.  Meanwhile keys and screen-menu clicks
+// wait and then run in the order given, on the new screen, so none is aimed
+// by a number that now means another line; the grid ignores the mouse.
 let holdInput = 0;
 const heldInput = [];
 function whenSettled(fn) { if (holdInput) heldInput.push(fn); else fn(); }
@@ -679,11 +710,39 @@ async function restructure(work) {
     while (!holdInput && heldInput.length) heldInput.shift()();
   }
 }
+// The screen read again before the input waiting on it runs.  If it cannot
+// be read, the input keeps waiting -- on the old screen it would land on the
+// wrong lines -- and a box offers Retry, which reads it again.  The change
+// itself is made already and is not sent again.
+let screenFresh = true;
+async function syncScreen(load) {
+  for (;;) {
+    try { await load(); return; } catch (e) {
+      let detail = e.message;
+      try { detail = JSON.parse(detail).detail || detail; } catch (_) {}
+      await new Promise(go => {
+        modal(`<div class="msgbox"><div class="mbtitle">Error</div>
+          <div class="mbtext">The screen could not be read again: ${esc(detail)}<br><br>
+          The change before it was made. Keys pressed since wait until the screen is read.</div>
+          <div class="row"><button id="mbRetry">Retry</button></div></div>`);
+        S.modalLocked = true;            // only Retry closes it
+        const retry = () => {
+          document.removeEventListener('keydown', key, true);
+          S.modalLocked = false; closeModal(); go();
+        };
+        const key = ev => { if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); retry(); } };
+        document.addEventListener('keydown', key, true);
+        $('#mbRetry').onclick = retry; $('#mbRetry').focus();
+      });
+    }
+  }
+}
 // the structural change itself, then the screen read again before the input
 // waiting on it runs
-async function restructuring(work, what) {
-  const ok = await queueSave(work, what);
-  if (pendingSaves) await doRefresh();   // others still queued: read it now
+async function restructuring(work, what, key) {
+  const ok = await queueSave(work, what, S.nid, { key: key || what, structural: true });
+  // others still queued, or the drain's read failed: read it now
+  if (pendingSaves || !screenFresh) await syncScreen(doRefresh);
   return ok;
 }
 
@@ -715,7 +774,8 @@ function commitBuffer(advance) {
   if (advance) moveToNextField(); else renderGrid();
   queueSave(nid => api(`/api/networks/${nid}/nodes/${at.branch}/${at.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body) }), `${at.branch}.${at.node} ${c.head} ${val}`);
+    body: JSON.stringify(body) }), `${at.branch}.${at.node} ${c.head} ${val}`,
+    S.nid, { key: `${at.branch}.${at.node} ${c.key}` });
 }
 
 // Taps, couplers and actives are typed at the cell: "4.23" is a 4-port 23 tap,
@@ -742,7 +802,7 @@ function commitCode() {
         ? `${out.placed.name} — ${out.placed.ports} port, ${out.placed.value_db} dB,`
           + ` shown as the tap ID ${out.placed.tap_id}`
         : 'tap cleared');
-    }, `${at.branch}.${at.node} ${c.head} ${code}`, nid);
+    }, `${at.branch}.${at.node} ${c.head} ${code}`, nid, { key: `${at.branch}.${at.node} ${c.key}` });
     // taking off a tap whose port feeds a branch asks first (the older
     // AL004's 11.16, 28b); Yes takes the tap off and the branch stays, fed
     // by nothing (its 43 still there after), No leaves the tap
@@ -768,14 +828,14 @@ function commitCode() {
                   : p.through_leg === 1 ? 'through leg to this branch, tap leg downstream'
                   : 'through leg to the right-most branch';
       msg(`${p.name} — branch ${p.branch}, legs ${p.legs.join(' / ')} dB, ${where}`);
-    }, `${at.branch}.${at.node} ${c.head} ${code}`));
+    }, `${at.branch}.${at.node} ${c.head} ${code}`, `${at.branch}.${at.node} ${c.key}`));
   } else {
     queueSave(async nid => {
       await api(`/api/networks/${nid}/nodes/${at.branch}/${at.node}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amp_code: code }) });
       msg(code === '0' || code === '' ? 'active cleared' : 'active placed');
-    }, `${at.branch}.${at.node} ${c.head} ${code}`);
+    }, `${at.branch}.${at.node} ${c.head} ${code}`, S.nid, { key: `${at.branch}.${at.node} amp` });
   }
 }
 
@@ -998,7 +1058,7 @@ function modal(html) {
   const c = $('#mClose'); if (c) c.onclick = closeModal;
 }
 function closeModal() { $('#modal').hidden = true; S.modalKeys = null; }
-$('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
+$('#modal').onclick = e => { if (e.target.id === 'modal' && !S.modalLocked) closeModal(); };
 
 function chooser(title, items, onPick, note) {
   modal(`<h2>${esc(title)}</h2>${note ? `<p class="hint">${esc(note)}</p>` : ''}
@@ -1024,7 +1084,8 @@ async function pickTap(slot) {
       await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}/tap`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) }),
-        `${r.branch}.${r.node} tap${slot + 1} ${pick ? pick.label : 'cleared'}`, nid);
+        `${r.branch}.${r.node} tap${slot + 1} ${pick ? pick.label : 'cleared'}`, nid,
+        { key: `${r.branch}.${r.node} tap${slot}` });
     }, 'Tap values are drawn in the bracket style of their port count: /2/ [4] {6} <8>');
 }
 
@@ -1045,7 +1106,8 @@ async function selectTap(slot) {
     await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}/tap`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slot, part_id: id }) }),
-      `${r.branch}.${r.node} tap${slot + 1} ${byId[id] ? label(byId[id]).trim() : id}`, nid);
+      `${r.branch}.${r.node} tap${slot + 1} ${byId[id] ? label(byId[id]).trim() : id}`, nid,
+      { key: `${r.branch}.${r.node} tap${slot}` });
   };
   const draw = () => {
     modal(`<div class="seltap"><div class="sttitle">Select Tap</div>
@@ -1097,7 +1159,7 @@ async function pickCoupler(slot) {
     const ok = await restructuring(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}/coupler`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) }),
-      `${r.branch}.${r.node} cplr${slot + 1} ${pick ? pick.label : 'cleared'}`);
+      `${r.branch}.${r.node} cplr${slot + 1} ${pick ? pick.label : 'cleared'}`, `${r.branch}.${r.node} cplr${slot}`);
     if (ok) msg(pick ? 'coupler placed — it starts a new branch; press . → to go into it'
                      : 'coupler and its branch removed');
   }), 'Placing a coupler creates the branch it feeds.');
@@ -1112,7 +1174,7 @@ async function pickActive() {
     await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pick ? { amp_code: pick.aid || '' } : { clear_amp: true }) }),
-      `${r.branch}.${r.node} amp ${pick ? pick.label : 'cleared'}`, nid);
+      `${r.branch}.${r.node} amp ${pick ? pick.label : 'cleared'}`, nid, { key: `${r.branch}.${r.node} amp` });
   });
 }
 
@@ -1124,7 +1186,7 @@ async function pickCable() {
     await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(pick ? { cab: pick.idx, cab_part: pick.id } : { cab: 0, cab_part: null }) }),
-      `${r.branch}.${r.node} cab ${pick ? pick.label : 'cleared'}`, nid);
+      `${r.branch}.${r.node} cab ${pick ? pick.label : 'cleared'}`, nid, { key: `${r.branch}.${r.node} cab` });
   }, 'Even cable IDs are aerial, odd are underground.');
 }
 
@@ -1195,7 +1257,8 @@ function ampDefinition() {
     S.lastAmpName = name;
     await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amp_label: name }) }), `${r.branch}.${r.node} Amp ID ${name}`, nid);
+      body: JSON.stringify({ amp_label: name }) }), `${r.branch}.${r.node} Amp ID ${name}`, nid,
+      { key: `${r.branch}.${r.node} ampname` });
   };
   $('#adOk').onclick = ok;
   input.onkeydown = ev => {
@@ -1275,7 +1338,7 @@ async function togglePowerStop() {
   await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ power_stop: !r.power_stop }) }),
-    `${r.branch}.${r.node} power stop ${r.power_stop ? 'off' : 'on'}`);
+    `${r.branch}.${r.node} power stop ${r.power_stop ? 'off' : 'on'}`, S.nid, { key: `${r.branch}.${r.node} stop` });
 }
 function delBranch() {
   return restructure(async () => {
@@ -1360,7 +1423,8 @@ async function nameAmp() {
   if (v === null) return;
   await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amp_label: v }) }), `${r.branch}.${r.node} name ${v}`);
+    body: JSON.stringify({ amp_label: v }) }), `${r.branch}.${r.node} name ${v}`, S.nid,
+    { key: `${r.branch}.${r.node} ampname` });
 }
 // Lode's Edit Notes window: the line's note, a line per row.  The file
 // keeps each row followed by "~0" (SN001_MID 1.1: SHIN1 - 4953 - P-003938~0
@@ -1382,7 +1446,8 @@ async function notes() {
     closeModal();
     if (await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note }) }), `${r.branch}.${r.node} notes`, nid)) msg('note saved');
+      body: JSON.stringify({ note }) }), `${r.branch}.${r.node} notes`, nid,
+      { key: `${r.branch}.${r.node} notes` })) msg('note saved');
   };
 }
 function netInit() {
@@ -1405,15 +1470,24 @@ function netInit() {
     <input id="niPs" type="number" value="${n.supply_volts}">
     <div class="row"><button class="primary" id="niOk">OK</button>
       <button id="mClose">Cancel</button></div>`);
-  $('#niOk').onclick = async () => {
-    await api(`/api/networks/${S.nid}`, { method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source_dbmv: +$('#niLevel').value, source_tilt_db: +$('#niTilt').value,
-        supply_volts: +$('#niPs').value,
-        parameters: { forward_high_mhz: +$('#niFh').value, forward_low_mhz: +$('#niFl').value,
-                      return_high_mhz: +$('#niRh').value, return_low_mhz: +$('#niRl').value } }) });
-    closeModal(); await reload(); msg('network initialised');
+  // after every change keyed before it, in the network it was opened on;
+  // keys wait for the levels it gives
+  const nid = S.nid;
+  $('#niOk').onclick = () => {
+    const body = JSON.stringify({
+      source_dbmv: +$('#niLevel').value, source_tilt_db: +$('#niTilt').value,
+      supply_volts: +$('#niPs').value,
+      parameters: { forward_high_mhz: +$('#niFh').value, forward_low_mhz: +$('#niFl').value,
+                    return_high_mhz: +$('#niRh').value, return_low_mhz: +$('#niRl').value } });
+    closeModal();
+    restructure(async () => {
+      if (S.nid !== nid) return;
+      const ok = await queueSave(nid => api(`/api/networks/${nid}`, { method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' }, body }), 'Network Initialization', nid,
+        { key: '@netinit' });
+      await syncScreen(reload);
+      if (ok) msg('network initialised');
+    });
   };
 }
 
@@ -1609,12 +1683,26 @@ function projectSettings() {
     const base = files[0].name.replace(/\.[^.]*$/, '');
     PS_FILES.forEach(([, ext], k) => { $('#psf' + k).value = base + ext; });
   };
-  $('#psOk').onclick = async () => {
+  // the set goes in after every change keyed before it (a tap code is read
+  // against the set it was keyed under), in the network it was opened on;
+  // keys wait until the new set and the screen it gives are read
+  const nid = S.nid;
+  $('#psOk').onclick = () => {
     if (!files || !files.length) { closeModal(); return; }
     const fd = new FormData(); files.forEach(f => fd.append('files', f));
-    const out = await api(`/api/networks/${S.nid}/library/spec`, { method: 'POST', body: fd });
-    await reload();
-    errorsLoading(out.errors || []);
+    const base = files[0].name.replace(/\.[^.]*$/, '');
+    let out = null;
+    closeModal();
+    restructure(async () => {
+      if (S.nid !== nid) return;
+      const ok = await queueSave(async nid => {
+        out = await api(`/api/networks/${nid}/library/spec`, { method: 'POST', body: fd });
+      }, `spec set ${base}`, nid, { key: '@spec', structural: true });
+      await syncScreen(reload);
+      return ok;
+    // its box ("Press any key") after the keys that waited have run: it
+    // would take the first of them
+    }).then(ok => { if (ok) errorsLoading(out.errors || []); });
   };
 }
 
@@ -1710,9 +1798,15 @@ function attachSpec() {
         `${Object.keys(out.library.actives).length} actives`);
   };
 }
-async function sampleSpecs() {
-  await api(`/api/networks/${S.nid}/library/sample`, { method: 'POST' });
-  await reload(); msg('sample specs attached — samples only, not for real design');
+function sampleSpecs() {
+  const nid = S.nid;
+  return restructure(async () => {
+    if (S.nid !== nid) return;
+    const ok = await queueSave(nid => api(`/api/networks/${nid}/library/sample`, { method: 'POST' }),
+                               'sample specs', nid, { key: '@sample', structural: true });
+    await syncScreen(reload);
+    if (ok) msg('sample specs attached — samples only, not for real design');
+  });
 }
 // ---------------------------------------------------------------- Spec Edit
 // Spec Edit > Parameters, Actives, Taps, Couplers, Cables: the program's own
@@ -2095,7 +2189,6 @@ async function saveNetwork(as) {
     }
     const name = handle ? handle.name : `${S.net.name || 'network'}.ntw`;
     await saveChain;                     // every edit keyed so far goes in
-    const failed = (failedEdits[nid] || []).slice();
     const r = await fetch(`/api/networks/${nid}/ntw?filename=${encodeURIComponent(name)}`, { method: 'POST' });
     if (!r.ok) {
       let t = await r.text();
@@ -2121,23 +2214,39 @@ async function saveNetwork(as) {
       renderInfo();                      // the title bar carries the name
       await loadList(nid);
     }
-    if (S.nid === nid) S.modified = false;
+    // a change still owed keeps the network modified, and every save says it
+    const n = (failedEdits[nid] || []).length;
+    if (S.nid === nid) S.modified = n > 0;
     msg(`saved ${name}` + (skipped.length ? ` — ${skipped.length} not written: ${skipped[0]}` : '')
-        + (failed.length ? ` — ${failed.length} change${failed.length > 1 ? 's' : ''} not made` : ''));
-    if (failed.length) {
-      // said once, by the save the changes are missing from
-      failedEdits[nid] = failedEdits[nid].slice(failed.length);
-      const one = failed.length === 1;
-      modal(`<div class="msgbox"><div class="mbtitle">Error</div>
-        <div class="mbtext">${esc(name)} was saved without ${one ? 'this change' : `these ${failed.length} changes`}:
-        ${one ? 'it was' : 'they were'} not made, so ${one ? 'it is' : 'they are'} not in the file.<br><br>${
-          failed.map(esc).join('<br>')}</div>
-        <div class="row"><button id="mbOk">OK</button></div></div>`);
-      $('#mbOk').onclick = closeModal; $('#mbOk').focus();
-    }
+        + (n ? ` — ${n} change${n > 1 ? 's' : ''} not made` : ''));
+    if (n) owedChanges(nid, name);
   } catch (e) {
     if (e.name !== 'AbortError') msg(e.message);
   }
+}
+
+// The changes a save is without: OK closes the box and they stay owed; Retry
+// sends one again, Discard drops it.
+function owedChanges(nid, name) {
+  const list = failedEdits[nid] || [];
+  if (!list.length) { closeModal(); return; }
+  const one = list.length === 1;
+  modal(`<div class="msgbox"><div class="mbtitle">Error</div>
+    <div class="mbtext">${esc(name)} was saved without ${one ? 'this change' : `these ${list.length} changes`}:
+    ${one ? 'it was' : 'they were'} not made, so ${one ? 'it is' : 'they are'} not in the file.</div>
+    <div class="owed">${list.map((f, i) => `<div class="failed" data-i="${i}"><span class="fwhat">${esc(f.what)}</span>:
+      <span class="fdetail">${esc(f.detail)}</span>
+      <button class="retry">Retry</button><button class="discard">Discard</button></div>`).join('')}</div>
+    <div class="row"><button id="mbOk">OK</button></div></div>`);
+  $$('#modalbox .failed').forEach(row => {
+    const f = list[+row.dataset.i];
+    row.querySelector('.retry').onclick = () => { closeModal(); retryChange(nid, f); };
+    row.querySelector('.discard').onclick = () => {
+      failedEdits[nid] = (failedEdits[nid] || []).filter(x => x !== f);
+      owedChanges(nid, name);
+    };
+  });
+  $('#mbOk').onclick = closeModal; $('#mbOk').focus();
 }
 
 // ---------------------------------------------------------------- lifecycle
@@ -2156,9 +2265,13 @@ async function refresh() {
 
 async function doRefresh() {
   const nid = S.nid;
-  const scr = await api(`/api/networks/${nid}/screen`);
+  let scr;
+  try { scr = await api(`/api/networks/${nid}/screen`); } catch (e) {
+    if (S.nid === nid) screenFresh = false;
+    throw e;
+  }
   if (S.nid !== nid) return;             // another network was opened meanwhile
-  S.scr = scr;
+  S.scr = scr; screenFresh = true;
   if (!branchMeta(S.branch)) S.branch = S.scr.branches.length ? S.scr.branches[0].number : 1;
   S.row = Math.max(0, Math.min(S.row, pageRows().length - 1));
   renderGrid();
@@ -2177,8 +2290,8 @@ async function reload() {
 // pressed meanwhile wait for the new one's screen
 function open(id) {
   return restructure(async () => {
-    S.nid = id; S.row = 0; S.branch = 1; S.modified = false; S.buffer = null;
-    await reload(); setMode(S.mode);
+    S.nid = id; S.row = 0; S.branch = 1; S.modified = owed(id); S.buffer = null;
+    await syncScreen(reload); setMode(S.mode);
     $('#selNet').value = id;
   });
 }

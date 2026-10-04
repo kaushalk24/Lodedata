@@ -1560,8 +1560,268 @@ def test_a_failed_edit_is_not_reported_as_saved(page):
     assert "4.1 ftg 500" in box and "server unavailable" in box
     assert "not in the file" in box
     page.click("#mbOk")
-    # said once: a later save has nothing more to own up to
+    # still owed: the next save says it again
     _file_menu(page, "Save Network")
+    assert "4.1 ftg 500" in page.inner_text("#modalbox")
+    assert not page.evaluate("document.getElementById('modal').hidden")
+    assert not page.errors
+
+
+def _log_messages(page):
+    """Every status-line message, in order (later ones overwrite earlier)."""
+    page.evaluate("""() => { window.__msgs = [];
+      new MutationObserver(() => { const t = document.getElementById('stMsg').textContent;
+        if (t) window.__msgs.push(t); })
+        .observe(document.getElementById('stMsg'), { childList: true, characterData: true, subtree: true }); }""")
+
+
+def _sent_paths(page):
+    return page.evaluate(
+        "window.__sent.map(([m, u]) => m + ' ' + u.replace(/^.*\\/api\\/networks\\/[^/]+/, ''))")
+
+
+def test_a_spec_set_attached_while_an_edit_waits_comes_after_it(page):
+    """Tap code 4.23 keyed on AL004 under WV750-2026 is still on its way when
+    Project Settings attaches KERMIT750: the code is read as keyed, against
+    WV750 (MGT-2423C-USP), and only then is the new set attached.  Overtaken,
+    it was read against KERMIT750 (MMT2423).  Then, while a set is being
+    attached, keys wait for the new set: a cable ID keyed meanwhile names a
+    cable of the set attached, not of the one before."""
+    _open_al004(page)
+    _hold_requests(page)
+    _log_messages(page)
+    _hold_next(page, "PUT", "/nodes/4/1/tap")
+    _goto(page, 4, 1, "tap1")
+    _type(page, "04.23")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    page.evaluate("projectSettings()")
+    page.wait_for_timeout(300)
+    page.set_input_files("#psFiles", sorted(str(f) for f in (SAMPLES / "KERMIT750").glob("KERMIT750-2026.*")))
+    page.click("#psOk")
+    page.wait_for_timeout(1000)
+    assert "POST /library/spec" not in _sent_paths(page), "the spec set overtook the waiting edit"
+    _release(page)
+    page.wait_for_selector("#mbOk", timeout=15000)       # Errors Loading Project
+    page.click("#mbOk")
+    page.wait_for_timeout(500)
+    sent = _sent_paths(page)
+    assert sent.index("PUT /nodes/4/1/tap") < sent.index("POST /library/spec")
+    assert any("MGT-2423C-USP" in m for m in page.evaluate("window.__msgs"))
+    assert page.evaluate("S.net.library.name") == "KERMIT750-2026"
+
+    # WV750 attached again, its answer held: a cable keyed meanwhile waits
+    _hold_next(page, "POST", "/library/spec", answer=True)
+    page.evaluate("projectSettings()")
+    page.wait_for_timeout(300)
+    page.set_input_files("#psFiles", sorted(str(f) for f in (SAMPLES / "AL004-WV750").glob("WV750-2026.*")))
+    page.click("#psOk")
+    page.wait_for_timeout(800)
+    assert len(_held(page)) == 1
+    _goto(page, 4, 2, "cab")
+    _type(page, "0406")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert page.evaluate("holdInput") > 0, "keys did not wait for the spec set"
+    assert "PATCH /nodes/4/2" not in _sent_paths(page)
+    _release(page)
+    page.wait_for_selector("#mbOk", timeout=15000)
+    page.click("#mbOk")
+    page.wait_for_timeout(1500)
+    net = _server_network(page)
+    n42 = net["branches"]["4"]["nodes"][1]
+    assert n42["cab"] == 406
+    assert n42["cab_part"] in net["library"]["cables"], "the cable named a part of the set before"
+    assert net["library"]["cables"][n42["cab_part"]]["name"] == "EX TX10 700 A"
+    assert not page.errors
+
+
+def test_network_init_and_sample_specs_wait_for_pending_edits(page):
+    """Network Initialization and the sample specs go in after the edits keyed
+    before them, never ahead."""
+    _open_al004(page)
+    _hold_requests(page)
+    _hold_next(page, "PATCH", "/nodes/4/1")
+    _goto(page, 4, 1, "ftg")
+    _type(page, "0500")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    page.evaluate("netInit()")
+    page.wait_for_timeout(200)
+    page.fill("#niLevel", "40")
+    page.click("#niOk")
+    page.wait_for_timeout(800)
+    assert "PATCH " not in _sent_paths(page), "Network Initialization overtook the waiting edit"
+    _release(page)
+    page.wait_for_timeout(1500)
+    sent = _sent_paths(page)
+    assert sent.index("PATCH /nodes/4/1") < sent.index("PATCH ")
+    net = _server_network(page)
+    assert net["branches"]["4"]["nodes"][0]["ftg"] == 500 and net["source_dbmv"] == 40
+
+    _hold_next(page, "PATCH", "/nodes/4/2")
+    _goto(page, 4, 2, "ftg")
+    _type(page, "0222")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    page.evaluate("projectSettings()")
+    page.wait_for_timeout(300)
+    page.click("#psSample")
+    page.wait_for_timeout(800)
+    assert "POST /library/sample" not in _sent_paths(page), "the sample specs overtook the waiting edit"
+    _release(page)
+    page.wait_for_timeout(1500)
+    sent = _sent_paths(page)
+    assert sent.index("PATCH /nodes/4/2") < sent.index("POST /library/sample")
+    assert _server_network(page)["branches"]["4"]["nodes"][1]["ftg"] == 222
+    assert not page.errors
+
+
+def _fail_next_edit(page, branch, node, col, typed):
+    _hold_next(page, "PATCH", f"/nodes/{branch}/{node}")
+    _goto(page, branch, node, col)
+    _type(page, "0" + typed)
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    _release(page, "fail")
+    page.wait_for_timeout(800)
+
+
+def _report(page):
+    """The changes the open box says are not made, or None with no box."""
+    if page.evaluate("document.getElementById('modal').hidden"):
+        return None
+    return page.evaluate("Array.from(document.querySelectorAll('#modalbox .failed .fwhat')).map(e => e.textContent)")
+
+
+def test_a_failed_change_stays_until_corrected_retried_or_discarded(page):
+    """A change the server did not take stays owed: every Save and Save As
+    says so, OK only closes the box, and the network stays modified.  Keying
+    the same field again with success settles that change alone; Retry sends
+    it again; Discard drops the one chosen."""
+    if not (SAMPLES / "AL004-WV750" / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    _open_al004_with_file_access(page)
+    _hold_requests(page)
+    _log_messages(page)
+    _fail_next_edit(page, 4, 1, "ftg", "500")
+    _fail_next_edit(page, 4, 2, "hc", "7")
+    assert page.evaluate("S.modified")
+    _file_menu(page, "Save Network")
+    assert _report(page) == ["4.1 ftg 500", "4.2 hc 7"]
+    page.click("#mbOk")
+    _file_menu(page, "Save Network")
+    assert _report(page) == ["4.1 ftg 500", "4.2 hc 7"], "OK erased the owed changes"
+    assert page.evaluate("window.__msgs.at(-1)") == "saved AL004.ntw — 2 changes not made"
+    page.click("#mbOk")
+    _file_menu(page, "Save Network As...")
+    assert _report(page) == ["4.1 ftg 500", "4.2 hc 7"]
+    page.click("#mbOk")
+    assert page.evaluate("S.modified")
+
+    # 4.1's ftg keyed again, taken this time: that one is settled
+    _goto(page, 4, 1, "ftg")
+    _type(page, "0500")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(1000)
+    _file_menu(page, "Save Network")
+    assert _report(page) == ["4.2 hc 7"]
+    # Retry sends 4.2's change again
+    page.click("#modalbox .failed button.retry")
+    page.wait_for_timeout(1500)
+    assert _server_network(page)["branches"]["4"]["nodes"][1]["hc"] == 7
+    _file_menu(page, "Save Network")
+    assert _report(page) is None
+    assert page.evaluate("window.__msgs.at(-1)") == "saved AL004_B.ntw"
+    assert not page.evaluate("S.modified")
+
+    # Discard drops the one chosen and leaves the other
+    _fail_next_edit(page, 4, 3, "ftg", "999")
+    _fail_next_edit(page, 4, 5, "ftg", "888")
+    _file_menu(page, "Save Network")
+    assert _report(page) == ["4.3 ftg 999", "4.5 ftg 888"]
+    page.click("#modalbox .failed:first-child button.discard")
+    page.wait_for_timeout(200)
+    assert _report(page) == ["4.5 ftg 888"]
+    page.click("#mbOk")
+    _file_menu(page, "Save Network")
+    assert _report(page) == ["4.5 ftg 888"]
+    page.click("#mbOk")
+    assert not page.errors
+
+
+def test_failed_changes_survive_a_cancelled_save_and_switching_networks(page):
+    """Cancelling Save's file dialog keeps the owed change; it belongs to its
+    network: the other network saves clean, and back on the first it is still
+    modified and its Save still says what is missing."""
+    _open_al004(page)
+    _hold_requests(page)
+    a = page.evaluate("S.nid")
+    _fail_next_edit(page, 4, 1, "ftg", "500")
+    page.evaluate("() => { window.showSaveFilePicker = async () => { throw new DOMException('no', 'AbortError'); }; }")
+    _file_menu(page, "Save Network")
+    assert _report(page) is None
+    b = page.evaluate("""() => window.__realFetch('/api/networks', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'OTHER3', sample_specs: false }) }).then(r => r.json()).then(d => d.id)""")
+    page.evaluate(f"loadList('{a}')")
+    page.wait_for_timeout(300)
+    page.evaluate("""() => { window.showSaveFilePicker = async (o) => ({ name: o.suggestedName,
+        createWritable: async () => ({ write: async () => {}, close: async () => {} }) }); }""")
+    page.select_option("#selNet", b)
+    page.wait_for_timeout(1200)
+    assert not page.evaluate("S.modified")
+    _file_menu(page, "Save Network")
+    assert _report(page) is None
+    page.select_option("#selNet", a)
+    page.wait_for_timeout(1500)
+    assert page.evaluate("S.modified"), "back on AL004 it looks saved"
+    _file_menu(page, "Save Network")
+    assert _report(page) == ["4.1 ftg 500"]
+    page.click("#mbOk")
+    assert not page.errors
+
+
+def test_keys_wait_while_the_screen_cannot_be_read_after_an_insert(page):
+    """Insert on 4.3 is made, but reading the screen again fails (twice: it is
+    read once more at once): keys pressed meanwhile must not run on the old
+    numbers (they would put 4.4's ftg on the old 4.3, record 127985).  A box
+    says so; Retry reads the screen and the keys then run on the new numbers.
+    The insert is not sent again."""
+    _open_al004(page)
+    _hold_requests(page)
+    before = _by_rec(_server_network(page), 4)
+    _hold_next(page, "GET", "/screen")
+    _goto(page, 4, 3, "ftg")
+    page.keyboard.press("Insert")
+    page.wait_for_timeout(500)
+    assert len(_held(page)) == 1                 # the screen read after the insert
+    page.keyboard.press("ArrowDown")
+    _type(page, "0444")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(200)
+    _hold_next(page, "GET", "/screen")           # the read tried again at once
+    _release(page, "fail")
+    page.wait_for_timeout(500)
+    assert len(_held(page)) == 1
+    now = _by_rec(_server_network(page), 4)
+    assert now[127985]["ftg"] == 134 and now[127984]["ftg"] == 121, "keys ran on the old numbers"
+    _release(page, "fail")
+    page.wait_for_timeout(1000)
+    now = _by_rec(_server_network(page), 4)
+    assert now[127985]["ftg"] == 134 and now[127984]["ftg"] == 121, "keys ran on the old numbers"
+    assert len(now) == len(before) + 1
+    assert page.evaluate("holdInput") > 0
+    assert "server unavailable" in page.inner_text("#modalbox")
+    page.click("#mbRetry")
+    page.wait_for_timeout(1500)
+    now = _by_rec(_server_network(page), 4)
+    assert now[127984]["ftg"] == 444 and now[127985]["ftg"] == 134
+    assert _sent_paths(page).count("POST /branches/4/nodes") == 1
+    assert page.evaluate("holdInput") == 0
     assert page.evaluate("document.getElementById('modal').hidden")
-    assert "saved AL004.ntw" in page.inner_text("#stMsg")
     assert not page.errors
