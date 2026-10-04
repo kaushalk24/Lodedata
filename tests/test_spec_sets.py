@@ -34,7 +34,7 @@ def test_every_file_is_a_layout_checked_against_lode(base):
     for ext in ("cbl", "cpr", "atv", "tap", "par"):
         a = spec_coverage.audit(base.with_suffix("." + ext))
         # a version read as a layout already checked, not yet checked itself
-        # against Lode's screens (Beckley750's Parameters 7.0, AL005's set)
+        # against Lode's screens
         if not a["seen"] and a["same_layout"]:
             waiting.append(ext)
             continue

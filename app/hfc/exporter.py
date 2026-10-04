@@ -141,7 +141,8 @@ def export_ntw(design: Design, source: bytes | None, name: str | None = None,
             line_extenders={a.index for a in lib.actives.values()
                             if a.index > 0 and _active_kind(a) == "line_extender"},
             points=dict(p.equipment_points or {}),
-            housings=[tuple(h) for h in (p.housings or [])])
+            housings=[tuple(h) for h in (p.housings or [])],
+            internal_couplers={c.record for c in lib.passives.values() if c.internal and c.record > 0})
     try:
         plain_out, ids = W.build(raw, outs, name=name, spec=lib.name or None, fresh=fresh,
                                  info=info)

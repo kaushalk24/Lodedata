@@ -142,6 +142,9 @@ class NtwNetwork:
     spec_names: list = field(default_factory=list)
     saved_with: list = field(default_factory=list)    # the 8 file names, in SAVED_WITH_FILES order
     branches: dict = field(default_factory=dict)      # number -> NtwBranch
+    file_name: str = ""         # the name the file was saved under (at 44542)
+    # PCD connections: (state byte, [(network, branch, line), (network, branch, line)])
+    pcds: list = field(default_factory=list)
 
     @property
     def node_count(self) -> int:
@@ -275,4 +278,37 @@ def read_network(plain: bytes) -> NtwNetwork:
     feeder = net.branches.get(1)
     if feeder and feeder.nodes and feeder.nodes[0].label:
         net.name = feeder.nodes[0].label
+    if len(plain) > FILE_NAME + 261:
+        net.file_name = _text(plain[FILE_NAME:FILE_NAME + 261])
+    net.pcds = _pcds(plain)
     return net
+
+
+# The networks a PCD (Power Connecting Device) joins, before branch 1: a u32
+# count of connections at 44803, then each one a byte and its two ends, the
+# network's file name char[261], its branch and its line (u32 each).
+# Bullhead's H043A_MID and H043B_MID hold the same one: H043A_MID 1.1 and
+# H043B_MID 1.1; each draws the other end in its PCD's cplr cell.
+FILE_NAME = 44542
+PCD_TABLE = 44803
+PCD_END = 261 + 8
+
+
+def _pcds(plain: bytes) -> list:
+    if len(plain) < PCD_TABLE + 4:
+        return []
+    count = struct.unpack_from("<I", plain, PCD_TABLE)[0]
+    at = PCD_TABLE + 4
+    if not 0 < count < 100 or at + count * (1 + 2 * PCD_END) > len(plain):
+        return []
+    out = []
+    for _ in range(count):
+        state = plain[at]
+        at += 1
+        ends = []
+        for _ in range(2):
+            b, n = struct.unpack_from("<II", plain, at + 261)
+            ends.append((_text(plain[at:at + 261]), b, n))
+            at += PCD_END
+        out.append((state, ends))
+    return out

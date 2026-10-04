@@ -167,8 +167,11 @@ version or size is reported by the tool. What no file explains yet:
 * **Actives** (3.3, 3.4d; the user's recordings of NBERN1GHz's and
   BH1GHzMid's Actives windows). Out/Loss: set to Loss on row 1's Out - F1
   it is byte **518** of the file (TEST_OL.atv: the only data byte that
-  changed; 0 in every file); which byte the other rows and columns use is
-  not known. R3 / R4 In (+187, +191) and Out (+211, +215): no file has a
+  changed; 0 in every file); the second test (TEST_OL2, 4 Oct: row 1's
+  Out - F2 and row 2's Out - F1 to Loss) set byte **519** alone, which
+  fits either change, so the rest of the layout is not known. None of
+  the ~300 real `.atv` files has a byte set at 512–849: nothing the user
+  sees depends on it. R3 / R4 In (+187, +191) and Out (+211, +215): no file has a
   figure there. The two figures after the power steps (+163, +167) and
   the three bytes before the Configuration Table. The Configuration
   Table's **Quantity**: 1 beside every plug-in named, 0 beside none (13c–
@@ -835,7 +838,7 @@ Node record, offsets from its id:
 | 98, 102 | u32 branch started here, first and second coupler column |
 | 106, 107 | amp column: an active when both bytes are the actives index; an in-line device Qn when they are 80−n and 24−n (Q1 = 79/23, Q2 = 78/22, Q5 = 75/19) |
 | 112 + 3·k | forward pad, return pad, forward EQ, return EQ (amps only) |
-| 128 | u8 fixed (locked) — drawn as `→` left of the footage |
+| 128 | u8 fixed (locked) — drawn as `→` left of the footage. Changing the line's house count clears it (H_B's 2.1, 36.png); a footage edit, a tap taken off or a coupler placed leaves it (33.png, PS_B) |
 | 129 | u8 house count |
 | 130 | u16 cable ID as displayed (series·100 + cable file index) |
 | 132 | u8 lv (System Levels row) |
@@ -870,14 +873,16 @@ flat middle and `{` with a notch, all three easily taken for `<`):
   on 4.16's 105, 9.1's `108<10>` past 9.2's power stop).
 * `[n]` — anything else.
 
-The walk to the nearest span passes 0-ft lines and power stops. From a
-coupler on a 0-ft line, the span found counts only on that line's cable
-(the cable file index, not the series): the older AL004's 4.14 (410) is
-`3[11]{12}` because 4.16's 105 is on 100, and S3 with its coupler moved to a
-0-ft line with no cable reads `100[2]` though 1.3's 100 is branch 2's; SN001
-18.1 (442, then 142) is `108<19>`. From a line with its own span the cable
-does not matter (SN001 24.17's `63<29>`, 442 on to 40). The preview box
-draws every branch `[n]`.
+The walk to the nearest span passes power stops, and 0-ft lines on the
+coupler line's cable (the cable file index, its series ignored); a 0-ft
+line on another cable ends it, with no span found. The span it reaches may
+be on any cable. The older AL004's 4.14 (0 ft, 410) is `3[11]{12}`: 4.15 is
+0 ft on 100, so 4.16's 105 is not reached. LG001's 11.5 (0 ft, 100) is
+`2<16>`: 11.6 is 0 ft on 100 too, and 11.7's 200 on 104 counts (c1, 4 Oct).
+So are H043B's 1.3 `99<2>` (cable 0, then 234 ft on 119; n3) and AL003's
+10.4 `3<18>`. SN001 18.1 (442, then 142) is `108<19>`; from a line with its
+own span the cable does not matter (SN001 24.17's `63<29>`, 442 on to 40).
+The preview box draws every branch `[n]`.
 
 Everything above was checked against AL004's screens: all 29 footages, cables,
 house counts, taps, couplers, both amplifiers and their names on branch 4;
@@ -913,7 +918,10 @@ whose head holds 999 at +126 (E7 03; the only heads with a high byte):
 H043A_MID's 91 and H043B_MID's 24, from 1.1 (fixed), one 0-ft line on cable
 0. Lode draws a PCD with the network and line it connects to (LK002's 1.5:
 `LK265 1.5`; its box "PCD branch connected to Network:  LK265 1.5", the
-status bar "No Feeder"); where the file names that line is not decoded.
+status bar "No Feeder" with the cursor on it, "Feeder 1.1" elsewhere —
+n4). The line is the other end in the network table at 44803 (below):
+H043B_MID's 1.1 reads `H043A_MID 1.1` and H043A_MID's `H043B_MID 1.1` (n3,
+n4).
 The PCD counts one connector on its line's cable (both files one more on
 cable 0 than their spans give).
 
@@ -934,10 +942,21 @@ cable 0 than their spans give).
 | 981 | char[16] amplifier name, the same way |
 | 1706 | u8 the house count again |
 | 1714 | 32 × u32: all 4 on every record that holds or has held an active |
-| 1842 | 32 × u32: 1 for each home, then 4 — on the lines where it is filled in (125 of 275), all 0 on the rest. It is not rewritten when the house count goes to 0: SN001_MID's 8.3 holds 0 homes over 1 1 1 |
+| 1842 | 32 × u32: 1 for each home, then 4 — on the lines where it is filled in (125 of 275), all 0 on the rest. Lode fills it whenever the house count is changed to some homes, an empty list too (H_B's 2.1, 0 → 2: 1 1 4 4 …; the 0-ft line inserted under it, a new record, all 4). It is not rewritten when the house count goes to 0: SN001_MID's 8.3 holds 0 homes over 1 1 1 |
 
 An extended record (2504 bytes) is the same record with 534 zero bytes put in
-at +1706: the three tail fields move to 2240, 2248 and 2376. Taking the
+at +1706: the three tail fields move to 2240, 2248 and 2376.
+
+**A new power supply** (PS_A / PS_B, 4 Oct: a power inserter — WV750's
+coupler 1, CLPS-3009PI, record 7 — keyed on AL004's 2.1, which makes branch
+46 with one 0-ft line of cable 0, and supply C, NEW APLHA 90V PS, type 4, on
+46.1). The supply's line takes the extended record and an object id, as an
+active does; its name is written as typed (`C ` with the space) and its type
+at the type byte. At +808 Lode starts four 21-byte blocks
+`ff ff ff ff 00 ff ff 00 ff ff 00 ff ff 00 ff ff 00 00 00 00 00`, and the
+house list (+1842 + 534) is all 0. The app writes exactly that; PS_B is the
+app's byte for byte but for the cursor (41425) and 36121 (+2, not decoded).
+A supply on a line that already holds an active has not been seen. Taking the
 active away takes the block out again.
 
 **The line's Notes.** At +698 every line holds a C string: its Notes (Lode's
@@ -992,19 +1011,36 @@ Rebuilt from nothing, these are the bytes Lode Data wrote:
 | 22377 + 4·i | (u16 aerial, u16 underground) actives of index i |
 | 23381 + 4·n | the same for in-line device Qn |
 | 23477 | u32 power stops (AL004: 2) |
-| 23481, 23483 | u16 70 and 81 on AL004, 0 on an empty network — **not decoded** |
+| 23481, 23483 | u16 70 and 81 on AL004, 0 on an empty network — **not decoded**; not rewritten on every save (H_A → H_B leaves them) |
 | 23513 + 16·row + 4·code | taps by tap-file row and port code |
 | 31705 + 4·code | taps by port code |
 | 31721 + 4·r | couplers by record + 1; a 3-way splitter feeding two branches counts once |
 | 35723 + 4·i | u16 connectors on cable file index i: one at each end of a span (a line with footage) that meets a device — the location it runs from or to holds a tap, coupler, active, in-line device or supply, or it is a branch's start at its coupler (a branch whose first line is 0 ft still starts there) |
-| 36121, 36125, 36129 | (u16 aerial, u16 UG) three counts — **not decoded** (AL004: 58/1, 0/1, 28/4; 0 on an empty network) |
-| 36141 + 4·n | (u16 aerial, u16 UG) Underground Housing n, one per underground location: its equipment points (Parameters: amplifier or line extender, tap or 8-port tap, coupler — a splitter feeding two branches is one — equalizer for an in-line device, power supply) reach the housing's Minimum Size |
+| 36121, 36125, 36129 | (u16 aerial, u16 UG) three counts — **not decoded** (AL004: 58/1, 0/1, 28/4; 0 on an empty network). Three, as the Parameters' Misc. Parts are three (H-H connectors, splices, terminators); 36129 matches the taps ending a branch on both AL004s only. PS_B's power inserter added 2 to 36121's aerial count; H_B's edits changed none. Kept as the file has them |
+| 36141 + 4·n | (u16 aerial, u16 UG) Underground Housing n — see "Underground housings" below |
 | 36201 + 4·k | (u16 aerial, u16 UG): 0 taps, 1 couplers (a PCD is not one: H043A/B count one aerial coupler, their 1.1 PCDs left out), 2 splitters (both branches of a line off one coupler record), 3 in-line devices, 4 line extenders — actives table items 1 – 12, 5 all other actives, 12 is 1 in every file but H043A_MID, which has its 1 at k = 6 (not decoded: kept as the file has it; the empty network's is 1), 56 + t supplies of type t |
 | 41401 | u16 41, u8 1, u8 1, u32 branch count, the id counter |
-| 41425 | u32 branch, u32 line, u8 1: where the program's cursor was (AL005: 12, 25; else 1, 1) |
+| 41425 | u32 branch, u32 line, u8 1: where the program's cursor was when the file was saved (AL005: 12, 25; H_B 2, 2; PS_B 46, 1; BH_KEYED 1, 3; S1 1, 2; S2 1, 3; S3 2, 1). The app keeps the file's value (1, 1 when that line is gone) |
 | 42366 + 261·k | the 8 files it was saved with: Parameters, Actives, Taps, Couplers, Cables, Prices, Performance, Map Grid (the program's "Spec File Mismatch" box lists them in this order) |
 | 44542 | the file name it was saved as, without `.ntw`. Opening a file under another name, the program warns "Filename AL004 has changed to AL004_T2_insert. Setting all PCDs to open." |
-| 44803 | u32: 0, or — in a network joined to others by a **PCD** (Power Connecting Device) — non-zero, and a table of those networks follows before branch 1: in H043A_MID and H043B_MID (both list H043A_MID, H043B_MID) one byte, then per network char[261] its file name and two u32 (1, 1); branch 1 then starts 539 bytes on. Read and written as the file has it |
+| 44803 | u32: 0, or — in a network joined to others by a **PCD** (Power Connecting Device) — non-zero, and a table of those networks follows before branch 1: in H043A_MID and H043B_MID (both list H043A_MID, H043B_MID) one byte, then for each end char[261] the network's file name and two u32, the branch and line of that end (1, 1 in both); branch 1 then starts 539 bytes on. Read and written as the file has it |
+
+**Underground housings** (36141; the user's H043B screens with `/`, n5a–f,
+4 Oct, and every file's tally). A *place* is a line with footage, or a
+branch's first line, together with the 0-ft lines after it. It is
+underground when its first line's cable file index is odd. Its points
+(Parameters → Underground Housings): the amplifier or line extender, each
+tap (4- or 8-port), each coupler — not an internal one, not a PCD, and a
+splitter feeding two branches from one record once — an in-line device's
+equalizer, and a power supply. A coupler whose branch starts with a 0-ft
+line brings that first group's points too (and so on down), when the
+branch's first line is itself underground. The housing is the largest whose
+Minimum Size the points reach; none below the first. Every place is
+counted, so a branch's 0-ft first group is counted on its own and again in
+its coupler's place. On the screen the housing `(n)` is drawn under the
+place's first line, but not under a branch's 0-ft first line (H043B 7.1
+shows none, 2.5 `(5)`). This gives the tally of all eleven networks, and
+H043A_MID / H043B_MID now save byte for byte.
 
 The writer rewrites the decoded totals, the branch count and the id counter.
 Everything not decoded is left as the file had it. Every total above is

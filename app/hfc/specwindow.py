@@ -383,8 +383,9 @@ def parameters_window(par: bytes, name: str) -> dict:
     on = S.read_frequencies(par)
     levels = S.read_levels(par)
     supplies = {s.type_id: s for s in S.read_supplies(par)} if hasattr(S, "read_supplies") else {}
-    classic = S._classic(par)
-    nsup = S.CLASSIC_PAR_SUPPLY_SLOTS if classic else S.PAR_SUPPLY_SLOTS
+    # ID 1-25 whatever the file holds: an older file keeps 15 (Beckley750's
+    # and WVEXT862's Powering tabs list 25, the rest empty -- n9e, set A 3d)
+    nsup = S.PAR_SUPPLY_SLOTS
     lv = levels.get("levels") or []
     extra = p.get("extra_levels") or [[0.0] * 6] * 16
     tilts = p.get("tilts") or [[0.0] * 4] * 16

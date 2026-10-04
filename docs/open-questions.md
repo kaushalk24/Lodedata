@@ -55,12 +55,12 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    `[n]` otherwise. The walk passes 0-ft lines and power stops — 9.1 is
    `108<10>` with 9.2's stop on (29b) as off (SHINSTON3 2); the `108[10]`
    behind the old power-stop rule was branch 9's preview box, which draws
-   every branch `[n]`. From a coupler on a 0-ft line the span found counts
-   only on that line's cable file index: the older AL004's 4.14 (410) is
-   `3[11]{12}` (4.16's 105 on 100, SHINSTON3 1c), S3's coupler moved to a
-   0-ft line with no cable `100[2]` (7b), SN001 18.1 (442 → 142) `108<19>`.
-   Still to see: a 0-ft coupler line whose span ahead is on another cable
-   and same length on a file the app has (QUESTIONS N3, C1).
+   every branch `[n]`. The walk also passes 0-ft lines on the coupler
+   line's cable file index and stops at a 0-ft line on another; the span it
+   reaches may be on any cable: the older AL004's 4.14 (410) is `3[11]{12}`
+   (4.15 0 ft on 100, SHINSTON3 1c), LG001's 11.5 `2<16>` (11.6 0 ft on
+   100, then 200 on 104: c1, 4 Oct), H043B's 1.3 `99<2>` (n3), SN001 18.1
+   (442 → 142) `108<19>`.
 2. **Tap brackets — closed.** The Design screen draws 2-port `/n/`, 4-port
    `[n]`, 8-port `<n>` (11.2's `<15>`, pointed) and a 6-port slot `{n}` (the
    LEQ\RC pads, 6.8's `{43}`, 36.6's `{40}`, as the manual says); the
@@ -88,8 +88,13 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
    AL00419) — Recalc changes nothing, opening a file keeps what it holds.
    With "Allow Over Equalization" unticked neither EQ takes off more tilt
    than is there, return as forward (1b's Return Eq 6, not 7; all 48
-   actives of H043A/B). Not explained: WV750's 88 (FML1G7J ALC LE) keyed on
-   AL004 4.2 on 28 Sep kept 0 / SCS6 / 0 / 0 (QUESTIONS N1).
+   actives of H043A/B). A fibre-fed active is picked too (BH_KEYED's NC4000
+   on 1.1, at the 0.00 its line reads: 0 0 7 0), and a bank column with no
+   rows gives 255 (VOID). Not explained: WV750's 88 (FML1G7J ALC LE) keyed
+   on AL004 4.2 keeps 0 / SCS6 / 0 / 0, and still does after 4.1's ftg
+   476 → 477 (N1a/N1b, 4 Oct): Lode does not pick it. Its pads are bank 2
+   (NPB-, no Flag row), its EQs bank 1 — which of those stops the pick is
+   asked in QUESTIONS N1b; the app picks it (20 / SCS2 / 19 / 2).
 5. **Tap and port colours — closed.** The user's recording of Test (screen
    menu 5) lists 37 problems on AL004; the replica produces the same 37 lines,
    word for word, from three checks on each tap's port levels, compared to
@@ -150,9 +155,13 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
      power supply 30) pick the largest housing whose Minimum Size they
      reach — 22.3: LE 11 + 22.4's coupler 5 = 16 → TV-104 (from 11); a tap,
      5 → TV-60 (from 4). "The smallest that holds them" would make 22.5 a 2.
+     The whole rule (4 Oct, H043B's n5a–f and every file's tally):
+     file-formats 3.8 "Underground housings".
 
    Open, each with the evidence that would settle it (asked of the user):
-   * (a) Whether a 0-ft first node (22.1) shows the block for being first
+   * (a) **Answered (c3, 4 Oct):** a branch's 0-ft first line gets no
+     block for being first (5.1); 22.1's is for being the last line on its
+     cable. Was: whether a 0-ft first node (22.1) shows the block for being first
      or for sitting 0 ft on from a coupler. AL004's deciders are nodes 0 ft
      on from a coupler that are not first: 5.25 (after 5.24's coupler, no
      amplifier), 9.2, 10.4, 14.5, 20.18, 25.2, 29.3, 29.7, 36.2, 37.2.
@@ -170,10 +179,11 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
      404), 22.5, 34.8 and 34.9, one tap each, 1 or 8 homes. Not the homes,
      not the tap cascade (34.9 is the second tap after 34.6 and still reads
      `(1)`). The tap slot or the TSG. The replica prints the slot.
-   * The small 3-option dialog seen in the user's old videos (earlier
-     session; the videos are no longer here). Possibly the manual's
-     NETWORK MODIFIED menu (3 Restore, 7 Save, 9 Switch), which Num Lock
-     opens.
+   * The small 3-option dialog seen in the user's old videos: the
+     "Network Modified" box, which Num Lock opens after an edit (33.png,
+     4 Oct): `[3] Restore`, `[7] Save`, `[9] Switch` and a Close button.
+     The app draws it; `[7]` saves. What Restore and Switch do is asked
+     (QUESTIONS 33b).
 8. **Keystrokes — answered.** Design mode's digits are the screen
    menu (`0 Alter`, `5 Test`, `.2 BkFeed`, `..5 Dsmry`; `./ Distance`), `/`
    toggles the expanded display, Esc closes a window. `0` on a tap prompts
@@ -402,7 +412,10 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       stand-in ("input below the module input", the whole line red);
     * where the Branch: line sits in the tap box, and which tap feeds the
       branch when a line has more than one;
-    * what 0 on a tap feeding a branch does (kept here, fed by nothing);
+    * what 0 on a tap feeding a branch does — **answered** (28A/28b, 33,
+      4 Oct): Lode asks "Deleting Branch — Deleting this branch will delete
+      all downstream design. Continue?" (Yes / No); Yes takes the tap off
+      and branches 43 and 44 stay, fed by nothing. The app does the same;
     * the older AL004's Test list — all 94 lines, in Lode's order, every
       line (twice: 1 Oct, and 2 Oct from AL004_SETA). Its five crossovers:
       WVEXT862 holds Max. Crossover 0.00, a limit like any other;
@@ -415,6 +428,22 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
       550 alone (its colour is taken to be its worst port's, as at the other
       frequencies); where a Lode 12 .atv keeps an active's F3 levels;
     * 23481/23483 and the three pairs at 36121;
-    * which new lines get their house list filled in;
-    * where TSG, Map, Loc and address go (listed as not written);
-    * a new power supply's record;
+    * which new lines get their house list filled in — **answered** (H_A /
+      H_B): every line whose house count is changed to some homes, and a
+      new line's record (file-formats 3.8). An hc edit also clears the
+      line's fixed arrow (36.png);
+    * where TSG, Map, Loc and address go (listed as not written; QUESTIONS
+      34, step by step);
+    * a new power supply's record — **answered** (PS_A / PS_B, file-formats
+      3.8 "A new power supply"); how the supply is keyed in Power mode is
+      asked (QUESTIONS 35b);
+    * Power mode on the older files (37.png, AL002 branch 4): a supply type
+      the spec set does not list (AL002's type 5, WVEXT862 lists 1–3) is
+      taken as 60 V — branch 4 then reads Lode's 57.21 / 56.68 / 56.14 /
+      55.63 V at 1.98 A; a line no supply reaches reads 0.00; NIU `Y`; the
+      cab cell in its series' colour. The `↕` after 4.4's amplifier is not
+      explained (QUESTIONS 44);
+    * "Not enough taps at node b.n." — red, in the Test list after the
+      node's tap lines, when the homes are more than the line's tap ports
+      (n12a/b, 1c);
+    * the cursor Lode saves at 41425 (QUESTIONS 43).

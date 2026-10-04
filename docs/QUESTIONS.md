@@ -1,11 +1,223 @@
 # Questions for the user
 
-Updated 4 Oct. Part A is what is still open from the list of 3 Oct (its
-numbers kept), part B the questions the answers of 3 Oct raised, part C the
-ones the answers of 4 Oct raised — in that order, as you asked. Each says
-what to do in Lode Data, what to send, what it settles and what the app does
-now. A screenshot means the whole Lode window, info box showing. Where
-answers came from: `EVIDENCE.md`.
+Updated 4 Oct, evening. Only what the app cannot settle without Lode Data
+is asked; everything else from your answers of 4 Oct (`6.zip`) is solved and
+listed under "Answered". Each question says why it is needed, what to do in
+Lode step by step, what to send, what it settles and what the app does
+meanwhile. "Screenshot" means the whole Lode window with the info box
+showing. Work on copies: never save over AL004.ntw itself. Where every
+answer came from: `EVIDENCE.md`.
+
+## Open — needed to finish the app
+
+**N1b. Why Lode did not pick 88's pads (4.2).**
+*Why:* every active keyed so far had its pads and EQs picked at once, but
+WV750's 88 (FML1G7J ALC LE) on AL004 4.2 kept Forward Pad 0, Forward Eq
+SCS6, Return Pad 0, Return Eq 0 — still after 4.1's ftg 476 → 477 (N1a,
+N1b). The app picks 20 / SCS2 / 19 / 2 there, so on this one the app and
+Lode differ. Three things could cause it; one test each tells them apart.
+*Do* (AL004 with WV750-2026; do not save — close with No after each):
+1. Open AL004. Cursor on 4.2's **amp** cell, press `0`, key `63`, Enter
+   (63 = FM901e-B, which uses the same pad and EQ banks as 88).
+   Screenshot with the cursor on 4.2's amp cell.
+2. Open AL004 again. Cursor on 4.2's amp cell, `0`, key `32`, Enter
+   (32 = LE 750MHz ALC, another ALC line extender, on the line extenders'
+   bank). Screenshot the same way.
+3. Open AL004 again. Cursor on **4.11**'s amp cell, `0`, key `88`, Enter.
+   Screenshot the same way.
+*Send:* the three screenshots (each box shows Forward Pad, Forward Eq,
+Return Pad, Return Eq).
+*Settles:* 1 picked → the banks are not the cause; 2 not picked → Lode does
+not pick ALC actives; 3 picked → it was 4.2's input level.
+*App now:* picks 88 like any other active.
+
+**34. TSG, Map, Loc and address — where the file keeps them.**
+*Why:* the app lets you key all four but cannot save them yet: nothing
+says where they sit in the `.ntw`. Two saves of the same network, before
+and after, show exactly which bytes they use.
+*Do:*
+1. Open AL004 with WV750-2026. File → Save Network As… `TSG_A.ntw`.
+2. Design mode. Put the cursor on 4.24's **TSG** cell (the column between
+   amp and tap1). Press `0`, key `2`, Enter. If the status bar or a box
+   asks anything, screenshot it.
+3. Put the cursor on 4.24's **ftg** cell. Its box ends
+   `<double-click or [.][ENTER] to edit address>`: press `.` then Enter,
+   type `123 TEST ST`. Screenshot the window before you press OK, then OK.
+4. Mode → **Entry**. Go to 4.24 (branch 4, node 24). Key `7` in its **Map**
+   column and `12` in its **Loc** column (the manual: Entry has Branch,
+   Node, ftg, hc, cab, lv, TSG, Map, Loc). Screenshot the Entry screen
+   showing 4.24.
+5. Mode → Design. File → Save Network As… `TSG_B.ntw`.
+*Send:* `TSG_A.ntw`, `TSG_B.ntw` and the screenshots. If any step goes
+differently (no TSG column, no Map/Loc in Entry, a different key), say what
+you did instead.
+*Settles:* where TSG, the address, Map and Loc are written.
+*App now:* keeps them while the network is open; a save drops them.
+
+**35b. Keying a power supply in Power mode.**
+*Why:* PS_B gave the supply's record exactly (the app now writes it as Lode
+does), but not the keys: 35a shows `PW04` in 46.1's supply cell, 35b `C`
+with `\04 0%`. The app has to accept the same keys in the same order.
+*Do:* open `PS_A.ntw` with WV750-2026 (the copy without the new supply).
+Key the power inserter on 2.1 as you did (coupler `1`). Then Mode →
+Powering, go to 46.1, and before every key you press take a screenshot
+(the status bar at the bottom shows Lode's prompt), up to the moment the
+supply cell reads `C`. Do not save.
+*Send:* the screenshots in order, and the keys you pressed between them
+(e.g. "0, then 4, Enter, then C, Enter").
+*Settles:* what `PW04` is (type 4's default name?) and how the type and
+the name are entered.
+*App now:* a number typed in Power's supply cell sets the supply's volts;
+it cannot name the supply or pick its type from the keyboard yet.
+
+**33b. Restore and Switch in the Network Modified box.**
+*Why:* the box (33.png) is in the app; `[7] Save` saves, but what
+`[3] Restore` and `[9] Switch` do is not known, so the app only says
+"not implemented yet" for them.
+*Do:* open a copy of AL004 (Save As `NM_TEST.ntw` first). Change 4.1's ftg
+476 → 477. Press Num Lock, click `[3] Restore`: screenshot what appears and
+then branch 4. Change 4.1's ftg again, Num Lock, click `[9] Switch`:
+screenshot what appears.
+*Send:* the screenshots.
+*Settles:* what each does.
+
+**43. The cursor Lode saves.**
+*Why:* Lode writes the cursor's branch and line into the file on every
+save (AL005: 12.25, H_B: 2.2, PS_B: 46.1, BH_KEYED: 1.3). The app keeps
+whatever the opened file held, so its saves differ from Lode's in those 8
+bytes only.
+*Do:* open `AL005.ntw` with Beckley750: screenshot right after it opens,
+before touching anything. Then open `H_B.ntw`: the same.
+*Send:* the two screenshots.
+*Settles:* whether Lode reopens a network at the line it was saved on.
+*And a yes / no:* may the app write its own cursor position on save, as
+Lode does? It changes those 8 bytes in a saved file whenever the cursor is
+not on 1.1 (nothing else).
+
+**N11b. A network on an old spec set (NPG550).**
+*Why:* the oldest Actives formats (2.20, 3.0, 5.0: NPG550, bymac862,
+gefd862, jarr625, npg750, npg860, steph870) are read from your recording
+(19a) only; a network checks the reading. You have no network on any of
+them, so key a small one.
+*Do:* File → New, then load NPG550 for all the spec files (Set All
+Files). Key:
+1. 1.1: amp `61` (or the first amplifier ID NPG550's Actives tab lists).
+2. 1.2: ftg `190`, hc `2`, a tap `0 2 . 4` (or the nearest 2-port tap it
+   offers).
+3. 1.3: ftg `150`, amp: the first line extender ID it lists.
+4. 1.4: ftg `100`, hc `3`, a 4-port tap.
+File → Save Network As… `NPG_KEYED.ntw`.
+*Send:* `NPG_KEYED.ntw`; a screenshot of branch 1 with `/` (expanded) on;
+one with the cursor on each amp cell (1.1 and 1.3, their boxes showing);
+the Test list (`5`).
+*Settles:* the oldest actives' levels, pads and EQs, checked figure for
+figure.
+*App now:* cannot read those spec sets' actives yet; they are decoded
+next, from 19a, and this network checks the result.
+
+**44. (Optional) The `↕` in Power mode.**
+*Why:* in 37.png (AL002 branch 4, Power) 4.4's amp cell reads `61↕`; the
+app draws `61`. Nothing explains the mark.
+*Do:* AL002 with WVEXT862, Mode → Powering, branch 4. Put the cursor on
+4.4's amp cell: screenshot (its box showing). If Help or the manual names
+the mark, say where.
+*Settles:* what the mark means and when Lode draws it.
+
+## Priority 7 — later work, in this order (when we get there)
+
+39. **The design commands.** *Why:* the next big piece is the design engine
+    — what each screen-menu command changes. *Do:* on a copy of AL004
+    (Save As `CMD_BASE.ntw`), for each command below: open `CMD_BASE.ntw`,
+    put the cursor where it says, take a screenshot, press the keys, take a
+    screenshot of every prompt or box, answer with the default (Enter), take
+    a screenshot of the result, then File → Save Network As… `CMD_<name>.ntw`
+    (e.g. `CMD_AutoCpl.ntw`). The files show exactly what changed.
+    * `7 AutoCpl` — cursor on 4.9's cplr cell (no coupler there).
+    * `6 WillWrk` — cursor on 4.24's amp cell.
+    * `.6 XWillWk` — cursor on 4.24's amp cell, after WillWrk.
+    * `9 Toggle` — cursor on 4.27's tap1 cell (`[17]`).
+    * `.8 RotTap` — cursor on 4.27's tap1 cell.
+    * `.7 SetMDU` — cursor on 4.27's hc cell.
+    * `2 Forward`, `4 Fwd2A`, `.4 XFd2A` — cursor on 4.24's amp cell.
+    * `.2 BkFeed`, `.3 UnBkFd`, `..2 FwdFd`, `..3 UnFFd` — cursor on 4.4's
+      cplr cell (`12{6}`).
+    * `.0 Break`, `.1 Join` — cursor on 4.10's ftg cell.
+    * `.5 MoveCpl` — cursor on 4.17's cplr cell (`1(18)`).
+    * `..7 CAwBF`, `..8 XCAmp`, `..9 LckDStr`, `..4 BrLabel`, `..0 SpcVw`,
+      `..1 Xspec` — cursor on 4.24's amp cell.
+    *Send:* every screenshot and `CMD_*.ntw`, named by command.
+    *Settles:* each command's effect, built one by one.
+40. **Connecting networks.** *Why:* H043A_MID and H043B_MID share a supply
+    through a PCD; how Lode joins them is not seen. *Do:* open H043B_MID with
+    BH1GHzMid; put the cursor on 1.1's PCD cell (`H043A_MID 1.1`); try
+    Misc → Connect (and, if it asks, choose H043A_MID); screenshot every box
+    in order; Power mode on branch 1 after it. A short screen recording is
+    best (under 2 minutes). Do not save over the originals: Save As
+    `H043B_CONN.ntw` at the end.
+    *Send:* the recording or screenshots and `H043B_CONN.ntw`.
+    *Settles:* the PCD connect and the shared supply's volts.
+41. **Spec Edit → Pricing, Performance and Control.** *Do:* with WV750-2026
+    loaded, open each of the three windows and click through every tab,
+    one screenshot per tab (or one recording). *Send:* the screenshots, and
+    the `.prc` / `.per` files if WV750-2026 has them (same folder as its
+    `.par`). *Settles:* the three windows the app does not draw yet.
+42. **The repository's history (yes / no).** Old commits of
+    `docs/file-formats.md` and `tools/lodedata/header.py` (before 26 Sep)
+    quote licence and user ids from file headers; the current files do not.
+    Rewriting the branch's history removes them from every old commit, but
+    anyone with an old clone must clone again. *Answer:* yes (rewrite) or no
+    (leave the history as it is).
+
+## Answered 4 Oct, evening (`6.zip`)
+
+* **22** — WVBeck750 is in the samples; its 34 tests run (none skipped).
+* **28** — `0` `0` on the older AL004's 11.16 `117+` asks "Deleting Branch —
+  Deleting this branch will delete all downstream design. Continue?"; Yes
+  takes the tap off and branches 43 and 44 stay, fed by nothing (28A/28b,
+  33). The app now asks the same and does the same.
+* **33** — Num Lock after an edit opens "Network Modified": `[3] Restore`,
+  `[7] Save`, `[9] Switch`, Close. Now in the app (33b asks the rest).
+  Every level on 33 and 11.11's box match.
+* **35** — PS_A / PS_B: the power inserter (coupler 1, CLPS-3009PI) on 2.1
+  makes branch 46; supply C (NEW APLHA 90V PS) on 46.1. The app writes the
+  supply's record as Lode does (byte for byte but the cursor and one
+  undecoded counter), and draws 46.1 as 35b / 35c (-50.00 -61.00 116.00
+  116.00; C, `\04 0%`). 35b asks the keys.
+* **36** — H_A / H_B: hc 0 → 2 fills the house list and takes off the
+  line's arrow; the inserted line is a new record. The app writes H_B as
+  Lode does, byte for byte but the cursor.
+* **37** — AL002's supplies are type 5, which WVEXT862 does not list: Lode
+  takes 60 V; branch 4's volts and currents are now Lode's (57.21 / 56.68
+  / 56.14 / 55.63 at 1.98 A), 0.00 where no supply reaches, NIU `Y`, the
+  cab cell in its series' colour. 44 asks about `↕`.
+* **38** — AL004_NOTES opened in Lode with the app's notes on 2.1 and 4.13;
+  every figure of 38b is the app's.
+* **C1** — LG001 11.5 is `2<16>`: the walk passes 11.6 (0 ft on 11.5's
+  cable) and 11.7's 200 counts though it is on 104. Fixed.
+* **C2** — the pad / EQ labels are untrimmed (`SPB-  10`) until the amp's box
+  has been shown, then trimmed (c2, c2b). The app now does the same.
+* **C3** — no block on a branch's 0-ft first line (5.1); 22.1's is for being
+  the last line of its cable. Fixed.
+* **C4** — the older AL004's 43.1: `<NO FWD EQ>` and `<NO RET EQ>`. As the
+  app draws them.
+* **C5** — `12{6}` is a DC-12 coupler (coupler column), not a 6-port tap; its
+  preview draws 6.8's 6-port slot `<43>`, as the app does.
+* **N1** — 88 not picked (N1a/N1b); N1b above asks why.
+* **N2** — H043A's Test list, 12 yellow lines: the app's.
+* **N3 / N4** — the PCD cell shows the other network and line; the status bar
+  reads "No Feeder" only with the cursor on it. Now in the app.
+* **N5** — the underground housings: rule found (file-formats 3.8); every
+  marker on n5a–f and every file's tally match; H043A/B save byte for byte.
+* **N6** — TEST_OL2 set byte 519 only; nothing the user sees depends on it.
+* **N7** — EQ Manual / Auto / Auto Ex, OP Off / On Fail / On, DEV Total /
+  Fwd / Rtn Dev.: the app's lists already.
+* **N8** — BH_KEYED: the NC4000 is picked too (0 0 7 0), the FM332 21 21 2 1;
+  the app's pick and every tally match.
+* **N9 / N10** — Beckley750's six Parameters tabs and AL005's 51 Test lines:
+  every field and line is the app's.
+* **N11** — no network on an old spec: N11b above asks for a keyed one.
+* **N12** — "Not enough taps at node b.n.", red, after the node's tap lines.
+  Now in the app.
 
 ## Answered 4 Oct (25–33)
 
@@ -91,143 +303,6 @@ answers came from: `EVIDENCE.md`.
     actives' pads and EQs matching.
 24. **"ntw map AL004"** — a file named in the first sessions; you don't know
     it, so dropped.
-
-## Part A — still open from the list of 3 Oct
-
-22. **WVBeck750 (yes / no).** You sent it on 29 Sep. May it go into the test
-    samples? 34 tests use it.
-
-### Explained again (25–33)
-
-28. **Taking off a tap that feeds a branch.** In the older AL004 (with
-    WVEXT862) the tap on 11.16 is drawn `117+` and the one on 11.18 `104+`:
-    each feeds a branch (43, 44) straight from its port, with no coupler.
-    *Do:* open the older AL004 with WVEXT862, File → Save Network As…
-    TAP_A.ntw; put the cursor on 11.16's `117+`, press 0 (Alter), key 0 and
-    Enter to take the tap off. *Send:* a screenshot before and after, and
-    any box that appears. *Settles:* what becomes of branch 43 — deleted
-    with the tap, kept with nothing feeding it, or the tap refused. *App
-    now:* kept, fed by nothing (0.00).
-33. **The NETWORK MODIFIED menu.** The manual says Num Lock opens a
-    "NETWORK MODIFIED" menu (3 Restore, 7 Save, 9 Switch). *Do:* on a copy of
-    AL004, change one ftg, then press Num Lock. *Send:* a screenshot of what
-    appears (nothing is fine too). *Settles:* whether the menu exists in your
-    version and what it offers (the app has none).
-
-### Priority 6 — what Lode writes when saving
-
-34. **TSG, Map, Loc and address.** *Do:* on a copy of AL004, Save As
-    TSG_A.ntw; on 4.24 set TSG 2, Map 7, Loc 12 and an address; Save As
-    TSG_B.ntw. *Send:* both files and the values used. *Settles:* where
-    the file keeps them (the app does not write them yet).
-35. **A new power supply.** *Do:* on a copy, Save As PS_A.ntw; place one
-    supply on one line; Save As PS_B.ntw. *Send:* both, and the line and
-    supply. *Settles:* the supply's record.
-36. **House lists of new lines.** *Do:* on a copy, Save As H_A.ntw; add a
-    line with 2 homes and one with 0; Save As H_B.ntw. *Send:* both.
-    *Settles:* which lines get a house list (and, with 34–35, the counters
-    at 23481 / 23483 / 36121).
-37. **Power stops on the older files.** *Do:* AL002 with its spec set,
-    Power screen, any branch. *Send:* screenshot. *Settles:* where Lode
-    draws `=` (AL002–AL005 set the power-stop field on many lines).
-38. **AL004_NOTES.ntw** (optional). Open it with WV750-2026; check `..+` on
-    2.1 and 4.13 shows the notes the app wrote.
-
-### Priority 7 — later work (when we get there)
-
-39. **The design commands.** A short recording of each screen-menu command
-    on a copy of AL004: 6 WillWrk, 7 AutoCpl, 8 Recalc, 9 Toggle, .7 SetMDU,
-    .8 RotTap and the others — what each changes.
-40. **Connecting networks.** A recording of connecting two networks (PCD
-    connect, two networks sharing a power supply).
-41. **Spec Edit → Pricing, Performance and Control.** Screenshots of each
-    window's tabs, and the files (.prc, .per) if you use them.
-42. **The repository's history (yes / no).** Old commits of
-    `docs/file-formats.md` and `tools/lodedata/header.py` quote licence
-    and user ids from file headers (removed from the current files).
-    Rewrite the branch's history to remove them?
-
-## Part B — questions the answers of 3 Oct raised (after part A)
-
-N1. **88 on AL004 4.2.** On 28 Sep, 88 (FML1G7J ALC LE) keyed on 4.2 kept
-    0 / SCS6 / 0 / 0, where every other active keyed today was picked at
-    once. *Do:* AL004 with WV750-2026, Save As AL004_88.ntw, key 88 on 4.2,
-    screenshot with the cursor on it; then change 4.1's ftg 476 → 477,
-    screenshot again. *Settles:* whether an ALC line extender is never
-    picked or the 28 Sep box was taken before the pick. *App now:* 20 / SCS2
-    / 19 / 2 at once.
-N2. **H043A's Test list.** *Do:* open H043A_MID with BH1GHzMid, press 5.
-    *Send:* every line. *App now:* 12 lines: 2.25 (two), 15.44, 33.6, 38.6,
-    38.9, 64.3, 64.5, 66.3, 67.1, 74.2, 89.2.
-N3. **H043B's PCD.** *Do:* open H043B_MID, cursor on 1.1's cplr cell.
-    *Send:* screenshot of branch 1 lines 1.1–1.8 with the box. *Settles:*
-    which network and line it names, and the levels on 1.1 and 1.2 (the app:
-    0.00, nothing feeding the first line); also 1.3's bracket — a coupler on
-    a 0-ft line of no cable with 234 ft ahead on 119, branch 2 starting 234
-    ft (the app: `99[2]`, as S3's 7b). *App now:* draws `(24)`.
-N4. **H043A's PCD.** The same on H043A_MID's 1.1; its 1.3 is a 0-ft line on
-    19 with a power stop on 1.4 and 625 ft on 19 ahead (the app: `99<2>`).
-N5. **Underground housings.** *Do:* H043B_MID, press `/`, go to 1.6, 1.13,
-    2.9, 3.7, 13.1 and 7.1. *Send:* a screenshot at each. *Settles:* which
-    housing each place takes: Lode's file counts 82 / 11 / 4 / 2 of housings
-    1 / 3 / 4 / 5, the app 83 / 10 / 5 / 1 (it gives all five FM902T places
-    housing 4 and only 7.1's supply housing 5).
-N6. **Out/Loss, a second test.** *Do:* open BH1GHzMid.atv in Spec Edit →
-    Actives, Save As TEST_OL2; set row 1's Out/Loss beside "Out - 102" to
-    Loss and row 2's beside "Out - 1002" to Loss; Save. *Send:* TEST_OL2.atv.
-    *Settles:* where every row's and column's Out/Loss is kept (row 1 Out -
-    1002 is byte 518).
-N7. **The EQ, OP and DEV drop-downs** on the toolbar. *Send:* a screenshot of
-    each list open. *Settles:* what EQ "Auto" can be switched to (the pick
-    above happens under Auto).
-N8. **BH_TEST.ntw.** It has the same size and branches as H043B_MID — is it
-    H043B saved under another name? The file wanted was Q1's keyed network
-    (1.1 amp 71, 1.2 190 ft hc 2, 1.3 amp 11) saved: *Do:* key it again,
-    File → Save Network As… BH_KEYED.ntw. *Send:* the file. *Settles:* that
-    the app writes a new network with two extra frequencies as Lode does.
-N9. **Beckley750's Parameters.** *Do:* Spec Edit → Parameters with
-    Beckley750. *Send:* all six tabs. *Settles:* its file version (7.0),
-    read now as the older layout but not checked against Lode.
-N10. **AL005's Test list** with Beckley750. *Send:* every line. *App now:* 51
-     lines, beginning "Fslope too low to equalize at 1.1.".
-N11. **A network on an old spec.** *Send:* one .ntw designed with NPG550 (or
-     bymac862, gefd862, jarr625, npg750, npg860, steph870) and its Test list.
-     *Settles:* the oldest actives' reading (decoded next from 19a), checked
-     on a real network.
-N12. **"Not enough taps at node 1.2."** (1c: 2 homes, no tap). *Do:* AL004
-     with WV750-2026, Save As AL004_HC.ntw; set hc 5 on 4.27 (`[17]`, 4-port)
-     and hc 3 on 4.29 (`/ 4/`, 2-port); press 5. *Send:* the Test list, every
-     line. *Settles:* the line's wording, colour and place in the list, and
-     that it is homes against all the line's tap ports (the rule hc turns
-     red by). *App now:* hc red, no Test line.
-
-## Part C — new questions from 4 Oct (after part B)
-
-C1. **LG001 11.5.** *Do:* LG001 with WV750-2026 (its own), go to 11.5 (the
-    LE `11` with coupler 2 to branch 16, 0 ft on cable 100; 11.6 0 ft, 11.7
-    200 ft on 104; branch 16 starts 200 ft). *Send:* a screenshot of 11.3–11.8.
-    *Settles:* whether the span ahead counts when it is on another cable than
-    the 0-ft coupler line (the app: `2[16]`; it drew `2<16>` before today).
-C2. **When the pad and EQ labels lose their spaces.** On 29a (03:34)
-    5.23 read `SPB-  10¦  SEQ-750-   6` / `MEQ-42-   2`; on 32a (03:59)
-    `MEQ-42-2`. *Do:* close Lode, open it, AL004 with WV750-2026, press `/`,
-    go to 5.23: screenshot. Then put the cursor on 5.23's amp cell (its box
-    showing), move down a line: screenshot again. *Settles:* whether showing
-    the box is what trims them (the app always shows them trimmed).
-C3. **A branch's 0-ft first line.** *Do:* AL004 with WV750-2026, `/`, the top
-    of branch 5 (5.1, 0 ft with nothing on it, 5.2 on the same cable).
-    *Send:* screenshot. *Settles:* whether a branch's first line gets the
-    block for being first (the app: yes) — 22.1, the only one seen, is also
-    the last line on its cable.
-C4. **No EQ on the return, and on the older files.** *Do:* the older AL004
-    with WVEXT862, `/`, go to 43.1 (WIFI OMNI; both EQs VOID in its box).
-    *Send:* screenshot. *Settles:* the return line with no EQ, and the forward
-    one on a file opened rather than keyed (the app: `<NO FWD EQ>` and
-    `VOID`).
-C5. **A 6-port slot in a coupler's preview.** *Do:* AL004, cursor on 4.4's
-    `12{6}` (its preview lists branch 6, with 6.8's `{43}`). *Send:*
-    screenshot. *Settles:* how the preview box draws a 6-port slot (the
-    app: `<43>`; 2-, 4- and 8-port are `(17)` `[8]` `{15}` there).
 
 ---
 

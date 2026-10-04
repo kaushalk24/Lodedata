@@ -437,6 +437,10 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path | None,
                     miss(f"{number}.{i}: power supply type {nn.supply_type}")
             for child in nn.branches:
                 cb = net.branches.get(child)
+                if cb and cb.coupler_record == PCD_RECORD:
+                    node.couplers.append(CouplerPlacement(
+                        branch=child, pcd=_pcd_end(net, number, i)))
+                    continue
                 part = passives.get(cb.coupler_record) if cb else None
                 node.couplers.append(CouplerPlacement(
                     part_id=part.id if part else None,
@@ -465,6 +469,24 @@ def design_from_ntw(ntw: str | Path | bytes, spec_base: str | Path | None,
             else:
                 line.couplers.append(CouplerPlacement(branch=number, removed=True))
     return design, report
+
+
+PCD_RECORD = 999       # a branch head's coupler record for a PCD
+
+
+def _pcd_end(net, branch: int, line: int) -> str:
+    """The other end of the PCD on this line, as the program draws it in the
+    cplr cell: H043B_MID's 1.1 reads "H043A_MID 1.1" and H043A_MID's
+    "H043B_MID 1.1" (the user's n3, n4); LK002's 1.5 "LK265 1.5"."""
+    own = (net.file_name or net.name).upper()
+    for _, ends in net.pcds:
+        here = [e for e in ends if e[0].upper() == own and (e[1], e[2]) == (branch, line)]
+        if here:
+            other = next((e for e in ends if e is not here[0]), None)
+            if other:
+                return f"{other[0]} {other[1]}.{other[2]}"
+    other = next((e for _, ends in net.pcds for e in ends if e[0].upper() != own), None)
+    return f"{other[0]} {other[1]}.{other[2]}" if other else ""
 
 
 def spec_mismatch(net, loaded: str) -> list:

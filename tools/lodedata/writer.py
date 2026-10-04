@@ -42,6 +42,11 @@ N_SELF = 718                 # u32 the node's own id, in an extended record
 TAIL_HC = 1706               # u8 the house count again (+534 when extended)
 TAIL_A = 1714                # 32 u32: 4 on every record that has held an active
 TAIL_HOMES = 1842            # 32 u32: 1 per home, then 4 -- when filled in
+# a supply's record, as the program starts one (AL004's 43.1 and 45.1,
+# SN001_MID's 27.1 and 41.1, all three of AL002's, PS_B's new 46.1): four
+# 21-byte groups at +808 (of the record without its text), and no house list
+PS_BLOCK = 808
+PS_BLOCK_NEW = bytes.fromhex("ffffffff00ffff00ffff00ffff00ffff0000000000") * 4
 EMPTY_TAP = b"\xff\xff\xff\xff\x00"     # tap-file row -1, port code 0
 
 # Where a design refers to a part the spec set could not resolve, the
@@ -211,6 +216,7 @@ class SpecInfo:
     line_extenders: set = field(default_factory=set)   # actives indices
     points: dict = field(default_factory=dict)         # Parameters: equipment points
     housings: list = field(default_factory=list)       # [(housing number, least points)]
+    internal_couplers: set = field(default_factory=set)  # coupler records an amp holds
 
 
 class WriteError(ValueError):
@@ -426,6 +432,9 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
     has_active = bool(rec[N.N_AMP_INDEX]) and not rec[N_INLINE_FLAG] if keep_active else nd.active_index > 0
     named = nd.label if nd.label is not None else bytes(rec[N.N_LABEL:N.N_LABEL + 1]) != b"\0"
     want = bool(has_active or nd.supply)
+    if nd.supply and has_active and not rec[N.N_PS_NAME]:
+        raise WriteError(f"line id {own}: a power supply on a line with an active is "
+                         "not written yet -- that record has not been seen")
     if want and not extended and not nd.supply and not named:
         # an active the program has not been given a name for stays on the
         # short record: the user's S1 Ripple, and 22 of AL002's actives
@@ -439,6 +448,9 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
         if has_active:
             # every AL004 record holding an active has this list all 4
             struct.pack_into("<32I", rec, TAIL_A + EXT_SIZE, *([4] * 32))
+        else:
+            rec[PS_BLOCK:PS_BLOCK + len(PS_BLOCK_NEW)] = PS_BLOCK_NEW
+            rec[TAIL_HOMES + EXT_SIZE:TAIL_HOMES + EXT_SIZE + 128] = bytes(128)
     elif extended and not want:
         # taken away: back to the short record (AL004's 9.20 still holds the
         # pads of the amplifier moved to 9.21, so those are left)
@@ -500,9 +512,6 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
     if nd.label is not None and (nd.label or rec[N.N_LABEL]):
         _text_into(rec, N.N_LABEL, nd.label)
     if nd.supply:
-        if not rec[N.N_PS_NAME]:
-            raise WriteError(f"line id {own}: a power supply placed here is not "
-                             "written yet -- its record layout is still being checked")
         if nd.supply != bytes(rec[N.N_PS_NAME:N.N_PS_NAME + 16]).split(b"\0", 1)[0].decode("latin-1"):
             # written C-style, the rest left: AL004's 18.1 holds "A\0004A",
             # the "A" written over "AL004A"; an unchanged label is left alone
@@ -517,9 +526,10 @@ def _node_record(nd: NodeOut, src: bytes | None, own: int, prev: int, nxt: int,
     rec[TAIL_HC + tail] = nd.hc & 0xFF
     homes = TAIL_HOMES + tail
     # filled in: a 1 for each home, 4 for the rest -- rewritten when the house
-    # count changes to some homes; SN001_MID's 8.3 holds 0 homes over a list
-    # still reading 1 1 1, so a line left alone keeps its list
-    if any(rec[homes:homes + 128]) and nd.hc and nd.hc != old_hc:
+    # count changes to some homes, an empty list too (H_B's 2.1, 0 -> 2 homes:
+    # 1 1 4 4 ...); SN001_MID's 8.3 holds 0 homes over a list still reading
+    # 1 1 1, so a line left alone keeps its list
+    if nd.hc and nd.hc != old_hc:
         for k in range(32):
             struct.pack_into("<I", rec, homes + 4 * k, 1 if k < nd.hc else 4)
     rec[N.N_TEXT:N.N_TEXT] = text
@@ -670,28 +680,44 @@ def tallies(plain, info: SpecInfo | None = None) -> dict:
             t[P_CONNECTORS + 4 * (lines[0].cable % 100)] += ends
 
         if info is not None and info.points and info.housings:
-            pts = info.points
             for lines in groups:
-                if not ug(lines[0]):
-                    continue
-                total = 0
-                for nd in lines:
-                    if nd.active_index:
-                        total += pts.get("line_extender" if nd.active_index in info.line_extenders
-                                         else "amplifier", 0)
-                    total += sum(pts.get("tap_8_port" if tp.ports == 8 else "tap", 0) for tp in nd.taps)
-                    if nd.branches:
-                        recs = [net.branches[b].coupler_record for b in nd.branches if b in net.branches]
-                        devices = 1 if len(recs) == 2 and recs[0] == recs[1] else len(recs)
-                        total += pts.get("coupler", 0) * devices
-                    if nd.inline:
-                        total += pts.get("equalizer", 0)
-                    if nd.supply:
-                        total += pts.get("power_supply", 0)
+                total = _place_points(net, lines, info)
                 fits = [number for number, least in info.housings if total and least <= total]
                 if fits and fits[-1] in HOUSING_SLOTS:
                     t[P_HOUSINGS + 4 * fits[-1] + 2] += 1
     return t
+
+
+def _place_points(net, lines: list, info: SpecInfo) -> int:
+    """The Parameters points of the equipment at one place, 0 unless its
+    first line is underground: its lines' -- an amplifier or a line
+    extender, each tap, each coupler (a splitter's two legs one, an amp's
+    internal one and a PCD none), an in-line equalizer, a supply -- and
+    those of the 0-ft first lines of the branches started on them.  Every
+    file's tally is every such place's housing, a branch's 0-ft start
+    counted on its own as well (H043A_MID 179/23/8/7 of housings 1/3/4/5,
+    H043B_MID 82/11/4/2: its 7.1 supply a (5) and 2.5's place, which holds
+    it, another)."""
+    if not (lines[0].cable % 100) % 2:
+        return 0
+    pts = info.points
+    total = 0
+    for nd in lines:
+        if nd.active_index:
+            total += pts.get("line_extender" if nd.active_index in info.line_extenders else "amplifier", 0)
+        total += sum(pts.get("tap_8_port" if tp.ports == 8 else "tap", 0) for tp in nd.taps)
+        recs = [net.branches[b].coupler_record for b in nd.branches if b in net.branches]
+        devices = [r for r in recs if r and r != PCD_RECORD and r not in info.internal_couplers]
+        total += pts.get("coupler", 0) * (1 if len(devices) == 2 and devices[0] == devices[1] else len(devices))
+        if nd.inline:
+            total += pts.get("equalizer", 0)
+        if nd.supply:
+            total += pts.get("power_supply", 0)
+        for b in nd.branches:
+            child = net.branches.get(b)
+            if child is not None and child.coupler_record != PCD_RECORD and child.nodes and not child.nodes[0].ftg:
+                total += _place_points(net, _groups(child.nodes)[0], info)
+    return total
 
 
 def _more_totals(out: bytearray, info: SpecInfo | None) -> None:

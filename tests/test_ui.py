@@ -232,6 +232,15 @@ def test_expanded_display_draws_the_amplifier_and_its_block(page):
     page.wait_for_timeout(300)
     _type(page, "/")
     page.wait_for_timeout(300)
+    # the bank labels as the file has them, spaces and all, until the amp's
+    # box has shown them (29a's 5.23: SPB-  10 / SEQ-750-   6)
+    text = page.eval_on_selector_all("#grid tbody td.xtext", "els => els.map(e => e.textContent)")
+    assert "[           AL00429]  (      SPB-   2\u00a6  SEQ-750-   5)" in text
+    assert "(                 A)  (      SPB-   1\u00a6   MEQ-42-   2)" in text
+    # the cursor on its amp cell, as on the 26 Sep screenshot: the box shows
+    # them, and from then on they are trimmed
+    page.evaluate("S.col = columns().findIndex(c => c.key === 'amp'); renderGrid()")
+    page.wait_for_timeout(300)
     text = page.eval_on_selector_all("#grid tbody td.xtext", "els => els.map(e => e.textContent)")
     assert "[           AL00429]  (      SPB-2   \u00a6  SEQ-750-5   )" in text
     assert "(                 A)  (      SPB-1   \u00a6   MEQ-42-2   )" in text
@@ -1243,4 +1252,104 @@ def test_spec_edit_taps_and_couplers_are_the_programs_windows(page):
     head = page.eval_on_selector_all("table.sw-t th", "s => s.map(x => x.textContent)")
     assert head[:6] == ["It...", "Part Number", "Coupler ID", "Optical", "Internal", "Tap 750"]
     page.keyboard.press("Escape")
+    assert not page.errors
+
+
+def _open(page, ntw, spec_glob):
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(ntw))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(ntw.parent.glob(spec_glob))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+
+
+def test_taking_off_a_tap_that_feeds_a_branch_asks_first(page):
+    """The older AL004's 11.16 (117+ feeds branch 43): 0 Alter, 0 brings up
+    "Deleting Branch" (28b); No leaves the tap, Yes takes it off and branch
+    43 stays, fed by nothing, 3 homes now red (33)."""
+    ntw = SAMPLES / "AL004-WVEXT862" / "AL004.ntw"
+    if not ntw.exists():
+        pytest.skip("the older AL004 not in samples")
+    _open(page, ntw, "WVEXT862.*")
+    branches = page.evaluate("S.scr.branches.length")
+    _goto(page, 11, 16, "tap0")
+    _key(page, "0", "0", "Enter", wait=800)
+    assert page.inner_text(".msgbox .mbtitle") == "Deleting Branch"
+    assert "Deleting this branch will delete all downstream design." in page.inner_text(".msgbox")
+    page.click("#mbNo")
+    page.wait_for_timeout(800)
+    assert _row(page, 11, 16)["taps"] == ["117+"]
+    _key(page, "0", "0", "Enter", wait=800)
+    page.click("#mbYes")
+    page.wait_for_timeout(1500)
+    assert _row(page, 11, 16)["taps"] == [] and _row(page, 11, 16)["hc_severity"] == "red"
+    assert page.evaluate("S.scr.branches.length") == branches
+    assert not page.errors
+
+
+def test_num_lock_on_a_changed_network_opens_network_modified(page):
+    """33: Num Lock after a change brings up "Network Modified" with [3]
+    Restore, [7] Save, [9] Switch and Close; before any change, nothing."""
+    _open_al004(page)
+    _goto(page, 4, 1, "ftg")
+    _key(page, "NumLock", wait=300)
+    assert page.is_hidden("#modal")
+    _key(page, "0", "4", "7", "7", "Enter", wait=1200)
+    _key(page, "NumLock", wait=300)
+    assert page.inner_text(".msgbox .mbtitle") == "Network Modified"
+    links = page.eval_on_selector_all(".msgbox .nmlink", "els => els.map(e => e.textContent)")
+    assert links == ["[3] Restore", "[7] Save", "[9] Switch"]
+    page.click("#mClose")
+    assert page.is_hidden("#modal")
+    assert not page.errors
+
+
+def test_no_feeder_only_with_the_cursor_on_a_pcd(page):
+    """H043B_MID: "No Feeder" on 1.1's PCD cell (n4, LK002's 20), "Feeder 1.1"
+    anywhere else (n5e, n5f)."""
+    ntw = next(SAMPLES.rglob("H043B_MID.ntw"), None)
+    spec = next(SAMPLES.rglob("BH1GHzMid.par"), None)
+    if ntw is None or spec is None:
+        pytest.skip("H043B_MID or BH1GHzMid not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(ntw))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(spec.parent.glob("BH1GHzMid.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    _goto(page, 1, 1, "cplr0")
+    assert page.inner_text("#stFeeder") == "No Feeder"
+    _goto(page, 13, 1, "ftg")
+    assert page.inner_text("#stFeeder") == "Feeder 1.1"
+    assert not page.errors
+
+
+def test_al002_power_screen_as_37(page):
+    """37: AL002 branch 4 in Powering -- 57.21 V and 1.98 A at 4.1 (supply A
+    is type 5, which WVEXT862 does not list: 60 V), 0.00 past the stop on
+    4.5, NIU Y on every line, cable 0's segment red (WVEXT862's 000 series)."""
+    ntw = next(SAMPLES.rglob("AL002.ntw"), None)
+    spec = next(SAMPLES.rglob("WVEXT862.par"), None)
+    if ntw is None or spec is None:
+        pytest.skip("AL002 or WVEXT862 not in samples")
+    page.evaluate("importNtw()")
+    page.wait_for_timeout(200)
+    page.set_input_files("#ntwFile", str(ntw))
+    page.set_input_files("#ntwSpecs", [str(f) for f in sorted(spec.parent.glob("WVEXT862.*"))])
+    page.click("#ntwGo")
+    page.wait_for_timeout(2500)
+    page.evaluate("setMode('power')")
+    page.wait_for_timeout(500)
+    _goto(page, 4, 1, "ftg")
+    cells = page.evaluate("""() => Array.from(document.querySelectorAll('#grid tbody tr')).map(tr =>
+        Object.fromEntries(Array.from(tr.querySelectorAll('td[data-c]')).map(td =>
+          [columns()[+td.dataset.c].key, td.textContent])))""")
+    assert [c["volt"] for c in cells] == ["57.21", "56.68", "56.14", "55.63", "0.00", "0.00", "0.00", "0.00"]
+    assert [c["current"] for c in cells] == ["1.98"] * 4 + ["0.00"] * 4
+    assert [c["niu"] for c in cells] == ["Y"] * 8
+    assert [c["stop"] for c in cells][4] == "="
+    colour = page.evaluate("getComputedStyle(document.querySelectorAll('#grid tbody tr')[4]"
+                           "  .querySelector('td.cab')).color")
+    assert colour == "rgb(255, 0, 0)"
     assert not page.errors

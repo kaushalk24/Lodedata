@@ -287,3 +287,7 @@ table.sw-t td.series{background:#000}
 .sw-form .ck input{margin:0}
 .sw-form .sw-gridbox{border:1px solid #828790}
 .sw-form select.sw-in{padding:0}
+/* "Network Modified" (Num Lock): three link-blue choices, Close centred */
+.msgbox.nmod{min-width:280px}
+.msgbox.nmod .nmlink{display:inline-block;color:#2020c0;text-decoration:none;font-size:13px;margin:4px 6px}
+.msgbox.nmod .nmrow{justify-content:center}

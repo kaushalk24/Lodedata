@@ -70,6 +70,9 @@ class CouplerPlacement:
     # the branch stays, hanging from this line with nothing feeding it (the
     # program shows "- [55]")
     removed: bool = False
+    # a PCD (Power Connecting Device, coupler record 999): the network and
+    # line it joins, drawn in the cell instead of a bracket ("H043A_MID 1.1")
+    pcd: str = ""
 
 
 # Which leg of a coupler carries the through (low-loss) path.  From the manual:

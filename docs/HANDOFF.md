@@ -4,10 +4,11 @@ Everything a new session needs to carry on without losing anything: the
 goal, how the user works, the rules learned, where the evidence is, what is
 done and what comes next. Then read, in this order:
 
-1. `docs/QUESTIONS.md` — every question still open: part A (left from the
-   3 Oct morning list, its numbers kept) and part B (new, N1–N12), each with
-   what to do in Lode, what to send, what it settles and what the app does
-   now. **Part A, then part B** (in order).
+1. `docs/QUESTIONS.md` — the questions still open, only those the app
+   cannot settle without Lode (N1b, 34, 35b, 33b, 43, N11b, 44), then
+   Priority 7 (39–42); each says why, what to do in Lode step by step, what
+   to send, what it settles and what the app does meanwhile. Below them,
+   every answer so far.
 2. `docs/open-questions.md` — each rule with its evidence, and the list
    "Still to confirm" at the end.
 3. `docs/EVIDENCE.md` — every file, screenshot and recording the user sent,
@@ -120,21 +121,21 @@ build's "as if downloaded" start checks it every time.
 2. `unzip -o lodedata-samples.zip -d .` in the repository root → `samples/…`
    as listed in `samples/README.md`. Unzip the evidence outside the repo
    (e.g. the scratchpad); `docs/EVIDENCE.md` indexes it.
-3. `python -m pytest -q`. Expected with the samples zip in place and
-   Playwright/Chromium present: **all pass, 34 skipped** — the 34 need the
-   **WVBeck750** spec set, which no pack has (QUESTIONS 22). The browser
-   tests use `/opt/pw-browsers/chromium` (or `CHROMIUM_PATH`).
-4. `python tools/regression.py snapshot /tmp/base.json`, then
-   `python tools/regression.py diff samples/regression-baseline.json /tmp/base.json`
-   — the baseline in the pack was taken on commit e129475 (set A) and sent
-   on 2 Oct; set A2 changed 23 of the 70 since (see "Set A2" below: the
-   older AL004 + WVEXT862, Test lines with a port under zero, cascade
-   positions with KERMIT's or SHINSTON's actives — AL004 + WV750 and SN001
-   + SHINSTON unchanged). Exactly those 23, and nothing else, means the
-   session starts where the last one ended. If the pack holds the 30 Sep
-   baseline, from 5e55e0d, set A's changes differ too: the networks opened
-   with WVEXT862, S3's 1.2 bracket and a few mismatched-spec combinations.
-   `/tmp/base.json` is then the baseline for the regression check below.
+   The pack of 2 Oct lacks what came later; put it in place from the
+   user's zips if they upload them: `WVBeck750.zip` → `samples/WVBeck750/`
+   (Q22: yes), `6.zip`'s PS_A, PS_B, H_A, H_B, BH_KEYED `.ntw` →
+   `samples/lode-saved/`, `4_2.zip`'s Beckley750 → `samples/AL005-Beckley750/`,
+   `wxext862-4.zip`'s H043A/B_MID → `samples/bullhead/`, LG001 (`5.zip`) →
+   `samples/designs/`, and BH1GHzMid, HUMB1GHzMid, NBERN1GHz of 29 Jul 2025
+   (the regions' zip) → `samples/regions/<name>/`. Each test that needs a
+   missing file skips.
+3. `python -m pytest -q`. Expected with all of them in place and
+   Playwright/Chromium present: **all pass, none skipped** (261 on 4 Oct).
+   The browser tests use `/opt/pw-browsers/chromium` (or `CHROMIUM_PATH`).
+4. `python tools/regression.py snapshot /tmp/base.json` on the current
+   commit: that is the baseline for the regression check below. (The
+   pack's `samples/regression-baseline.json` is from e129475, 2 Oct; every
+   change since was intended and is listed under "Done" below.)
 
 ## Regression check (every change)
 
@@ -223,13 +224,45 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-`docs/QUESTIONS.md` **part A** (still open from 3 Oct: 22, 28 and 33
-explained again, 34–42), then **part B** (N1–N12), then **part C** (C1–C5,
-raised by the 4 Oct answers).
+The answers to `docs/QUESTIONS.md`'s open list when they come (N1b, 34,
+35b, 33b, 43, N11b, 44), then Priority 7 (39–42).
 The work item that needs no answer first: **reading the oldest actives
 formats** (2.20 / 3.0 / 5.0) from the user's recording of NPG550's Actives
 window (`2026-10-03_set/19a.mp4`, every tab; 19b–19f its Couplers and Taps
-windows, the older 10.0 / 3.0 layouts the readers already know).
+windows, the older 10.0 / 3.0 layouts the readers already know); N11b's
+keyed network then checks it.
+
+**Done 4 Oct, evening** (the user's `6.zip`: answers to 22, 28, 33–38,
+C1–C5, N1–N12; `EVIDENCE.md`, `2026-10-04b_set`):
+
+* Underground housings: the rule (file-formats 3.8) gives every file's
+  tally and every marker on H043B's n5a–f; H043A/B now save byte for byte.
+* Saving as Lode saves: a new power supply's record (PS_B), the house list
+  filled on an hc change and the arrow (fixed flag) cleared by it (H_B),
+  both byte for byte but the cursor at 41425 (and PS_B's undecoded 36121);
+  BH_KEYED's pads and tallies (`tests/test_lode_saved.py`).
+* Pick: fibre-fed actives are picked too (BH_KEYED's NC4000 0 0 7 0); an
+  EQ bank column with no rows gives 255.
+* Screens: brackets — a 0-ft line on another cable ends the walk, the span
+  reached may be on any cable (C1: LG001 11.5 `2<16>`; N3: H043B 1.3
+  `99<2>`); no block on a branch's 0-ft first line (C3); pad / EQ labels
+  untrimmed until the amp's box has been shown (C2); the PCD cell and "No
+  Feeder" (N3/N4); "Not enough taps at node b.n." (N12); a supply type the
+  spec does not list is 60 V, unpowered lines 0.00, NIU `Y`, the cab cell in
+  its series' colour in Power (37); a supply in an area another supply
+  already powers is still drawn — its label, type and % (35b/35c: PS_B's
+  46.1; also AL002's 43.1).
+* Keys: "Deleting Branch" before a tap feeding a branch is taken off (28);
+  Num Lock's "Network Modified" box (33).
+* Beckley750's Parameters checked against all six tabs; AL005's Test list
+  (51 lines) is Lode's (`tests/test_al005.py`); WVBeck750 in the samples.
+* Regression against 32e5eed: saved bytes change only for H043A/B (now the
+  source's); on the networks' own spec sets the screens change only where
+  the answers above say (brackets of LG001 11.5, H043B 1.3, AL003 10.4;
+  blocks and node boxes on branches' 0-ft first lines; the PCD cells; the
+  housings; AL002's 60 V and 43.1's supply label; "Not enough taps" lines on
+  AL002, AL003, NEW_T1, H_B, BH_KEYED; the older AL004's 43.1/44.1
+  `<NO RET EQ>`). The mismatched combinations move with the 60 V fallback.
 
 **Done 4 Oct** (the user's answers to 25–33; `EVIDENCE.md`, `2026-10-04_set`):
 

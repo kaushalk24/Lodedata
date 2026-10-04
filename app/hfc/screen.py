@@ -76,11 +76,14 @@ class Row:
     # takes it back to green (the user, recording 2's 2.2)
     hc_severity: str = ""
     tap_levels: list = field(default_factory=list)    # each tap's port levels, per frequency
+    tap_extra: list = field(default_factory=list)     # the same at the extra frequencies
+    tap_extra_severity: list = field(default_factory=list)
     power_stop: bool = False
     end: bool = False           # the line under a branch's last node
     port_levels: list = field(default_factory=list)   # that line: last tap's port output
     port_severity: list = field(default_factory=list)
     tap_notes: list = field(default_factory=list)  # (severity, message) about taps
+    homes_notes: list = field(default_factory=list)  # more homes than tap ports, after the taps'
     slope_notes: list = field(default_factory=list)  # the active's, listed ahead of its taps
     active_notes: list = field(default_factory=list)  # its inputs, outputs and cascade, ahead of those
     level_severity: dict = field(default_factory=dict)  # MHz -> "red": an input or output the active misses
@@ -94,6 +97,8 @@ class Row:
     couplers: list = field(default_factory=list)   # e.g. "200[2]"
     coupler_parts: list = field(default_factory=list)
     coupler_severity: list = field(default_factory=list)  # "red" per coupler column
+    coupler_pcds: list = field(default_factory=list)      # per coupler: the PCD's other end, or ""
+    coupler_branches: list = field(default_factory=list)  # per cplr cell: the branch it leads into
     cumulative_ft: float = 0.0
     # powering
     volts: float | None = None
@@ -147,12 +152,18 @@ class Row:
             "out_levels": [as_shown(self.out_levels[f]) for f in self.freq_order]
                           if self.out_levels else [],
             "tap_levels": [[as_shown(v) for v in t] for t in self.tap_levels],
+            "tap_extra": [[as_shown(v) for v in t] for t in self.tap_extra],
+            "tap_extra_severity": self.tap_extra_severity,
+            "out_extra": [as_shown(self.out_levels[f]) for f in self.extra_order]
+                         if self.out_levels else [],
             "power_stop": self.power_stop,
             "port_levels": [as_shown(v) for v in self.port_levels],
             "port_severity": self.port_severity,
             "tap_parts": self.tap_parts, "tap_branches": self.tap_branches,
             "coupler_parts": self.coupler_parts,
             "coupler_severity": self.coupler_severity,
+            "coupler_pcds": self.coupler_pcds,
+            "coupler_branches": self.coupler_branches,
             "cumulative_ft": round(self.cumulative_ft, 0),
             "volts": None if self.volts is None else round(self.volts, 2),
             "current": round(self.current, 2),
@@ -267,17 +278,19 @@ def build(design: Design) -> Screen:
     #   <n> a forwardfeed, as long as the parent's nearest span ahead: 4.14's
     #       3-<11> on 4.16's 105 (106 ft turns it [11]), 9.1's 108<10>;
     #   [n] anything else.
-    # The walk passes 0-ft lines, a power stop's too (9.2's, 29b).  From a
-    # coupler on a 0-ft line the span found counts only on that line's cable:
-    # the older AL004's 4.14 (410) is 3[11]{12}, 4.16's 105 being on 100
-    # (SHINSTON3 1c), and S3 with its coupler moved to a 0-ft line of no
-    # cable reads 100[2] though 1.3's 100 is branch 2's (7b).  The cable ID's
-    # series does not matter (SN001 18.1's 108<19>, 442 on to 142), nor does
-    # the cable after a line with a span of its own (24.17's 63<29>, 442 on
-    # to 40), a power stop (16.4's 8{17} past 16.4's own; SN001 1.15's
-    # 63{15}), or the branch's own cable (the older 9.14's 2{14} on 404).
-    # A span as long both ways is a backfeed: S3's 1.2, 100 ft between two
-    # 100s, is 100{2} (7a).
+    # The walk passes 0-ft lines, a power stop's too (9.2's, 29b), but ends at
+    # a 0-ft line on another cable (its file index; the series does not
+    # matter): the older AL004's 4.14 (410) is 3[11]{12} -- 4.15, 0 ft on
+    # 100, stands before 4.16's 105 (SHINSTON3 1c) -- where LG001's 11.5
+    # (100) is 2<16> past 11.6 (0 ft, 100) to 11.7's 200 on 104 (c1), and
+    # H043B's 1.3, 0 ft with no cable, 99<2> on 1.4's 234 on 119 (n3).  The
+    # cable of the span itself does not matter (SN001 18.1's 108<19>, 442
+    # on to 142; 24.17's 63<29>, 442 on to 40), nor a power stop (16.4's
+    # 8{17} past 16.4's own; SN001 1.15's 63{15}), nor the branch's own
+    # cable (the older 9.14's 2{14} on 404).  A span as long both ways is a
+    # backfeed: S3's 1.2, 100 ft between two 100s, is 100{2} (7a).  (7b, S3's
+    # coupler moved onto a 0-ft line above, read 100[2] in that session:
+    # nothing here makes it so; the files say otherwise.)
     def branch_kind(b: Branch) -> str:
         first = next((n for n in b.nodes if n.ftg), None)
         if first is None:
@@ -291,7 +304,9 @@ def build(design: Design) -> Screen:
         def nearest(lines) -> float:
             for n in lines:
                 if n.ftg:
-                    return 0.0 if not own.ftg and n.cab % 100 != own.cab % 100 else n.ftg
+                    return n.ftg
+                if n.cab % 100 != own.cab % 100:
+                    return 0.0
             return 0.0
         if first.ftg == nearest(reversed(parent.nodes[:k])):
             return "{}"
@@ -330,7 +345,11 @@ def build(design: Design) -> Screen:
             ports = sum(lib.taps[s.part_id].ports if s.part_id in lib.taps else s.file_ports
                         for s in node.taps)
             if node.hc > ports:
+                # and a red Test line after the line's tap lines: AL004 4.27
+                # (5 homes, a 4-port tap) and 4.29 (3, a 2-port), N12; Q1's
+                # 1.2 (2 homes, no tap), 1c
                 row.hc_severity = "red"
+                row.homes_notes.append(("red", f"Not enough taps at node {branch.number}.{row.node}."))
             cable = lib.cables.get(node.cab_part)
             row.cab_name = cable.name if cable else ""
             # the number in its series' colour, the series named in the info
@@ -441,6 +460,10 @@ def build(design: Design) -> Screen:
                 row.tap_severity.append(sev)
                 row.tap_levels.append([ports[f] for f in freqs])
                 row.tap_port_severity.append(per_port)
+                # and at the extra frequencies, under their columns (H043B
+                # 2.10's (1): 19.48 23.76 at 550 and 860, n5c)
+                row.tap_extra.append([ports[f] for f in extra])
+                row.tap_extra_severity.append([per_all[allf.index(f)] for f in extra])
                 for e_sev, e_msg in errors:
                     row.tap_notes.append((e_sev, f"{e_msg} at {branch.number}.{row.node}."))
                 last_tap = (tap, ports, per_port)
@@ -481,9 +504,18 @@ def build(design: Design) -> Screen:
                           and len(passive.port_losses) > 2)
                 for i, cp in enumerate(node.couplers):
                     style = branch_style(cp)
+                    if cp.pcd:
+                        # a PCD: the network and line it joins, no bracket
+                        row.couplers.append(cp.pcd)
+                        row.coupler_severity.append("")
+                        row.coupler_pcds.append(cp.pcd)
+                        row.coupler_branches.append(cp.branch)
+                        continue
+                    row.coupler_pcds.append("")
                     if cp.removed:
                         # its coupler taken off with "0", the branch kept: "- [55]"
                         row.couplers.append(f"- {bracket(str(cp.branch), style)}")
+                        row.coupler_branches.append(cp.branch)
                         continue
                     own = lib.passives.get(cp.part_id) or passive
                     cid = cp.coupler_id or (own.coupler_id if own else 0)
@@ -493,6 +525,7 @@ def build(design: Design) -> Screen:
                     shown = cid or ("0" if not design.has_specs else "")
                     if i == 0 or not shared:
                         row.couplers.append(f"{shown}{mark if i == 0 else ''}{text}")
+                        row.coupler_branches.append(cp.branch)
                         # an internal coupler (an active's own output split)
                         # away from any active is drawn red: WV750's MULTI
                         # OUT (100) on S3's 1.2, 100 ft from its Ripple; on
@@ -583,7 +616,7 @@ def build(design: Design) -> Screen:
     _housings(design, scr)
     # the Test Results list runs in branch, then node order
     for r in sorted((r for r in scr.rows if not r.end), key=lambda r: (r.branch, r.node)):
-        scr.tests.extend(r.active_notes + r.slope_notes + r.tap_notes)
+        scr.tests.extend(r.active_notes + r.slope_notes + r.tap_notes + r.homes_notes)
     return scr
 
 
@@ -715,10 +748,13 @@ def choose_pads_eqs(part, levels: dict, p) -> list:
     # 2.21 and 2.35 (30a-30c), 11-11.5 dB of tilt arriving where the active
     # wants less than none -- "VOID" (or the blank row-0 label) in the box,
     # <NO FWD EQ> in the expanded display
-    fe = NO_EQ if rows == [] else nearest(feq, need, rows)
-    re_ = nearest(req, rh - rl, rrows)
+    # a bank with no EQ rows at all gives 255 too: SN001_MID's Ripple-2
+    # (bank 4 empty) and AL005's NC4000 Node hold 0 0 255 255, the older
+    # AL004's WIFI OMNIs (bank 3, pads only) 5 0 255 255
+    fe = NO_EQ if rows == [] or not feq else nearest(feq, need, rows)
+    re_ = nearest(req, rh - rl, rrows) if req else NO_EQ
     f_loss = feq[fe] if feq and fe != NO_EQ else [0.0, 0.0]
-    r_loss = req[re_] if req else [0.0, 0.0]
+    r_loss = req[re_] if req and re_ != NO_EQ else [0.0, 0.0]
     fp = largest(fpad, lambda db: hi - db - f_loss[0] >= part.in_forward_high - slack
                  and lo - db - f_loss[1] >= part.in_forward_low - slack)
     rp = largest(rpad, lambda db: part.out_return_high - db - r_loss[0] >= rh - slack
@@ -751,13 +787,15 @@ def repick(design: Design, before: dict, keyed=()) -> None:
     (BH1GHzMid, amp 11 keyed at 1.3: Flag / CS8 / Flag / 2 at once), 1b
     (1.3's ftg 0 -> 900: 060 / 13 / 190 / 6; Recalc changes nothing), and
     6b (a Ripple placed on AL004 4.20: AL00419 at 4.24 FLAG / SCS6 / 20 / 0,
-    AL00416 at 4.13, whose input it left, as stored).  A fibre-fed active
-    has none to pick."""
+    AL00416 at 4.13, whose input it left, as stored).  A fibre-fed node is
+    picked the same way, at the 0.00 its line reads: BH1GHzMid's NC4000
+    keyed at 1.1 holds 0 0 7 0 (BH_KEYED, as H043A_MID's and H043B_MID's
+    1.2), the row of no tilt in its bank; WV750's banks give it 0 0 0 0."""
     if not design.has_specs:
         return
     p = design.parameters
     for node, part, r in _active_lines(design, build(design)):
-        if not part or len(part.pad_eq) != 4 or not part.needs_rf_input:
+        if not part or len(part.pad_eq) != 4:
             continue
         now = tuple(as_shown(v) for _, v in sorted(r.levels.items()))
         if id(node) in keyed or before.get(id(node)) != now:
@@ -804,8 +842,18 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # with no spec set an active is still there, by its index
         return bool(nd.amp or nd.kept_active)
 
+    def kind(nd) -> str:
+        # past the line extenders, an active counts as an amplifier unless
+        # Custom Cascading excludes it: WV750's Ripple on AL004 1.1 counts
+        # for nothing (5.21's 2-0-0), WVEXT862's NC4000 on the older AL004
+        # 1.1 is one (43.1's 4-0-0, the user's C4)
+        part = lib.actives.get(nd.amp_part)
+        if part is not None and part.index > 12:
+            return "amplifier" if counted(nd) else ""
+        return _active_kind(part)
+
     def kinds(nodes) -> list:
-        found = [_active_kind(lib.actives.get(nd.amp_part)) for nd in nodes if nd.amp]
+        found = [kind(nd) for nd in nodes if nd.amp]
         # the third count is 0 on every node seen so far; what it counts is not known
         return [found.count("amplifier"), found.count("line_extender"), 0]
 
@@ -854,9 +902,10 @@ def _amp_info(design: Design, scr: Screen) -> None:
         nd = node(b, n)
         nodes = design.branch(b).nodes
         last = n == len(nodes)
-        # a branch's first node shows it at 22.1 (0 ft); whether that is for
-        # being first or for the 0 ft is not yet known, so only both
-        box = bool(has_amp(nd) or splits(nd) or last or (n == 1 and not nd.ftg))
+        # where it splits, an active, a branch's last line -- not its 0-ft
+        # first line for being first (5.1, the user's C3; 22.1 has one for
+        # ending its cable)
+        box = bool(has_amp(nd) or splits(nd) or last)
         # and so does the last line on a cable: the next line on another one
         # (its series aside: 22.2's 505 on to 405 has none).  AL004's 5.25
         # (406, then 414) and 5.27 (414, then 515), on the 4 Oct set (31,
@@ -918,6 +967,15 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # them then (88 on AL004 4.2: NPB-0, SEQ-750-SCS6, NPB-0, MEQ-42-0)
         stored = list(nd.pads[:4])
         shown_as = []
+        # each slot for the expanded display: the bank's prefix, its label as
+        # the bank holds it (spaces and all) and which bank row it is -- the
+        # program shows the label with its spaces until the active's box has
+        # shown it, and trimmed from then on, wherever that row is used
+        # (H043B: 1.8's "NPB- 150¦  CE-120-   3" beside 13.1's "NPB-090 ¦
+        # CE-120-CS8" with 13.1's box up, n5a/n5e; AL004 5.23 before and
+        # after its box, 29a and c2)
+        cols = []
+        banks = list(getattr(part, "banks", []) or []) + [0, 0, 0, 0]
         for c, v in enumerate((stored + [0, 0, 0, 0])[:4]):
             column = part.pad_eq[c] if part and len(part.pad_eq) == 4 else ["", []]
             prefix, labels = column[:2]
@@ -925,19 +983,27 @@ def _amp_info(design: Design, scr: Screen) -> None:
             # blank where the bank's row 0 has no label (KERMIT750's FM902B
             # and FM902T, bank 5: "Forward Eq:" and nothing, 30b and 30c)
             if v == NO_EQ and len(column) > 3:
-                label = column[3]
+                raw = column[3]
             elif part and len(part.pad_eq) == 4 and not labels:
                 # the bank has nothing in that column: Lode leaves it blank
                 # (SN001's Ripple-2 on 1.1, bank 4, Forward and Return Pad)
-                label = ""
+                raw = ""
             else:
-                label = labels[v].strip() if 0 <= v < len(labels) else str(v)
+                raw = labels[v] if 0 <= v < len(labels) else str(v)
+            label = raw.strip()
             shown_as.append((label, prefix + label))
-        if stored[2:3] == [NO_EQ] and part and part.needs_rf_input:
-            # no forward EQ: <NO FWD EQ> in the expanded display (30a-30c).
-            # A fibre-fed node's (SN001's Ripple-2, AL005's NC4000) is not
-            # seen yet, so left as it was
-            shown_as[2] = (shown_as[2][0], "<NO FWD EQ>")
+            src = getattr(part, "source", "") if part else ""
+            cols.append({"prefix": prefix, "label": raw, "key": f"{src}:{banks[c]}:{c}:{v}", "none": ""})
+        if part and part.needs_rf_input:
+            # no EQ: <NO FWD EQ> / <NO RET EQ> in the expanded display (30a-30c;
+            # the older AL004's WIFI OMNI on 43.1, both, C4).  A fibre-fed
+            # node's (SN001's Ripple-2, AL005's NC4000) is not seen yet
+            if stored[2:3] == [NO_EQ]:
+                shown_as[2] = (shown_as[2][0], "<NO FWD EQ>")
+                cols[2]["none"] = "<NO FWD EQ>"
+            if stored[3:4] == [NO_EQ]:
+                shown_as[3] = (shown_as[3][0], "<NO RET EQ>")
+                cols[3]["none"] = "<NO RET EQ>"
         (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as
         # Cascade Position: the actives from the network's start down to this
         # one, itself included, but those Custom Cascading excludes: WV750's
@@ -962,6 +1028,7 @@ def _amp_info(design: Design, scr: Screen) -> None:
             "name": nd.amp_label, "type": part.name if part else "",
             "fwd_pad": fp, "ret_pad": rp, "fwd_eq": fe, "ret_eq": re_,
             "parts": [fp_part, rp_part, fe_part, re_part],
+            "cols": cols,
             **d,
             "cascade": position,
             "supply": r.powered_by, "homes_down": homes,
@@ -972,12 +1039,23 @@ def _housings(design: Design, scr: Screen) -> None:
     """The white (n) the expanded display puts under an underground node's
     number: the Underground Housings size the equipment there needs.
 
-    Nodes 0 ft apart are one location.  Its points -- Parameters: amplifier,
-    line extender, tap, 8-port tap, coupler, power supply -- pick the largest
-    housing whose Minimum Size they reach, shown on the location's first
-    node.  AL004: (3) at 22.3 (LE 11 + 22.4's coupler 5 = 16, TV-104 from
-    11), (1) at 22.5, 34.8 and 34.9 (a tap, 5 -- TV-60 from 4; "the smallest
-    that holds them" would make these a 2); none on aerial cable.
+    A line with footage starts a place, the lines 0 ft after it are at it;
+    an underground place (its first line's cable) takes the largest housing
+    whose Minimum Size its points reach.  The points -- Parameters: an
+    amplifier or a line extender, each tap (8-port or not), each coupler
+    (a splitter's two legs one; an amplifier's internal one and a PCD
+    none), an in-line equalizer, a power supply -- are its lines' and those
+    of the 0-ft first lines of the branches started on them, when those are
+    underground too.  The tally Lode saves counts every such place, a
+    branch's 0-ft start as well as the place it is at; the screen draws
+    the (n) on a place's first line but on a branch's 0-ft start (H043B's
+    7.1, its supply alone: no (5) there, 2.5's place holds it).  All eleven
+    files' tallies are these (H043A_MID 179/23/8/7 of housings 1/3/4/5,
+    H043B_MID 82/11/4/2); H043B: (4) at 2.9 and 3.7 (the FM902T 16 and the
+    tap on the 0-ft 8.1 or 4.1 -- the internal 62 nothing), (3) at 13.1
+    (16 alone: 17.1's tap is on cable 0, not underground); AL004: (3) at
+    22.3 (LE 11 + 22.4's coupler 5 = 16), (1) at 22.5, 34.8 and 34.9 (a
+    tap, 5); none on aerial cable.
     """
     p = design.parameters
     pts, sizes = p.equipment_points, p.housings
@@ -986,32 +1064,49 @@ def _housings(design: Design, scr: Screen) -> None:
     lib = design.library
     rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
 
-    def points(nd) -> int:
+    def underground(nd) -> bool:
+        cable = lib.cables.get(nd.cab_part)
+        index = cable.cable_index if cable and cable.cable_index >= 0 else nd.cab % 100
+        return index % 2 == 1
+
+    def place(nodes: list, k: int) -> list:
+        end = k + 1
+        while end < len(nodes) and not nodes[end].ftg:
+            end += 1
+        return nodes[k:end]
+
+    def points(lines: list) -> int:
+        if not underground(lines[0]):
+            return 0
         n = 0
-        if nd.amp:
-            kind = _active_kind(lib.actives.get(nd.amp_part))
-            n += pts["line_extender"] if kind == "line_extender" else pts["amplifier"]
-        n += sum(pts["tap_8_port"] if t.ports == 8 else pts["tap"] for t in nd.taps if t.part_id)
-        n += pts["coupler"] * len(nd.couplers)
-        n += pts["power_supply"] if nd.supply_volts else 0
+        for nd in lines:
+            if nd.amp:
+                kind = _active_kind(lib.actives.get(nd.amp_part))
+                n += pts.get("line_extender" if kind == "line_extender" else "amplifier", 0)
+            n += sum(pts.get("tap_8_port" if (t.ports if t.part_id else t.file_ports) == 8 else "tap", 0)
+                     for t in nd.taps if t.part_id or t.file_ports)
+            devices = [cp.part_id for cp in nd.couplers
+                       if cp.part_id and not cp.pcd and not cp.removed
+                       and not getattr(lib.passives.get(cp.part_id), "internal", False)]
+            n += pts.get("coupler", 0) * (1 if len(devices) == 2 and devices[0] == devices[1] else len(devices))
+            n += pts.get("equalizer", 0) if nd.inline else 0
+            n += pts.get("power_supply", 0) if (nd.supply_part or nd.supply_label or nd.supply_volts) else 0
+            for cp in nd.couplers:
+                child = design.branches.get(cp.branch)
+                if child is not None and not cp.pcd and child.nodes and not child.nodes[0].ftg:
+                    n += points(place(child.nodes, 0))
         return n
 
     for branch in design.branches.values():
-        groups = []
-        for k, nd in enumerate(branch.nodes, start=1):
-            if k == 1 or nd.ftg:
-                groups.append([])
-            groups[-1].append((k, nd))
-        for group in groups:
-            k, first = group[0]
-            cable = lib.cables.get(first.cab_part)
-            index = cable.cable_index if cable and cable.cable_index >= 0 else first.cab % 100
-            if index % 2 == 0:
+        for k, nd in enumerate(branch.nodes):
+            if k and not nd.ftg:
                 continue
-            total = sum(points(nd) for _, nd in group)
+            if k == 0 and not nd.ftg and branch.parent_branch:
+                continue
+            total = points(place(branch.nodes, k))
             fits = [number for number, least in sizes if total and least <= total]
-            if fits and (branch.number, k) in rows:
-                rows[(branch.number, k)].housing = fits[-1]
+            if fits and (branch.number, k + 1) in rows:
+                rows[(branch.number, k + 1)].housing = fits[-1]
 
 
 def _tap_ports(p, freqs, levels: dict, tap) -> dict:
@@ -1177,11 +1272,17 @@ def _powering(design: Design, scr: Screen) -> None:
                 return part.current_at(volts, design.parameters.power_interpolation)
         return 0.0
 
-    seen = set()
+    seen, area_current = set(), {}
     for key, n in nodes.items():
         # a supply the spec set cannot name still has its area (AL004 with
         # no spec set: AL00416's box says Power Supply A)
-        if not (n.supply_volts or n.supply_label) or key in seen:
+        if not (n.supply_volts or n.supply_label):
+            continue
+        if key in seen:
+            # in an area already walked, its cells are still drawn: PS_B's C
+            # on 46.1, behind 2.1's power inserter -- "C" in the cplr column
+            # and its box (35c), "C  \04  0%" in Power (35b)
+            _supply_cells(rows.get(key), n, lib, area_current.get(key, 0.0))
             continue
         # the area this supply reaches, as a tree rooted at the supply
         parent, span_ohms, order = {key: None}, {key: 0.0}, [key]
@@ -1199,20 +1300,22 @@ def _powering(design: Design, scr: Screen) -> None:
         if others:
             rows[key].flags.append(("red", "bucking power: another supply in this "
                                            "area without a power stop between"))
-        volts = {k: n.supply_volts for k in order}
+        # a supply type the spec set does not list is 60 V: AL002's A and C
+        # (type 5; WVEXT862 lists 1-3) feed branch 4 at 57.21 V, 1.98 A (37)
+        v0 = n.supply_volts or (UNLISTED_SUPPLY_VOLTS if lib.power_supplies else 0.0)
+        volts = {k: v0 for k in order}
         current = {}
         for _ in range(30):
             current = {k: draw(k, volts[k]) for k in order}
             for k in reversed(order[1:]):
                 current[parent[k]] += current[k]
-            new = {key: n.supply_volts}
+            new = {key: v0}
             for k in order[1:]:
                 new[k] = new[parent[k]] - current[k] * span_ohms[k]
             done = max(abs(new[k] - volts[k]) for k in order) < 1e-6
             volts = new
             if done:
                 break
-        sup = lib.power_supplies.get(n.supply_part)
         for k in order:
             r = rows.get(k)
             if r is None:
@@ -1227,17 +1330,27 @@ def _powering(design: Design, scr: Screen) -> None:
                     r.flags.append(("red", f"{volts[k]:.1f} V is below the "
                                            f"{part.min_voltage:.0f} V minimum "
                                            f"for {part.name}"))
-        r = rows.get(key)
-        if r is not None:
-            r.supply = n.supply_volts
-            r.supply_label = n.supply_label
-            if sup:
-                r.supply_type, r.supply_name = sup.type_id, sup.name
-            if sup and sup.amps:
-                r.supply_pct = round(100 * current[key] / sup.amps)
-                if current[key] > sup.amps:
-                    r.flags.append(("red", f"excess current draw: {current[key]:.2f} A "
-                                           f"on a {sup.amps:g} A supply"))
+        area_current.update(current)
+        _supply_cells(rows.get(key), n, lib, current[key])
+
+
+def _supply_cells(r, n, lib, current: float) -> None:
+    """A supply's own cells: its label, type and the share of its amps."""
+    if r is None:
+        return
+    sup = lib.power_supplies.get(n.supply_part)
+    r.supply = n.supply_volts
+    r.supply_label = n.supply_label
+    if sup:
+        r.supply_type, r.supply_name = sup.type_id, sup.name
+    if sup and sup.amps:
+        r.supply_pct = round(100 * current / sup.amps)
+        if current > sup.amps:
+            r.flags.append(("red", f"excess current draw: {current:.2f} A "
+                                   f"on a {sup.amps:g} A supply"))
+
+
+UNLISTED_SUPPLY_VOLTS = 60.0
 
 
 def _totals(design: Design, scr: Screen) -> None:

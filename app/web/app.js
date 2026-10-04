@@ -4,6 +4,8 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const api = async (url, opts) => {
   const r = await fetch(url, opts);
   if (!r.ok) throw new Error((await r.text()).slice(0, 400));
+  // a line or branch changed: the network is modified (Num Lock's box)
+  if (opts && opts.method && /^\/api\/networks\/[^/]+\/(nodes|branches)\//.test(url)) S.modified = true;
   const t = r.headers.get('content-type') || '';
   return t.includes('json') ? r.json() : r.text();
 };
@@ -18,6 +20,12 @@ const S = {
   row: 0, col: 0, buffer: null,
   dot: false,         // the "." prefix that turns a nav key into a branch move
   tips: true,         // View > Show Tips: the info box
+  // pad / EQ bank rows whose labels an amplifier's box has shown: the
+  // program trims them in its memory, so the expanded display shows them
+  // without their spaces from then on (until it is restarted)
+  trimmed: new Set(),
+  modified: false,    // an edit since the network was opened or saved
+  modalKeys: null,    // keys a message box answers to ([3] [7] [9])
 };
 
 // rows of the branch currently on screen
@@ -137,10 +145,11 @@ function cellText(r, c) {
         (r.supply_pct != null ? `  ${r.supply_pct}%` : '')
       : '';
     case 'supplypct': return '';
-    case 'niu': return r.volts === null ? '' : 'Y';
+    // AL002's 4.5-4.8, past the stop at 0.00 V, read Y too (37)
+    case 'niu': return 'Y';
     case 'fx': return r.fixed ? '\u2192' : '';
     case 'stop': return S.mode === 'power' ? (r.power_stop ? '=' : '|') : (r.power_stop ? '=' : '');
-    case 'volt': return r.volts === null ? '' : r.volts.toFixed(2);
+    case 'volt': return r.volts === null ? '0.00' : r.volts.toFixed(2);
     case 'current': return r.current ? r.current.toFixed(2) : '0.00';
     case 'tap0': case 'tap1': case 'tap2': case 'tap3': {
       // in Design mode an amplifier's name runs on from the tap1 column
@@ -187,10 +196,13 @@ function expandedLines(r, cols) {
   // text drawn from the lv column on, across the rest of the line
   const at = cols.findIndex(c => c.key === 'lv');
   // segs: [text, class] runs drawn from there on
+  // the extra frequencies' columns keep their cells beside the text
+  const xi = cols.findIndex(c => c.key.startsWith('xlv:'));
   const line = (fill, segs) => `<tr class="xline"><td class="gutter">${esc(r.gutter && r.gutter !== '└' ? '│' : '')}</td>` +
     cols.slice(0, segs ? at : cols.length).map(c => fill(c)).join('') +
-    (segs ? `<td class="xtext" colspan="${cols.length - at + 1}">` +
-      segs.map(([t, cls]) => `<span class="${cls}">${esc(t)}</span>`).join('') + '</td>' : '<td></td>') + '</tr>';
+    (segs ? `<td class="xtext" colspan="${(xi > at ? xi : cols.length + 1) - at}">` +
+      segs.map(([t, cls]) => `<span class="${cls}">${esc(t)}</span>`).join('') + '</td>' +
+      (xi > at ? cols.slice(xi).map(c => fill(c)).join('') + '<td></td>' : '') : '<td></td>') + '</tr>';
   // lines 2-3: an amplifier's name and supply, then its pad and EQ parts,
   // forward then return; lines 4-5: the cyan block, which starts six
   // characters to the right of the name (columns as 4.24, 22.3, 34.3 show).
@@ -199,16 +211,24 @@ function expandedLines(r, cols) {
   const text = [null, null, null, null];
   const a = r.amp_info;
   if (a && a.name !== undefined) {
-    const [fp, rp, fe, re] = a.parts || ['', '', '', ''];
-    // no forward EQ: "<NO FWD EQ>" right after the bar, and the line's
-    // lead-in in reverse cyan (LG001 2.11, 2.21, 2.35 on KERMIT750, 30a-30c)
-    const noEq = fe.startsWith('<');
-    const feText = noEq ? fe.padEnd(14) : '  ' + fe.padEnd(12);
-    text[0] = [['[' + (r.amp_label || '').padStart(18) + ']', 'xname'],
-               ['  (      ', 'xblock' + (noEq ? ' xnoeq' : '')],
-               [fp.padEnd(8) + '\u00a6' + feText + ')', 'xblock']];
-    text[1] = [['(' + (a.supply || '').padStart(18) + ')', 'xsupply'],
-               ['  (      ' + rp.padEnd(8) + '\u00a6   ' + re.padEnd(11) + ')', 'xblock']];
+    // "(" then each slot's prefix right-aligned in ten, its label in four:
+    // "(      SPB-  10¦  SEQ-750-   6)", CE-120- one further right (H043B
+    // 1.8, n5a).  A label keeps its spaces until the active's box has shown
+    // it (S.trimmed); a missing EQ reads <NO FWD EQ> / <NO RET EQ> and the
+    // line's lead-in is reversed (LG001 2.11, the older AL004's 43.1)
+    const cols = a.cols || [];
+    const slot = c => {
+      if (!c) return ' '.repeat(14);
+      if (c.none) return c.none.padEnd(14);
+      const lab = S.trimmed.has(c.key) ? c.label.trim() : c.label;
+      return c.prefix.padStart(10) + lab.padEnd(4);
+    };
+    const line = (p, e) => {
+      const t = '  (' + slot(p) + '\u00a6' + slot(e) + ')';
+      return [[t.slice(0, 9), 'xblock' + (e && e.none ? ' xnoeq' : '')], [t.slice(9), 'xblock']];
+    };
+    text[0] = [['[' + (r.amp_label || '').padStart(18) + ']', 'xname'], ...line(cols[0], cols[2])];
+    text[1] = [['(' + (a.supply || '').padStart(18) + ')', 'xsupply'], ...line(cols[1], cols[3])];
   }
   if (r.block && r.block.distances) {
     const [one, two] = blockText(r.block);
@@ -219,10 +239,17 @@ function expandedLines(r, cols) {
   for (let k = 0; k < 4; k++) {
     const lv = (r.tap_levels || [])[k];
     const sev = (r.tap_port_severity || [])[k] || [];
+    const xl = (r.tap_extra || [])[k], xsev = (r.tap_extra_severity || [])[k] || [];
     lines.push(line(c => {
       if (c.key.startsWith('lvl:')) {
         const i = +c.key.slice(4);
         return lv ? cell(c, lv[i].toFixed(2), 'xport ' + (sev[i] || '')) : cell(c, '-', 'xdash');
+      }
+      // the extra frequencies' columns the same way (H043B 2.10, n5c)
+      if (c.key.startsWith('xlv:')) {
+        const i = +c.key.slice(4);
+        return xl && xl[i] !== undefined ? cell(c, xl[i].toFixed(2), 'xport ' + (xsev[i] || ''))
+                                         : cell(c, '-', 'xdash');
       }
       // which number this is -- the tap slot or its homes -- is not yet known
       if (c.key === 'ftg' && lv) return cell(c, `(${k + 1})`, 'xcyan');
@@ -231,9 +258,10 @@ function expandedLines(r, cols) {
       return cell(c, '');
     }, text[k]));
   }
-  const out = r.out_levels || [];
+  const out = r.out_levels || [], outx = r.out_extra || [];
   lines.push(line(c => c.key.startsWith('lvl:') && out.length
-    ? cell(c, out[+c.key.slice(4)].toFixed(2), 'xout') : cell(c, '')));
+    ? cell(c, out[+c.key.slice(4)].toFixed(2), 'xout')
+    : c.key.startsWith('xlv:') && outx.length ? cell(c, outx[+c.key.slice(4)].toFixed(2), 'xout') : cell(c, '')));
   lines.push(line(c => cell(c, '')));
   return lines.join('');
 }
@@ -306,8 +334,10 @@ function renderGrid() {
         (r[c.key[0] === 'l' ? 'level_severity' : 'extra_severity'] || [])[+c.key.slice(4)];
       if (lvsev) extra += ' ' + lvsev;
       if (c.key === 'amp' && r.amp_severity) extra += ' ' + r.amp_severity;
-      // the cable number in the colour its cable file gives its series
-      const style = c.key === 'cab' && r.cab_color && S.mode === 'design' ? ` style="--cab:${r.cab_color}"` : '';
+      // the cable number in the colour its cable file gives its series; in
+      // Powering its "|" too, even with cable 0 left blank (AL002's 4.1 and
+      // 4.5 on WVEXT862's red 000 series, 37)
+      const style = c.key === 'cab' && r.cab_color && S.mode !== 'entry' ? ` style="--cab:${r.cab_color}"` : '';
       return `<td class="${c.cls || ''}${cur}${extra}"${style} data-r="${i}" data-c="${j}">${esc(text)}</td>`;
     }).join('');
     const main = `<tr class="${cls}"><td class="gutter">${esc(r.gutter)}</td>${tds}<td></td></tr>`;
@@ -417,6 +447,10 @@ function infoTap(r, k) {
 // (20.9's EQ).
 function infoBranch(r, k) {
   const text = (r.couplers || [])[k] || '';
+  // a PCD (H043B_MID's 1.1, the user's n3)
+  const pcd = (r.coupler_pcds || [])[k];
+  if (pcd) return `${r.branch}.${r.node}\nPCD branch connected to Network:  ${pcd}\n` +
+    '<double-click or [.][LT] or [.][RT] to enter branch>';
   const found = /[\[<({](\d+)[\]>)}]/.exec(text);
   if (!found) return null;
   const fq = (S.scr && S.scr.frequencies) || [];
@@ -459,6 +493,9 @@ function infoSupply(r) {
 
 function infoAmp(r) {
   const a = r.amp_info || {};
+  // showing the box trims its labels for the rest of the session
+  const fresh = (a.cols || []).filter(c => !S.trimmed.has(c.key));
+  if (fresh.length) { fresh.forEach(c => S.trimmed.add(c.key)); if (S.expanded) setTimeout(renderGrid, 0); }
   const line = (label, v) => `${label.padEnd(36)}${v === undefined || v === null ? '' : v}\n`;
   // an active not yet named has no Amp Name line (88 on AL004 4.2)
   return `${r.branch}.${r.node}\n` +
@@ -523,7 +560,11 @@ function renderInfo() {
   box.hidden = !S.tips || !box.textContent;
   const total = (S.scr && S.scr.branches.length) || 1;
   $('#stBranch').textContent = `Branch ${S.branch} of ${total}`;
-  $('#stFeeder').textContent = 'Feeder 1.1';
+  // none with the cursor on a PCD (LK002's 1.5, H043A_MID's 1.1); H043B_MID,
+  // joined by one too, reads "Feeder 1.1" at 7.1 and 13.1
+  const cc = curCol() || { key: '' };
+  const onPcd = r && !r.end && /^cplr\d$/.test(cc.key) && (r.coupler_pcds || [])[+cc.key.slice(4)];
+  $('#stFeeder').textContent = onPcd ? 'No Feeder' : 'Feeder 1.1';
   const m = branchMeta(S.branch);
   const starting = m && m.parent_branch ? ` Starting ${m.parent_branch}.${m.parent_node}` : '';
   const mode = { design: 'Design', entry: 'Entry', power: 'Power' }[S.mode];
@@ -655,7 +696,7 @@ function commitCode() {
 
   if (c.key.startsWith('tap')) {
     const slot = +c.key.slice(3);
-    queueSave(async () => {
+    const put = () => queueSave(async () => {
       const out = await api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}/tap`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot, code }) });
@@ -664,6 +705,19 @@ function commitCode() {
           + ` shown as the tap ID ${out.placed.tap_id}`
         : 'tap cleared');
     });
+    // taking off a tap whose port feeds a branch asks first (the older
+    // AL004's 11.16, 28b); Yes takes the tap off and the branch stays, fed
+    // by nothing (its 43 still there after), No leaves the tap
+    if ((code === '' || code === '0') && (r.tap_branches || [])[slot]) {
+      modal(`<div class="msgbox"><div class="mbtitle">Deleting Branch</div>
+        <div class="mbbody"><span class="mbicon warn">!</span><span>Deleting this branch will delete all downstream design.<br><br>Continue?</span></div>
+        <div class="row"><button id="mbYes">Yes</button><button id="mbNo">No</button></div></div>`);
+      $('#mbNo').onclick = closeModal;
+      $('#mbYes').onclick = () => { closeModal(); put(); };
+      $('#mbYes').focus();
+      return;
+    }
+    put();
   } else if (c.key.startsWith('cplr')) {
     const slot = +c.key.slice(4);
     queueSave(async () => {
@@ -709,8 +763,10 @@ document.addEventListener('keydown', async ev => {
   }
   if (!$('#modal').hidden) {            // Esc closes a window, as in the program
     if (ev.key === 'Escape') closeModal();
+    else if (S.modalKeys && S.modalKeys[ev.key]) { ev.preventDefault(); S.modalKeys[ev.key](); }
     return;
   }
+  if (ev.key === 'NumLock' && S.modified) { ev.preventDefault(); networkModified(); return; }
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
   const cols = columns();
   const k = ev.key;
@@ -867,10 +923,12 @@ function stepBranch(delta) {
 function enterBranch(k = 0) {
   const r = curRow();
   if (!r || !r.couplers[k]) { msg('no branch begins on this node'); return; }
-  // the branch number is what sits inside the brackets
+  // the branch number is what sits inside the brackets; a PCD's cell names
+  // the other network instead, its branch kept beside it
   const m = /[[({<](\d+)[\])}>]/.exec(r.couplers[k]);
-  if (!m) { msg('no branch on this node'); return; }
-  gotoBranch(+m[1]);
+  const b = m ? +m[1] : (r.coupler_branches || [])[k];
+  if (!b) { msg('no branch on this node'); return; }
+  gotoBranch(b);
 }
 function returnToParent() {
   const m = branchMeta(S.branch);
@@ -891,9 +949,10 @@ const pickCableById = n => libTable('cables').find(c => c.cable_index === n % 10
 function modal(html) {
   $('#modalbox').innerHTML = html;
   $('#modal').hidden = false;
+  S.modalKeys = null;
   const c = $('#mClose'); if (c) c.onclick = closeModal;
 }
-function closeModal() { $('#modal').hidden = true; }
+function closeModal() { $('#modal').hidden = true; S.modalKeys = null; }
 $('#modal').onclick = e => { if (e.target.id === 'modal') closeModal(); };
 
 function chooser(title, items, onPick, note) {
@@ -1129,6 +1188,21 @@ async function deleteNode() {
     throw e;
   }
   await refresh(); msg('node deleted');
+}
+// Num Lock on a network changed since it was opened or saved: the program's
+// "Network Modified" box (the user's 33, the older AL004 after an ftg
+// change): [3] Restore, [7] Save, [9] Switch, Close; 3, 7 and 9 pick them
+function networkModified() {
+  const choices = { '3': ['Restore', NYI('Restore')], '7': ['Save', () => saveNetwork(false)],
+                    '9': ['Switch', NYI('Switch')] };
+  modal(`<div class="msgbox nmod"><div class="mbtitle">Network Modified</div>
+    ${Object.entries(choices).map(([k, [t]]) =>
+      `<div><a href="#" class="nmlink" data-k="${k}">[${k}] ${t}</a></div>`).join('')}
+    <div class="row nmrow"><button id="mClose">Close</button></div></div>`);
+  const pick = k => { closeModal(); choices[k][1](); };
+  $$('#modalbox .nmlink').forEach(a => a.onclick = e => { e.preventDefault(); pick(a.dataset.k); });
+  S.modalKeys = { '3': () => pick('3'), '7': () => pick('7'), '9': () => pick('9') };
+  $('#mClose').focus();
 }
 function errorBox(text) {
   modal(`<div class="msgbox"><div class="mbtitle">Error</div>
@@ -1988,6 +2062,7 @@ async function saveNetwork(as) {
       renderInfo();                      // the title bar carries the name
       await loadList(nid);
     }
+    if (S.nid === nid) S.modified = false;
     msg(`saved ${name}` + (skipped.length ? ` — ${skipped.length} not written: ${skipped[0]}` : ''));
   } catch (e) {
     if (e.name !== 'AbortError') msg(e.message);
@@ -2021,7 +2096,7 @@ async function reload() {
   await refresh();
 }
 async function open(id) {
-  S.nid = id; S.row = 0; S.branch = 1;
+  S.nid = id; S.row = 0; S.branch = 1; S.modified = false;
   await reload(); setMode(S.mode);
   $('#selNet').value = id;
 }

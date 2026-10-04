@@ -277,8 +277,7 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
         n.pads, n.kept_active, n.amp_config = [], 0, 0
     if body.amp_code is not None:
         n.kept_active = 0
-        # the program picks its pads and EQs as it is keyed (saving below);
-        # a fibre-fed one holds 0 in all four
+        # the program picks its pads and EQs as it is keyed (saving below)
         n.pads = [0, 0, 0, 0]
         try:
             part = resolve_active(d.library, body.amp_code)
@@ -290,6 +289,11 @@ def edit_node(nid: str, branch: int, node: int, body: NodeEdit):
             n.amp_config = config_slot(part, body.amp_code)
             n.amp = part.config_ids[n.amp_config] if n.amp_config else (part.active_id or "")
             n.amp_part = part.id
+    if body.hc is not None and body.hc != n.hc:
+        # a new house count frees a fixed line: H_B's 2.1 (0 -> 2 homes) lost
+        # its arrow and its flag; a new ftg (the older AL004's 11.11), a tap
+        # taken off (11.16) or a coupler put on (PS_B's 2.1) leave it
+        n.fixed = False
     for f, v in body.model_dump(exclude_none=True).items():
         if f in ("clear_amp", "amp_code"):
             continue

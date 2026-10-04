@@ -60,20 +60,46 @@ def test_h043b_test_list_is_lodes():
                                  ("yellow", "Tap(1002)  1.00 over window at 18.8.")]
 
 
+def test_h043a_test_list_is_lodes():
+    """N2 (4 Oct): all 12 lines, yellow, in Lode's order."""
+    ntw, spec = _paths("H043A_MID.ntw")
+    d, _ = design_from_ntw(ntw, spec)
+    assert SC.build(d).tests == [("yellow", m) for m in (
+        "Tap(1002)  0.08 over window at 2.25.", "Tap(5)  0.72 below window at 2.25.",
+        "Tap(1002)  1.00 over window at 15.44.", "Tap(5)  0.69 below window at 33.6.",
+        "Tap(1002)  0.50 over window at 38.6.", "Tap(5)  0.98 below window at 38.9.",
+        "Tap(1002)  0.16 below min at 64.3.", "Tap(1002)  0.18 below min at 64.5.",
+        "Tap(1002)  1.00 over window at 66.3.", "Tap(1002)  1.80 over window at 67.1.",
+        "Tap(1002)  1.17 over window at 74.2.", "Tap(1002)  1.98 over window at 89.2.")]
+
+
 @pytest.mark.parametrize("name", ["H043A_MID.ntw", "H043B_MID.ntw"])
-def test_a_network_with_a_pcd_saves_as_it_came_but_the_underground_housings(name):
+def test_a_network_with_a_pcd_saves_as_it_came(name):
     """The PCD's networks are listed before branch 1 and its branch head
     holds coupler record 999: both kept.  The PCD is no coupler in the
-    parts count and adds one connector on its line's cable.  Only the
-    underground housings' tally differs (not decoded for these yet)."""
+    parts count and adds one connector on its line's cable.  The
+    underground housings' tally is Lode's too (H043A_MID 179/23/8/7 of
+    housings 1/3/4/5, H043B_MID 82/11/4/2): the file comes back byte for
+    byte."""
     ntw, spec = _paths(name)
     src = ntw.read_bytes()
     d, _ = design_from_ntw(src, spec)
     out, _ = export_ntw(d, src, name=ntw.stem)
+    assert out == src
     a = src[:PAYLOAD_START] + deobfuscate(src[PAYLOAD_START:])
-    b = out[:PAYLOAD_START] + deobfuscate(out[PAYLOAD_START:])
-    assert len(a) == len(b)
-    differ = {i for i in range(len(a)) if a[i] != b[i]}
-    housings = range(W.P_HOUSINGS, W.P_HOUSINGS + 4 * 15)
-    assert differ and all(i in housings for i in differ)
     assert struct.unpack_from("<I", a, W.P_PCDS)[0]
+
+
+def test_h043b_underground_housings_as_lode_draws_them():
+    """n5a-n5f: the (n) under the node numbers.  A branch's 0-ft start gets
+    none (7.1, its supply alone), the place it is at holds it (2.5); 2.9 and
+    3.7 are an FM902T (16) and the tap on the 0-ft 8.1 / 4.1; 13.1 the
+    FM902T alone (17.1's tap is on cable 0)."""
+    ntw, spec = _paths("H043B_MID.ntw")
+    d, _ = design_from_ntw(ntw, spec)
+    got = {(r.branch, r.node): r.housing for r in SC.build(d).rows if not r.end}
+    lode = {(1, 5): 1, (1, 6): 4, (1, 7): 0, (1, 8): 0, (1, 13): 4, (1, 14): 0,
+            (2, 6): 0, (2, 9): 4, (2, 10): 1, (2, 11): 1, (3, 4): 0, (3, 5): 0, (3, 6): 0,
+            (3, 7): 4, (3, 8): 1, (3, 9): 1, (13, 1): 3, (13, 2): 0, (13, 3): 1, (13, 4): 1,
+            (13, 5): 0, (13, 6): 3, (7, 1): 0}
+    assert {k: got[k] for k in lode} == lode

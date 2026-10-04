@@ -22,9 +22,11 @@ Put real Lode Data files here to run the checks against them. They come in
       bullhead/         H043A_MID.ntw, H043B_MID.ntw (Bullhead, on BH1GHzMid,
                         joined by a PCD) -- tests/test_bullhead.py
       AL005-Beckley750/ Beckley750.par .atv .tap .cpr .cbl (AL005's own set)
-
-    Still missing: WVBeck750.par .atv .tap .cpr .cbl -- tests/test_import.py
-    and tests/test_entry.py need it with KERMIT750 and skip without it.
+      WVBeck750/        WVBeck750.par .atv .tap .cpr .cbl -- tests/test_import.py
+                        and tests/test_entry.py read it with KERMIT750
+      lode-saved/       PS_A/PS_B, H_A/H_B (AL004 saved by Lode before and after
+                        one change), BH_KEYED (Q1's network keyed on BH1GHzMid)
+                        -- tests/test_lode_saved.py
 
 `docs/EVIDENCE.md` says where each file came from and what it proved.
 
