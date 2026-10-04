@@ -4,8 +4,10 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const api = async (url, opts) => {
   const r = await fetch(url, opts);
   if (!r.ok) throw new Error((await r.text()).slice(0, 400));
-  // a line or branch changed: the network is modified (Num Lock's box)
-  if (opts && opts.method && /^\/api\/networks\/[^/]+\/(nodes|branches)\//.test(url)) S.modified = true;
+  // a line or branch of the network on screen changed: it is modified (Num
+  // Lock's box); a change still arriving for another network leaves it be
+  const changed = opts && opts.method && /^\/api\/networks\/([^/]+)\/(nodes|branches)\//.exec(url);
+  if (changed && changed[1] === S.nid) S.modified = true;
   const t = r.headers.get('content-type') || '';
   return t.includes('json') ? r.json() : r.text();
 };
@@ -345,6 +347,7 @@ function renderGrid() {
   }).join('');
 
   $$('#grid tbody td[data-r]').forEach(td => td.onclick = () => {
+    if (holdInput) return;               // the numbers on screen are about to change
     const typing = S.buffer !== null;
     S.row = +td.dataset.r; S.col = +td.dataset.c; S.buffer = null;
     if (typing) { renderGrid(); return; }
@@ -365,6 +368,7 @@ function renderGrid() {
 // One splitter feeding two branches is one cell, 3-<11>{12}: double-clicking
 // the second bracket goes into the second branch (the user, 4 Oct)
 $('#grid tbody').ondblclick = ev => {
+  if (holdInput) return;
   const td = ev.target.closest('td[data-r]');
   const c = td && columns()[+td.dataset.c];
   const text = c && /^cplr\d$/.test(c.key) && (curRow().couplers || [])[+c.key.slice(4)];
@@ -385,7 +389,7 @@ let wheelSum = 0;
 $('.grid-wrap').addEventListener('wheel', ev => {
   if (ev.ctrlKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return;  // zoom, sideways
   ev.preventDefault();
-  if (!$('#modal').hidden || !pageRows().length) return;
+  if (holdInput || !$('#modal').hidden || !pageRows().length) return;
   // a mouse wheel's notch is one line; a touchpad's small moves add up to one
   wheelSum += ev.deltaMode ? Math.sign(ev.deltaY) * 50 : ev.deltaY;
   if (Math.abs(wheelSum) < 50) return;
@@ -618,10 +622,10 @@ function renderMenu() {
       ? row.map(([k, label], j) =>
           `<span class="smkey" data-m="${i}" data-i="${j}">${esc(k)} ${esc(label)}</span>`).join('')
       : '<span class="smkey empty">&nbsp;</span>') + '</div>').join('');
-  $$('.smkey[data-m]').forEach(el => el.onclick = () => {
+  $$('.smkey[data-m]').forEach(el => el.onclick = () => whenSettled(() => {
     const fn = MENUS[S.mode][+el.dataset.m][+el.dataset.i][2];
     if (fn) fn(); else msg(`${el.textContent.trim()} is not implemented yet`);
-  });
+  }));
   document.body.className = 'mode-' + S.mode;
   $$('.tbset').forEach(t => { t.hidden = !t.dataset.modes.split(' ').includes(S.mode); });
   $('#app').className = 'mode-' + S.mode;
@@ -630,24 +634,57 @@ function renderMenu() {
 // ---------------------------------------------------------------- editing
 const EDIT_ORDER = ['ftg', 'hc', 'cab', 'lv'];
 
-// Keying is faster than the round trip, so every edit is queued and the saves
-// run strictly in order.  The cursor moves at once, on the keystroke, and a
-// single refresh follows once the queue drains -- otherwise "300 . 4 . 2"
-// races itself and lands the wrong values in the wrong columns.
+// Keying is faster than the round trip, so every change to a network -- a
+// typed value, a picker's choice, Insert, Delete, a coupler -- is queued and
+// the changes run strictly in order.  The cursor moves at once, on the
+// keystroke, and a single refresh follows once the queue drains -- otherwise
+// "300 . 4 . 2" races itself and lands the wrong values in the wrong columns.
+// Each change keeps the network it was keyed in (``nid``, taken as it is
+// queued): one still waiting when another network is opened goes into its
+// own.  ``what`` names the change; one the server did not take is said at
+// once and again by the next Save of that network, which is without it.
 let saveChain = Promise.resolve();
 let pendingSaves = 0;
+const failedEdits = {};                  // network id -> changes not made
 
-function queueSave(work) {
+function queueSave(work, what, nid = S.nid) {
   pendingSaves += 1;
-  saveChain = saveChain.then(work).catch(err => {
+  let ok = false;
+  saveChain = saveChain.then(() => work(nid)).then(() => { ok = true; }, err => {
     let detail = err.message;
     try { detail = JSON.parse(detail).detail || detail; } catch (_) {}
+    if (typeof detail !== 'string') detail = JSON.stringify(detail);
+    (failedEdits[nid] = failedEdits[nid] || []).push(`${what}: ${detail}`);
     msg(detail);
   }).then(() => {
     pendingSaves -= 1;
     if (pendingSaves === 0) return doRefresh();
-  });
-  return saveChain;
+  }).catch(err => msg(err.message)).then(() => ok);
+  return saveChain;                      // true once the change is made
+}
+
+// A change that renumbers lines or branches (Insert, Delete, a coupler put on
+// or taken off) and opening another network leave the screen's numbers stale
+// until it is read again.  Meanwhile keys and screen-menu clicks wait and
+// then run in the order given, on the new screen, so none is aimed by a
+// number that now means another line; the grid ignores the mouse.
+let holdInput = 0;
+const heldInput = [];
+function whenSettled(fn) { if (holdInput) heldInput.push(fn); else fn(); }
+async function restructure(work) {
+  if (holdInput) await new Promise(go => heldInput.push(() => { holdInput += 1; go(); }));
+  else holdInput += 1;
+  try { return await work(); } finally {
+    holdInput -= 1;
+    while (!holdInput && heldInput.length) heldInput.shift()();
+  }
+}
+// the structural change itself, then the screen read again before the input
+// waiting on it runs
+async function restructuring(work, what) {
+  const ok = await queueSave(work, what);
+  if (pendingSaves) await doRefresh();   // others still queued: read it now
+  return ok;
 }
 
 function curCol() { return columns()[S.col]; }
@@ -676,9 +713,9 @@ function commitBuffer(advance) {
 
   // move first, so the next keystroke lands in the right column
   if (advance) moveToNextField(); else renderGrid();
-  queueSave(() => api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}`, {
+  queueSave(nid => api(`/api/networks/${nid}/nodes/${at.branch}/${at.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body) }));
+    body: JSON.stringify(body) }), `${at.branch}.${at.node} ${c.head} ${val}`);
 }
 
 // Taps, couplers and actives are typed at the cell: "4.23" is a 4-port 23 tap,
@@ -696,15 +733,16 @@ function commitCode() {
 
   if (c.key.startsWith('tap')) {
     const slot = +c.key.slice(3);
-    const put = () => queueSave(async () => {
-      const out = await api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}/tap`, {
+    const nid = S.nid;
+    const put = () => queueSave(async nid => {
+      const out = await api(`/api/networks/${nid}/nodes/${at.branch}/${at.node}/tap`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot, code }) });
       msg(out.placed
         ? `${out.placed.name} — ${out.placed.ports} port, ${out.placed.value_db} dB,`
           + ` shown as the tap ID ${out.placed.tap_id}`
         : 'tap cleared');
-    });
+    }, `${at.branch}.${at.node} ${c.head} ${code}`, nid);
     // taking off a tap whose port feeds a branch asks first (the older
     // AL004's 11.16, 28b); Yes takes the tap off and the branch stays, fed
     // by nothing (its 43 still there after), No leaves the tap
@@ -720,8 +758,8 @@ function commitCode() {
     put();
   } else if (c.key.startsWith('cplr')) {
     const slot = +c.key.slice(4);
-    queueSave(async () => {
-      const out = await api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}/coupler`, {
+    restructure(() => restructuring(async nid => {
+      const out = await api(`/api/networks/${nid}/nodes/${at.branch}/${at.node}/coupler`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot, code }) });
       if (!out.placed) { msg('coupler and its branch removed'); return; }
@@ -730,14 +768,14 @@ function commitCode() {
                   : p.through_leg === 1 ? 'through leg to this branch, tap leg downstream'
                   : 'through leg to the right-most branch';
       msg(`${p.name} — branch ${p.branch}, legs ${p.legs.join(' / ')} dB, ${where}`);
-    });
+    }, `${at.branch}.${at.node} ${c.head} ${code}`));
   } else {
-    queueSave(async () => {
-      await api(`/api/networks/${S.nid}/nodes/${at.branch}/${at.node}`, {
+    queueSave(async nid => {
+      await api(`/api/networks/${nid}/nodes/${at.branch}/${at.node}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amp_code: code }) });
       msg(code === '0' || code === '' ? 'active cleared' : 'active placed');
-    });
+    }, `${at.branch}.${at.node} ${c.head} ${code}`);
   }
 }
 
@@ -757,6 +795,13 @@ function moveToNextField() {
 
 // ---------------------------------------------------------------- keyboard
 document.addEventListener('keydown', async ev => {
+  if (holdInput && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
+    ev.preventDefault();                 // runs once the screen is read again
+    const key = { key: ev.key, code: ev.code, ctrlKey: ev.ctrlKey, shiftKey: ev.shiftKey,
+                  altKey: ev.altKey, metaKey: ev.metaKey };
+    heldInput.push(() => document.dispatchEvent(new KeyboardEvent('keydown', key)));
+    return;
+  }
   if (SW.data) {                        // a Spec Edit window has the keys
     if (ev.key === 'Escape') closeSpecWin();
     return;
@@ -969,23 +1014,23 @@ function chooser(title, items, onPick, note) {
 }
 
 async function pickTap(slot) {
-  const r = curRow();
+  const r = curRow(), nid = S.nid;
   const taps = libTable('taps').sort((a, b) =>
     b.tap_value_db - a.tap_value_db || a.ports - b.ports);
   chooser(`Tap for node ${r.branch}.${r.node}, slot ${slot + 1}`,
     taps.map(t => ({ id: t.id, label: `${t.name}`,
       detail: `${t.ports} port · ${t.tap_value_db} dB · insertion ${t.through_loss.length ? t.through_loss.at(-1)[1] : '?'} dB` })),
     async pick => {
-      await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/tap`, {
+      await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}/tap`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) });
-      await refresh();
+        body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) }),
+        `${r.branch}.${r.node} tap${slot + 1} ${pick ? pick.label : 'cleared'}`, nid);
     }, 'Tap values are drawn in the bracket style of their port count: /2/ [4] {6} <8>');
 }
 
 const SELECT_BRACKETS = { 2: '//', 4: '[]', 6: '{}', 8: '<>' };
 async function selectTap(slot) {
-  const r = curRow(); if (!r) return;
+  const r = curRow(), nid = S.nid; if (!r) return;
   const out = await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/tap/${slot}/candidates`);
   const rows = new Map();
   for (const t of out.candidates) {
@@ -997,10 +1042,10 @@ async function selectTap(slot) {
   const label = t => SELECT_BRACKETS[t.ports][0] + String(t.tap_id).padStart(2) + SELECT_BRACKETS[t.ports][1];
   const place = async id => {
     closeModal(); S.buffer = null;
-    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/tap`, {
+    await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}/tap`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot, part_id: id }) });
-    await refresh();
+      body: JSON.stringify({ slot, part_id: id }) }),
+      `${r.branch}.${r.node} tap${slot + 1} ${byId[id] ? label(byId[id]).trim() : id}`, nid);
   };
   const draw = () => {
     modal(`<div class="seltap"><div class="sttitle">Select Tap</div>
@@ -1044,64 +1089,71 @@ async function selectTap(slot) {
 }
 
 async function pickCoupler(slot) {
-  const r = curRow();
+  const r = curRow(), nid = S.nid;
   const items = libTable('passives').map(p => ({ id: p.id, label: p.name,
     detail: `legs ${p.port_losses.map(v => v + ' dB').join(' / ')}` }));
-  chooser(`Coupler for node ${r.branch}.${r.node}`, items, async pick => {
-    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}/coupler`, {
+  chooser(`Coupler for node ${r.branch}.${r.node}`, items, pick => restructure(async () => {
+    if (S.nid !== nid) return;
+    const ok = await restructuring(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}/coupler`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) });
-    await refresh();
-    msg(pick ? 'coupler placed — it starts a new branch; press . → to go into it'
-             : 'coupler and its branch removed');
-  }, 'Placing a coupler creates the branch it feeds.');
+      body: JSON.stringify({ slot, part_id: pick ? pick.id : null }) }),
+      `${r.branch}.${r.node} cplr${slot + 1} ${pick ? pick.label : 'cleared'}`);
+    if (ok) msg(pick ? 'coupler placed — it starts a new branch; press . → to go into it'
+                     : 'coupler and its branch removed');
+  }), 'Placing a coupler creates the branch it feeds.');
 }
 
 async function pickActive() {
-  const r = curRow();
+  const r = curRow(), nid = S.nid;
   const items = libTable('actives').map(a => ({ id: a.id,
     label: (a.active_id ? a.active_id + '  ' : '') + a.name, aid: a.active_id,
     detail: `${a.kind} · in ${a.in_forward_high}/${a.in_forward_low} · out ${a.out_forward_high}/${a.out_forward_low}` }));
   chooser(`Active for node ${r.branch}.${r.node}`, items, async pick => {
-    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pick ? { amp_code: pick.aid || '' } : { clear_amp: true }) });
-    await refresh();
+      body: JSON.stringify(pick ? { amp_code: pick.aid || '' } : { clear_amp: true }) }),
+      `${r.branch}.${r.node} amp ${pick ? pick.label : 'cleared'}`, nid);
   });
 }
 
 async function pickCable() {
-  const r = curRow();
+  const r = curRow(), nid = S.nid;
   const items = libTable('cables').map((c, i) => ({ id: c.id, idx: i, label: c.name,
     detail: `${c.attenuation.length ? c.attenuation.at(-1)[1] + ' dB/100ft' : ''} · loop ${c.loop_resistance_ohm_per_1000ft} Ω/1000ft` }));
   chooser(`Cable for node ${r.branch}.${r.node}`, items, async pick => {
-    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(pick ? { cab: pick.idx, cab_part: pick.id } : { cab: 0, cab_part: null }) });
-    await refresh();
+      body: JSON.stringify(pick ? { cab: pick.idx, cab_part: pick.id } : { cab: 0, cab_part: null }) }),
+      `${r.branch}.${r.node} cab ${pick ? pick.label : 'cleared'}`, nid);
   }, 'Even cable IDs are aerial, odd are underground.');
 }
 
 // ---------------------------------------------------------------- commands
-async function insertNode() {
-  const r = curRow();
-  await api(`/api/networks/${S.nid}/branches/${r ? r.branch : 1}/nodes`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ after: r ? r.node : 0 }) });
-  await refresh(); S.row = Math.min(S.row + 1, pageRows().length - 1); renderGrid();
-  msg('node inserted');
+function insertNode() {
+  return restructure(async () => {
+    const r = curRow();
+    const ok = await restructuring(nid => api(`/api/networks/${nid}/branches/${r ? r.branch : 1}/nodes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ after: r ? r.node : 0 }) }),
+      `insert after ${r ? `${r.branch}.${r.node}` : '1.0'}`);
+    if (!ok) return;
+    S.row = Math.min(S.row + 1, pageRows().length - 1); renderGrid();
+    msg('node inserted');
+  });
 }
 // Design: a line with 0 footage above the cursor's (Insert) or below it
 // (". Insert"); the cursor stays on its node, so each press adds another
-async function insertRow(below) {
-  const r = curRow(); if (!r || r.end) return;
-  await api(`/api/networks/${S.nid}/branches/${r.branch}/nodes`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(Object.assign(below ? { after: r.node } : { before: r.node },
-                                       { cable_from_previous: true })) });
-  await refresh();
-  if (!below) S.row = Math.min(S.row + 1, pageRows().length - 1);
-  renderGrid();
+function insertRow(below) {
+  return restructure(async () => {
+    const r = curRow(); if (!r || r.end) return;
+    const ok = await restructuring(nid => api(`/api/networks/${nid}/branches/${r.branch}/nodes`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign(below ? { after: r.node } : { before: r.node },
+                                         { cable_from_previous: true })) }),
+      `insert ${below ? 'below' : 'above'} ${r.branch}.${r.node}`);
+    if (ok && !below) S.row = Math.min(S.row + 1, pageRows().length - 1);
+    renderGrid();
+  });
 }
 // ".+ Name" with the cursor on an amplifier: the Amplifier Definition window.
 // The name belongs to the amplifier: it shows in tap1 until a tap is placed
@@ -1124,6 +1176,7 @@ function ampExists(name, at) {
 function ampDefinition() {
   const r = curRow(), c = curCol();
   if (!r || r.end || !c || c.key !== 'amp' || !r.amp_info || r.amp_info.name === undefined) return;
+  const nid = S.nid;
   modal(`<div class="ampdef"><div class="adtitle">Amplifier Definition</div>
     <div class="adrow"><span class="adlab">Power Supply:</span><span>${esc(r.amp_info.supply || '')}</span></div>
     <div class="adrow"><span class="adlab">Amp ID:</span><input id="adName"></div>
@@ -1140,10 +1193,9 @@ function ampDefinition() {
     if (other) { ampExists(name, `${other.branch}.${other.node}`); return; }
     closeModal();
     S.lastAmpName = name;
-    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amp_label: name }) });
-    await refresh();
+      body: JSON.stringify({ amp_label: name }) }), `${r.branch}.${r.node} Amp ID ${name}`, nid);
   };
   $('#adOk').onclick = ok;
   input.onkeydown = ev => {
@@ -1157,16 +1209,24 @@ function ampDefinition() {
 // The Delete key, as the program does it (the user's recording): a line
 // with a power stop is refused; a line a branch begins at asks first, and OK
 // deletes the line with the branch and everything down it.
-async function deleteNode() {
-  const r = curRow(); if (!r || r.end) return;
-  const url = `/api/networks/${S.nid}/branches/${r.branch}/nodes/${r.node}`;
-  try {
-    await api(url, { method: 'DELETE' });
-  } catch (e) {
-    let d = null;
-    try { d = JSON.parse(e.message).detail; } catch (_) { throw e; }
-    if (d && d.error) { errorBox(d.error); return; }
-    if (d && d.branches) {
+function deleteNode() {
+  return restructure(async () => {
+    const r = curRow(); if (!r || r.end) return;
+    const nid = S.nid, path = `branches/${r.branch}/nodes/${r.node}`;
+    let d = null, deleted = false;
+    await restructuring(async nid => {
+      try {
+        await api(`/api/networks/${nid}/${path}`, { method: 'DELETE' });
+        deleted = true;
+      } catch (e) {
+        try { d = JSON.parse(e.message).detail; } catch (_) { throw e; }
+        if (!d || !(d.error || d.branches)) throw e;
+      }
+    }, `delete ${r.branch}.${r.node}`);
+    // shown before the keys pressed after Delete run: they answer it
+    if (deleted) msg('node deleted');
+    else if (d && d.error) errorBox(d.error);
+    else if (d && d.branches) {
       // one branch: "Branch 54, begins ... this branch"; two: "Branches
       // 11, 12, begin ... these branches" (AL004 4.14, the user)
       const many = d.branches.length > 1;
@@ -1177,17 +1237,15 @@ async function deleteNode() {
         `and all downstream nodes.<br>Delete this node?</div>
         <div class="row"><button id="mbOk">OK</button><button id="mbCancel">Cancel</button></div></div>`);
       $('#mbCancel').onclick = closeModal;
-      $('#mbOk').onclick = async () => {
-        closeModal();
-        await api(url + '?confirm=true', { method: 'DELETE' });
-        await refresh(); msg('node deleted');
-      };
+      $('#mbOk').onclick = () => { closeModal(); restructure(async () => {
+        if (S.nid !== nid) return;
+        if (await restructuring(nid => api(`/api/networks/${nid}/${path}?confirm=true`, { method: 'DELETE' }),
+                                `delete ${r.branch}.${r.node} with branch${many ? 'es' : ''} ${which}`))
+          msg('node deleted');
+      }); };
       $('#mbOk').focus();
-      return;
     }
-    throw e;
-  }
-  await refresh(); msg('node deleted');
+  });
 }
 // Num Lock on a network changed since it was opened or saved: the program's
 // "Network Modified" box (the user's 33, the older AL004 after an ftg
@@ -1214,19 +1272,21 @@ function errorBox(text) {
 // it off (the user's recording, AL002 55.2)
 async function togglePowerStop() {
   const r = curRow(); if (!r || r.end) return;
-  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+  await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ power_stop: !r.power_stop }) });
-  await refresh();
+    body: JSON.stringify({ power_stop: !r.power_stop }) }),
+    `${r.branch}.${r.node} power stop ${r.power_stop ? 'off' : 'on'}`);
 }
-async function delBranch() {
-  const r = curRow(); if (!r || r.branch === 1) { msg('the feeder cannot be deleted'); return; }
-  if (!confirm(`Delete branch ${r.branch} and everything on it?`)) return;
-  const parent = branchMeta(r.branch);
-  await api(`/api/networks/${S.nid}/branches/${r.branch}`, { method: 'DELETE' });
-  await refresh();
-  gotoBranch(parent && parent.parent_branch ? parent.parent_branch : 1);
-  msg('branch deleted');
+function delBranch() {
+  return restructure(async () => {
+    const r = curRow(); if (!r || r.branch === 1) { msg('the feeder cannot be deleted'); return; }
+    if (!confirm(`Delete branch ${r.branch} and everything on it?`)) return;
+    const parent = branchMeta(r.branch);
+    if (!await restructuring(nid => api(`/api/networks/${nid}/branches/${r.branch}`, { method: 'DELETE' }),
+                             `delete branch ${r.branch}`)) return;
+    gotoBranch(parent && parent.parent_branch ? parent.parent_branch : 1);
+    msg('branch deleted');
+  });
 }
 // 0 Alter: the cell takes a typed value, Enter keeps it, Esc drops it.  On a
 // tap the status line reads as the program's does, and Home lists the taps.
@@ -1298,16 +1358,15 @@ async function nameAmp() {
   const r = curRow(); if (!r) return;
   const v = prompt('Amplifier / power supply name (Amplifier Definition)', r.amp_label || '');
   if (v === null) return;
-  await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+  await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amp_label: v }) });
-  await refresh();
+    body: JSON.stringify({ amp_label: v }) }), `${r.branch}.${r.node} name ${v}`);
 }
 // Lode's Edit Notes window: the line's note, a line per row.  The file
 // keeps each row followed by "~0" (SN001_MID 1.1: SHIN1 - 4953 - P-003938~0
 // POWERED BY PS "PS1A"~0DATE :02/20/26~0, three rows in the window).
 async function notes() {
-  const r = curRow(); if (!r) return;
+  const r = curRow(), nid = S.nid; if (!r) return;
   const rows = (r.note || '').split('~0');
   if (rows.length && rows[rows.length - 1] === '') rows.pop();
   modal(`<h2>Edit Notes</h2>
@@ -1321,10 +1380,9 @@ async function notes() {
     const lines = $('#noteText').value.replace(/\r/g, '').replace(/\n+$/, '');
     const note = lines ? lines.split('\n').map(l => l + '~0').join('') : '';
     closeModal();
-    await api(`/api/networks/${S.nid}/nodes/${r.branch}/${r.node}`, {
+    if (await queueSave(nid => api(`/api/networks/${nid}/nodes/${r.branch}/${r.node}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note }) });
-    await refresh(); msg('note saved');
+      body: JSON.stringify({ note }) }), `${r.branch}.${r.node} notes`, nid)) msg('note saved');
   };
 }
 function netInit() {
@@ -2037,6 +2095,7 @@ async function saveNetwork(as) {
     }
     const name = handle ? handle.name : `${S.net.name || 'network'}.ntw`;
     await saveChain;                     // every edit keyed so far goes in
+    const failed = (failedEdits[nid] || []).slice();
     const r = await fetch(`/api/networks/${nid}/ntw?filename=${encodeURIComponent(name)}`, { method: 'POST' });
     if (!r.ok) {
       let t = await r.text();
@@ -2063,7 +2122,19 @@ async function saveNetwork(as) {
       await loadList(nid);
     }
     if (S.nid === nid) S.modified = false;
-    msg(`saved ${name}` + (skipped.length ? ` — ${skipped.length} not written: ${skipped[0]}` : ''));
+    msg(`saved ${name}` + (skipped.length ? ` — ${skipped.length} not written: ${skipped[0]}` : '')
+        + (failed.length ? ` — ${failed.length} change${failed.length > 1 ? 's' : ''} not made` : ''));
+    if (failed.length) {
+      // said once, by the save the changes are missing from
+      failedEdits[nid] = failedEdits[nid].slice(failed.length);
+      const one = failed.length === 1;
+      modal(`<div class="msgbox"><div class="mbtitle">Error</div>
+        <div class="mbtext">${esc(name)} was saved without ${one ? 'this change' : `these ${failed.length} changes`}:
+        ${one ? 'it was' : 'they were'} not made, so ${one ? 'it is' : 'they are'} not in the file.<br><br>${
+          failed.map(esc).join('<br>')}</div>
+        <div class="row"><button id="mbOk">OK</button></div></div>`);
+      $('#mbOk').onclick = closeModal; $('#mbOk').focus();
+    }
   } catch (e) {
     if (e.name !== 'AbortError') msg(e.message);
   }
@@ -2084,21 +2155,32 @@ async function refresh() {
 }
 
 async function doRefresh() {
-  S.scr = await api(`/api/networks/${S.nid}/screen`);
+  const nid = S.nid;
+  const scr = await api(`/api/networks/${nid}/screen`);
+  if (S.nid !== nid) return;             // another network was opened meanwhile
+  S.scr = scr;
   if (!branchMeta(S.branch)) S.branch = S.scr.branches.length ? S.scr.branches[0].number : 1;
   S.row = Math.max(0, Math.min(S.row, pageRows().length - 1));
   renderGrid();
 }
 async function reload() {
-  S.net = await api(`/api/networks/${S.nid}`);
+  const nid = S.nid;
+  const net = await api(`/api/networks/${nid}`);
+  if (S.nid !== nid) return;
+  S.net = net;
   const s = specName(S.net.library) || 'Untitled';
   $('#stSpecs').textContent = `${s} : ${s} : ${s} : ${s} : ${s} : Untitled`;
-  await refresh();
+  // read now, even with another network's changes still queued
+  await doRefresh();
 }
-async function open(id) {
-  S.nid = id; S.row = 0; S.branch = 1; S.modified = false;
-  await reload(); setMode(S.mode);
-  $('#selNet').value = id;
+// changes still queued for the network on screen go on into it; keys
+// pressed meanwhile wait for the new one's screen
+function open(id) {
+  return restructure(async () => {
+    S.nid = id; S.row = 0; S.branch = 1; S.modified = false; S.buffer = null;
+    await reload(); setMode(S.mode);
+    $('#selNet').value = id;
+  });
 }
 async function loadList(sel) {
   const list = await api('/api/networks');

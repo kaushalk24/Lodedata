@@ -1353,3 +1353,215 @@ def test_al002_power_screen_as_37(page):
                            "  .querySelector('td.cab')).color")
     assert colour == "rgb(255, 0, 0)"
     assert not page.errors
+
+
+# ------------------------------------------------- pending edits: order and identity
+# Keying runs ahead of the server: edits wait in a queue while the cursor moves
+# on.  These hold chosen requests in the page (released on cue), so each race
+# happens the same way every run, and then ask the server which physical line
+# -- by its record id in the .ntw, which renumbering does not change -- and
+# which network took each change.
+
+def _hold_requests(page):
+    page.evaluate("""() => {
+      window.__realFetch = window.__realFetch || window.fetch;
+      window.__held = []; window.__holdIf = null; window.__sent = [];
+      window.fetch = (url, opts) => {
+        url = String(url); opts = opts || {};
+        const m = opts.method || 'GET';
+        if (window.__holdIf && window.__holdIf(url, m)) {
+          window.__holdIf = null;                     // one request each time
+          if (window.__holdAnswer) {                  // the server has it; the page waits
+            window.__sent.push([m, url]);
+            const answer = window.__realFetch(url, opts);
+            return new Promise(res => window.__held.push({ url, method: m, go: () => res(answer) }));
+          }
+          return new Promise(res => window.__held.push({ url, method: m,
+            go: () => { window.__sent.push([m, url]); res(window.__realFetch(url, opts)); },
+            fail: () => res(new Response(JSON.stringify({ detail: 'server unavailable' }),
+                              { status: 503, headers: { 'content-type': 'application/json' } })) }));
+        }
+        if (m !== 'GET') window.__sent.push([m, url]);
+        return window.__realFetch(url, opts);
+      };
+    }""")
+
+
+def _hold_next(page, method, path_part, answer=False):
+    """Hold the next such request before it leaves the page, or with
+    ``answer`` let the server take it and hold only its answer."""
+    page.evaluate("([m, p, a]) => { window.__holdAnswer = a;"
+                  "  window.__holdIf = (url, method) => method === m && url.includes(p); }",
+                  [method, path_part, answer])
+
+
+def _held(page):
+    return page.evaluate("window.__held.map(h => [h.method, h.url])")
+
+
+def _release(page, how="go"):
+    page.evaluate(f"window.__held.splice(0).forEach(h => h.{how}())")
+
+
+def _server_network(page, nid=None):
+    return page.evaluate("nid => window.__realFetch('/api/networks/' + (nid || S.nid)).then(r => r.json())", nid)
+
+
+def _by_rec(net, branch):
+    return {n["rec"]: n for n in net["branches"][str(branch)]["nodes"]}
+
+
+def test_a_pending_edit_is_not_overtaken_by_insert_or_delete(page):
+    """ftg keyed on AL004 4.6 (record 127981, 144 ft) is still on its way
+    when Insert adds a line above 4.3: the edit must land on that line, not
+    on whatever is numbered 4.6 after the insert (4.5's 156-ft line, record
+    127788).  Then the same with Delete taking the new line off again."""
+    _open_al004(page)
+    _hold_requests(page)
+    before = _by_rec(_server_network(page), 4)
+    assert (before[127981]["seq"], before[127981]["ftg"]) == (6, 144)
+    assert (before[127788]["seq"], before[127788]["ftg"]) == (5, 156)
+
+    _hold_next(page, "PATCH", "/nodes/4/6")
+    _goto(page, 4, 6, "ftg")
+    _type(page, "0777")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    # keying stays responsive while the edit waits: the cursor moves at once
+    page.keyboard.press("ArrowDown")
+    assert page.evaluate("curRow().node") == 7
+    page.keyboard.press("ArrowUp")
+    _goto(page, 4, 3, "ftg")
+    page.keyboard.press("Insert")               # Design: a line above 4.3
+    page.wait_for_timeout(800)
+    _release(page)
+    page.wait_for_timeout(1500)
+    after = _by_rec(_server_network(page), 4)
+    assert after[127981]["ftg"] == 777, "the edit went to another line"
+    assert after[127981]["seq"] == 7            # moved down by the new line
+    assert after[127788]["ftg"] == 156 and after[127788]["seq"] == 6
+    nodes = _server_network(page)["branches"]["4"]["nodes"]
+    assert (nodes[2]["rec"], nodes[2]["ftg"]) == (0, 0)   # the inserted line at 4.3
+
+    # Delete: hc keyed on the line (now 4.7) waits; Delete takes 4.3 off
+    _hold_next(page, "PATCH", "/nodes/4/7")
+    _goto(page, 4, 7, "hc")
+    _type(page, "05")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    _goto(page, 4, 3, "ftg")
+    page.keyboard.press("Delete")
+    page.wait_for_timeout(800)
+    _release(page)
+    page.wait_for_timeout(1500)
+    after = _by_rec(_server_network(page), 4)
+    assert after[127981]["hc"] == 5, "the edit went to another line"
+    assert after[127981]["seq"] == 6 and after[127981]["ftg"] == 777
+    assert after[127980]["hc"] == before[127980]["hc"]     # the line after it
+    assert 0 not in after                                   # the new line is gone
+    assert not page.errors
+
+
+def test_keys_pressed_while_a_line_is_inserted_aim_at_the_new_numbering(page):
+    """Insert on 4.3: the server has put the new line in, its answer is still
+    on its way, so the screen still shows the old numbers.  ArrowDown and an
+    ftg keyed meanwhile mean the line below the cursor's line (4.4, record
+    127984), as the screen will show once it is read again -- not the line
+    numbered 4.4 on the server by then (the old 4.3, record 127985)."""
+    _open_al004(page)
+    _hold_requests(page)
+    before = _by_rec(_server_network(page), 4)
+    _hold_next(page, "POST", "/branches/4/nodes", answer=True)
+    _goto(page, 4, 3, "ftg")
+    page.keyboard.press("Insert")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    page.keyboard.press("ArrowDown")
+    _type(page, "0444")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    _release(page)
+    page.wait_for_timeout(2000)
+    after = _by_rec(_server_network(page), 4)
+    assert after[127984]["ftg"] == 444, "the edit went to another line"
+    assert after[127985]["ftg"] == before[127985]["ftg"] == 134
+    assert page.evaluate("curRow().node") == 5 and page.evaluate("S.buffer") is None
+    assert not page.errors
+
+
+def test_an_edit_waiting_when_another_network_is_opened_stays_in_its_own(page):
+    """Two edits keyed on AL004, the first still on its way, the second
+    queued behind it; another network is opened from the network list.  Both
+    edits belong to AL004: neither may land in the network now on screen,
+    and that network's screen must not be replaced by AL004's."""
+    _open_al004(page)
+    _hold_requests(page)
+    a = page.evaluate("S.nid")
+    b = page.evaluate("""() => window.__realFetch('/api/networks', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'OTHER', sample_specs: false }) })
+      .then(r => r.json()).then(d => d.id)""")
+    page.evaluate(f"loadList('{a}')")
+    page.wait_for_timeout(300)
+    b_before = _server_network(page, b)["branches"]["1"]["nodes"][0]
+
+    _hold_next(page, "PATCH", f"/networks/{a}/nodes/4/1")
+    _goto(page, 4, 1, "ftg")
+    _type(page, "0501")
+    page.keyboard.press("Enter")
+    _goto(page, 1, 1, "ftg")
+    _type(page, "0777")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    assert len(_held(page)) == 1
+    page.select_option("#selNet", b)            # open the other network
+    page.wait_for_timeout(1000)
+    _release(page)
+    page.wait_for_timeout(1500)
+
+    b_after = _server_network(page, b)["branches"]["1"]["nodes"][0]
+    assert b_after["ftg"] == b_before["ftg"], "AL004's edit went into the other network"
+    assert not any(b in url for _, url in page.evaluate("window.__sent"))
+    net_a = _server_network(page, a)
+    assert net_a["branches"]["4"]["nodes"][0]["ftg"] == 501
+    assert net_a["branches"]["1"]["nodes"][0]["ftg"] == 777
+    # the screen is the other network's, and stays it
+    assert page.evaluate("S.nid") == b
+    assert page.evaluate("S.net.name") == "OTHER"
+    assert page.evaluate("S.scr.branches.length") == 1
+    assert not page.errors
+
+
+def test_a_failed_edit_is_not_reported_as_saved(page):
+    """An edit the server never took (here it answers 503) is said at once,
+    and the next Save must not read as if the file had it: the save says
+    which change is not in the file."""
+    if not (SAMPLES / "AL004-WV750" / "AL004.ntw").exists():
+        pytest.skip("AL004 not in samples")
+    import base64
+    _open_al004_with_file_access(page)
+    _hold_requests(page)
+    _hold_next(page, "PATCH", "/nodes/4/1")
+    _goto(page, 4, 1, "ftg")
+    _type(page, "0500")
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(300)
+    _release(page, "fail")
+    page.wait_for_timeout(800)
+    assert "server unavailable" in page.inner_text("#stMsg")
+    _file_menu(page, "Save Network")
+    written = page.evaluate("window.__written")
+    assert [w[0] for w in written] == ["AL004.ntw"]
+    assert _ntw_lines(base64.b64decode(written[0][1])).branches[4].nodes[0].ftg == 476
+    assert not page.evaluate("document.getElementById('modal').hidden"), "the save said nothing"
+    box = page.inner_text("#modalbox")
+    assert "4.1 ftg 500" in box and "server unavailable" in box
+    assert "not in the file" in box
+    page.click("#mbOk")
+    # said once: a later save has nothing more to own up to
+    _file_menu(page, "Save Network")
+    assert page.evaluate("document.getElementById('modal').hidden")
+    assert "saved AL004.ntw" in page.inner_text("#stMsg")
+    assert not page.errors
