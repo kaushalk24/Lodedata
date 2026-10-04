@@ -1,16 +1,100 @@
 # Questions for the user
 
-Updated 4 Oct, evening. Only what the app cannot settle without Lode Data
-is asked; everything else from your answers of 4 Oct (`6.zip`) is solved and
-listed under "Answered". Each question says why it is needed, what to do in
-Lode step by step, what to send, what it settles and what the app does
-meanwhile. "Screenshot" means the whole Lode window with the info box
-showing. Work on copies: never save over AL004.ntw itself. Where every
-answer came from: `EVIDENCE.md`.
+Checkpoint of 4 Oct, end of session (code commit d1761f1). Only what the app
+cannot settle without Lode Data is asked; every earlier question is in the
+status register below with its answer. Each open question says why it is
+needed, what is known and unknown, what the app does now, what to do in
+Lode step by step, what to send and what it settles. "Screenshot" means the
+whole Lode window with the info box showing. Work on copies: never save
+over AL004.ntw itself. Where every answer came from: `EVIDENCE.md`.
 
-## Open — needed to finish the app
+**Never ask the user again anything marked SOLVED, SUPERSEDED or NO LONGER
+RELEVANT below.**
+
+## CURRENT OPEN QUEUE (in order)
+
+| # | ID | status | in one line |
+|---|---|---|---|
+| 1 | N1b | OPEN | why Lode keeps 0 / SCS6 / 0 / 0 on WV750's 88 (three keying tests) |
+| 2 | 34 | OPEN | where TSG, Map, Loc and the address are saved (TSG_A / TSG_B) |
+| 3 | 35b | OPEN | the keys that place and name a supply in Power mode (`PW04`) |
+| 4 | 33b | OPEN | what Network Modified's [3] Restore and [9] Switch do |
+| 5 | 43 | OPEN | where Lode puts the cursor on open; yes/no to the app saving its cursor |
+| 6 | N11b | OPEN | a small network keyed on NPG550 (checks the oldest actives formats) |
+| 7 | 44 | OPEN, optional | the `↕` after AL002 4.4's amp in Power mode |
+| 8 | 39–42 | OPEN, deferred (Priority 7) | design commands, connecting networks, Pricing/Performance/Control windows, history rewrite yes/no |
+
+Partly known and **not** queued (nothing the user sees depends on them; ask
+only if a screen ever shows otherwise): 12 / N6 (Out/Loss bytes past 519),
+30 (the third count of the block's triples, 0 everywhere).
+
+## STATUS REGISTER — every question asked so far
+
+SOLVED = Lode's behaviour seen and the app matches it (test named where one
+pins it). Details of each answer are in the "Answered" sections further down
+and in `EVIDENCE.md`.
+
+| ID | status | answer (evidence → test) |
+|---|---|---|
+| 1 | SOLVED | pads/EQs picked as an active is keyed and when its input changes; Recalc does nothing (1a, 1b, 6b → `test_keyed_regions.py`, `test_ntw.py::test_a_ripple_placed_in_the_middle_of_a_cascade`) |
+| 2 | SOLVED | H043B's Test list, two lines (2a → `test_bullhead.py`) |
+| 3 | SOLVED | HUMB keyed on its own spec (3a → `test_keyed_regions.py`) |
+| 4 | SOLVED | a 0 in a spec column is 0 dB, a negative coupler figure a gain (4a, H043A/B → `test_bullhead.py`) |
+| 5 | SOLVED | `/12/` (5.png → `test_keyed_regions.py`) |
+| 6 | SOLVED | an excluded Ripple mid-cascade (6a–6c → `test_ntw.py`) |
+| 7 | SOLVED | an internal coupler away from an active is red (7a/7b → `test_ntw.py::test_s3s_multi_out_100_ft_from_its_ripple_is_red`) |
+| 8 | SOLVED | crossover figure seven wide (user; = A11) |
+| 9 | NO LONGER RELEVANT | mismatched network/spec pairs do not matter (user, 3 Oct) |
+| 10, 11, 13–17 | SOLVED | Spec Edit windows (10a/b, 11.mp4, 13b–h, 14.mp4, 15.mp4, 16a–d, 17a/b → `test_spec_windows.py`) |
+| 12 | PARTIAL, not queued | Out/Loss: byte 518 = row 1 Out-F1; TEST_OL2 set 519, ambiguous (= N6) |
+| 18 | NO LONGER RELEVANT | Bridgers / Feedermakers not used |
+| 19 | OPEN → N11b | old formats in use; NPG550's windows recorded (19a–f) |
+| 20 | SOLVED | LK002 1.5 is a PCD (20.png; = N3/N4) |
+| 21 | SUPERSEDED by N8 | BH_TEST.ntw was not the keyed network; BH_KEYED.ntw is |
+| 22 | SOLVED | WVBeck750 may go into the samples (yes, 4 Oct) |
+| 23 | SOLVED | AL002/AL003 are WVEXT862's, AL005 Beckley750's |
+| 24 | NO LONGER RELEVANT | "ntw map AL004" unknown to the user |
+| 25 | SOLVED | double-click either bracket enters its branch (`test_ui.py`) |
+| 26 | SOLVED | four brackets `(n)` `{n}` `<n>` `[n]` (26a/b → bracket tests in `test_ntw.py`, `test_sn001.py`, `test_classic_specs.py`) |
+| 27 | SOLVED | several taps on one line (27a–d → `test_ntw.py::test_three_taps_on_one_line`); the tap-fed-branch-among-several part dropped |
+| 28 | SOLVED (4 Oct eve) | "Deleting Branch" box, Yes keeps branches 43/44 fed by nothing (28A/28b, 33 → `test_ui.py::test_taking_off_a_tap_that_feeds_a_branch_asks_first`) |
+| 29, 31, 32 | SOLVED | expanded display blocks, 5.29's `(1)`, the cyan `(k)` (29a–j, 31, 32a/b → `test_ntw.py::test_the_expanded_display_of_4_oct`) |
+| 30 | PARTIAL, not queued | `<NO FWD EQ>` solved (30a–e → `test_lg001.py`); the block's third count stays 0 (no active seen with one) |
+| 33 | SOLVED (4 Oct eve) | Num Lock opens "Network Modified" (33.png → `test_ui.py::test_num_lock_on_a_changed_network_opens_network_modified`); Restore/Switch → 33b |
+| 34 | OPEN | see below |
+| 35 | SOLVED (4 Oct eve) | a new supply's record (PS_A/PS_B → `test_lode_saved.py`); keys → 35b |
+| 36 | SOLVED (4 Oct eve) | house list filled on an hc change, arrow cleared (H_A/H_B, 36.png → `test_lode_saved.py`) |
+| 37 | SOLVED (4 Oct eve) | unlisted supply type = 60 V, 0.00 unpowered, NIU Y (37.png → `test_ui.py::test_al002_power_screen_as_37`); `↕` → 44 |
+| 38 | SOLVED (4 Oct eve) | AL004_NOTES' notes as written (38a/38b) |
+| 39–42 | OPEN, deferred | Priority 7, below |
+| 33b, 35b, 43, 44 | OPEN | below |
+| N1 | PARTIAL → N1b | 88 on 4.2 not picked, even after 4.1's ftg changed (N1a/N1b) |
+| N2 | SOLVED (4 Oct eve) | H043A's Test list, 12 yellow lines (N2.png → `test_bullhead.py::test_h043a_test_list_is_lodes`) |
+| N3, N4 | SOLVED (4 Oct eve) | the PCD cell names the other end; "No Feeder" only on it (n3, n4 → `test_ui.py::test_no_feeder_only_with_the_cursor_on_a_pcd`) |
+| N5 | SOLVED (4 Oct eve) | underground housings rule (n5a–f → `test_bullhead.py::test_h043b_underground_housings_as_lode_draws_them`, H043A/B saved byte for byte) |
+| N6 | PARTIAL, not queued | = 12 |
+| N7 | SOLVED (4 Oct eve) | EQ / OP / DEV drop-downs (n7a–c) |
+| N8 | SOLVED (4 Oct eve) | BH_KEYED: NC4000 picked 0 0 7 0, FM332 21 21 2 1 (`test_lode_saved.py`) |
+| N9, N10 | SOLVED (4 Oct eve) | Beckley750's Parameters, AL005's 51 Test lines (n9a–g, n10a/b → `test_al005.py`) |
+| N11 | SUPERSEDED by N11b | no NPG550 network exists; a keyed one asked instead |
+| N12 | SOLVED (4 Oct eve) | "Not enough taps at node b.n." red (n12a/b → `test_ntw.py::test_more_homes_than_tap_ports_is_a_red_test_line`) |
+| C1–C5 | SOLVED (4 Oct eve) | LG001 11.5 `2<16>`; labels untrimmed until the box is shown; no block on a branch's 0-ft first line; `<NO RET EQ>`; `12{6}` a DC-12 (c1–c5 → `test_lg001.py`, `test_ui.py`, `test_ntw.py`) |
+| A.1–A.3 | SOLVED | cascade position, no active on 11.18, the input/output Test lines (`test_classic_specs.py`) |
+| A.4 | SOLVED by A7 | 15.4: the Test rounds a level under zero a cent up |
+| A.5 | SUPERSEDED by 26 | brackets re-read glyph by glyph on 4 Oct; current rule: `file-formats.md` 3.7 |
+| A6–A9, A12 | SOLVED | see A2 below |
+| A10 | SUPERSEDED | S3's 1.2 is `100{2}` (re-read 4 Oct), red as an internal coupler away from an active (7) |
+| A11 | SOLVED as 8 | crossover spacing |
+| A13 | SOLVED as 6 | an excluded active mid-cascade |
+| A14 | SOLVED as 7 | S3's red coupler |
+
+## OPEN — detail of each, in queue order
 
 **N1b. Why Lode did not pick 88's pads (4.2).**
+*Known:* Lode stores 0 / SCS6 / 0 / 0 on 88 keyed on AL004 4.2, before and
+after an input change; it picks every other active keyed so far, and
+KERMIT750's 88 (FML1G7J AGC LE, banks 2 2 2 2) on LG001.
+*Unknown:* what stops the pick. *App now:* picks 88 — **guessed**.
 *Why:* every active keyed so far had its pads and EQs picked at once, but
 WV750's 88 (FML1G7J ALC LE) on AL004 4.2 kept Forward Pad 0, Forward Eq
 SCS6, Return Pad 0, Return Eq 0 — still after 4.1's ftg 476 → 477 (N1a,
@@ -32,6 +116,10 @@ not pick ALC actives; 3 picked → it was 4.2's input level.
 *App now:* picks 88 like any other active.
 
 **34. TSG, Map, Loc and address — where the file keeps them.**
+*Known:* the TSG column (1–99; 0 = the toolbar's TSG), Map and Loc in Entry,
+the address through the node box (manual, c2b). *Unknown:* their bytes.
+*App now:* keys them, a save drops them — **provisional** (nothing lost from
+the opened file: a save keeps the file's own bytes there).
 *Why:* the app lets you key all four but cannot save them yet: nothing
 says where they sit in the `.ntw`. Two saves of the same network, before
 and after, show exactly which bytes they use.
@@ -55,6 +143,8 @@ you did instead.
 *App now:* keeps them while the network is open; a save drops them.
 
 **35b. Keying a power supply in Power mode.**
+*Known:* the saved record (PS_B) and the screens (35a–c). *Unknown:* the
+keys. *App now:* volts typed in the supply cell — **provisional**.
 *Why:* PS_B gave the supply's record exactly (the app now writes it as Lode
 does), but not the keys: 35a shows `PW04` in 46.1's supply cell, 35b `C`
 with `\04 0%`. The app has to accept the same keys in the same order.
@@ -71,6 +161,8 @@ the name are entered.
 it cannot name the supply or pick its type from the keyboard yet.
 
 **33b. Restore and Switch in the Network Modified box.**
+*Known:* the box and [7] Save (33.png). *Unknown:* [3] and [9].
+*App now:* "not implemented yet" for both — **provisional**.
 *Why:* the box (33.png) is in the app; `[7] Save` saves, but what
 `[3] Restore` and `[9] Switch` do is not known, so the app only says
 "not implemented yet" for them.
@@ -82,6 +174,10 @@ screenshot what appears.
 *Settles:* what each does.
 
 **43. The cursor Lode saves.**
+*Known:* 41425 holds the branch and line of the cursor at save (file-formats
+3.8). *Unknown:* whether Lode reopens there; whether the user wants the app
+to write it. *App now:* keeps the opened file's value (1, 1 when that line
+is gone) — **confirmed harmless** (Lode opens every app-saved file).
 *Why:* Lode writes the cursor's branch and line into the file on every
 save (AL005: 12.25, H_B: 2.2, PS_B: 46.1, BH_KEYED: 1.3). The app keeps
 whatever the opened file held, so its saves differ from Lode's in those 8
@@ -95,6 +191,9 @@ Lode does? It changes those 8 bytes in a saved file whenever the cursor is
 not on 1.1 (nothing else).
 
 **N11b. A network on an old spec set (NPG550).**
+*Known:* NPG550's windows (19a–f). *Unknown:* the 2.20 / 3.0 / 5.0 actives
+layout, until decoded from 19a and checked. *App now:* those sets' actives
+are not read — **incomplete**.
 *Why:* the oldest Actives formats (2.20, 3.0, 5.0: NPG550, bymac862,
 gefd862, jarr625, npg750, npg860, steph870) are read from your recording
 (19a) only; a network checks the reading. You have no network on any of
@@ -116,6 +215,7 @@ figure.
 next, from 19a, and this network checks the result.
 
 **44. (Optional) The `↕` in Power mode.**
+*Known:* only 37.png. *App now:* draws no mark — **unknown**.
 *Why:* in 37.png (AL002 branch 4, Power) 4.4's amp cell reads `61↕`; the
 app draws `61`. Nothing explains the mark.
 *Do:* AL002 with WVEXT862, Mode → Powering, branch 4. Put the cursor on
@@ -337,8 +437,8 @@ Bridgers, Feedermakers, Inline EQs, Custom Cascading, Boosters) and Casc.
 4. **15.4 — Lode's own two figures differ.** Every number on branch 15 and
    in both tap boxes matches (15.4's port −4.19 on screen and in its box);
    only Lode's Test list says 23.18 / 16.98 where its screen gives 23.19 /
-   16.99. Asked again in A2.
-5. **Brackets — all seen.** AL004's 5.19 `100<29>`, the older 9.1
+   16.99. **[SOLVED by A7.]**
+5. **[SUPERSEDED by 26, 4 Oct: every bracket re-read glyph by glyph; the rule now is file-formats 3.7.]** **Brackets — all seen.** AL004's 5.19 `100<29>`, the older 9.1
    `108<10>` and 5.19 `100<32>` as predicted. Two showed the rule wrong,
    now corrected: 16.4 is `8<17>` (a power stop on the coupler's own line
    does not end the walk back) and 9.14 `2<14>` (on 404 cable: the cable
@@ -374,10 +474,10 @@ A9. **Red cable numbers — solved.** The cable number is the series (its
    the cable from column 15 ("EX P3 625 U    Dual New Build"). The user:
    5xx are risers (aerial–underground, 20 or 25 ft), 1xx double runs, 4xx
    here not a 4th run, 2xx rarely a riser.
-A10. **S3's 1.2 reads `100<2>`**, as the corrected rule draws it. Lode
+A10. **[SUPERSEDED, 4 Oct: S3's 1.2 is `100{2}`; it is red as an internal coupler away from an active (7).]** **S3's 1.2 reads `100<2>`**, as the corrected rule draws it. Lode
     draws that coupler red (A14); the user's S3 has also been edited since
     the pack's copy (taps 14, 47.71 at 1.2).
-A11. Not answered yet — asked again in A3.
+A11. **[SOLVED as 8, 3 Oct: crossover figure seven wide.]**
 A12. **Custom Cascading — solved.** Every row of both tabs reads from the
     actives' u16: bit 0 Cust. Casc. (Yes/No), bit 1 Exclude, bit k + 1
     Casc. k Valid (k 1–14; the tab shows 19 columns, 15–19 Invalid on every
