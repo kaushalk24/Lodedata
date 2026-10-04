@@ -190,7 +190,10 @@ asked about before pushing. Add every new sample the user sends to
   cable numbers in their series' colours (505, 515, 438 red).
 * **SN001 + SHINSTON:** 47 branches, 390 lines; branches 1, 2, 5, 8, 15, 18,
   24, 28 match; 15-line Test list; Notes written exactly as Lode writes them.
-* **Coupler brackets:** 85 of 85 seen match (AL004 29, older 28, SN001 28).
+* **Coupler brackets:** four kinds, `(n)` `{n}` `<n>` `[n]` (4 Oct; Lode's
+  glyphs measured pixel by pixel — `<`, `(` and `{` look alike at a glance):
+  every bracket on every screenshot since 26 Sep matches, on AL004, the older
+  AL004, SN001, LG001, S3 and the keyed BH/HUMB.
 * **Cascade Position:** from the actives' Custom Cascading (file-formats
   3.3; every row of WVEXT862's and WVBeck750's tabs decoded): every box
   seen on all three networks.
@@ -220,12 +223,34 @@ asked about before pushing. Add every new sample the user sends to
 
 ## Next step
 
-`docs/QUESTIONS.md` **part A** (what is still open from the 3 Oct morning
-list: 22, 25–42), then **part B** (N1–N12, raised by the 3 Oct answers).
+`docs/QUESTIONS.md` **part A** (still open from 3 Oct: 22, 28 and 33
+explained again, 34–42), then **part B** (N1–N12), then **part C** (C1–C5,
+raised by the 4 Oct answers).
 The work item that needs no answer first: **reading the oldest actives
 formats** (2.20 / 3.0 / 5.0) from the user's recording of NPG550's Actives
 window (`2026-10-03_set/19a.mp4`, every tab; 19b–19f its Couplers and Taps
 windows, the older 10.0 / 3.0 layouts the readers already know).
+
+**Done 4 Oct** (the user's answers to 25–33; `EVIDENCE.md`, `2026-10-04_set`):
+
+* Brackets: `(n)` no footage, `{n}` along the parent's span behind (wins
+  when both match), `<n>` along the span ahead, `[n]` the rest; the walk
+  passes 0-ft lines and power stops, and from a 0-ft coupler line a span
+  counts only on that line's cable (`screen.branch_kind`). 6-port slots
+  `{n}`; the expanded amp lines in round brackets.
+* Double-clicking the second bracket of a splitter enters its branch.
+* The expanded display's block also on the last line of a cable (5.25,
+  5.27), whose node box stays short.
+* With Allow Over Equalization unticked and no EQ that fits: no forward EQ
+  (255; `VOID` / blank in the box, `<NO FWD EQ>` with a reverse-cyan
+  lead-in) — KERMIT750 on LG001.
+* An internal coupler counts as at its active only after it (2.33's MB-JMP
+  above the FM902T on 2.35: red).
+* Regression against 8c39e19: no saved byte and no Test list changes on any
+  network; on their own spec sets the screens change in the brackets, the
+  new blocks, LG001 11.5 / H043A 1.3 / H043B 1.3 / AL003 10.4 (the 0-ft
+  coupler-line cable rule; C1, N3, N4 ask) and `<NO FWD EQ>` on the older
+  AL004's WIFI OMNIs (C4 asks).
 
 **Done 3 Oct** (the user's answers to the morning's 1–24; `EVIDENCE.md`):
 

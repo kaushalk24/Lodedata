@@ -31,10 +31,11 @@ BRANCH_BRACKETS = {
     BRANCH_FORWARDFEED: "<>",
 }
 
-# A tap is drawn in the bracket style of its port count.  The manual gives
-# 6-port as {n}; AL004's Design screen shows the 6-port-slot LEQ\RC pad as
-# <43>, and 8-port as <n> is what the program's users know.
-TAP_BRACKETS = {2: "//", 4: "[]", 6: "<>", 8: "<>"}
+# A tap is drawn in the bracket style of its port count: /n/ 2-port, [n]
+# 4-port, <n> 8-port (AL004 11.2's <15>), and {n} a 6-port slot, as the
+# manual gives it -- the LEQ\RC pads on 6.8 ({43}) and 36.6 / 37.6 ({40}),
+# told from <n> glyph by glyph on the user's screenshots.
+TAP_BRACKETS = {2: "//", 4: "[]", 6: "{}", 8: "<>"}
 
 
 def bracket(text: str, style: str) -> str:

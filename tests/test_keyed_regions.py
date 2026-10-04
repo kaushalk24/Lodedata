@@ -137,7 +137,7 @@ def test_bh1ghzmid_keyed_as_on_the_screenshot(server):
     assert s["labels"] == ["1002", "102", "85", "5"] and s["extra_labels"] == ["550", "860"]
     assert _lines(s) == BH
     rows = [r for r in s["rows"] if r["branch"] == 1 and not r["end"]]
-    assert [r["couplers"] for r in rows[1:4]] == [["99<2>"], ["99<3>"], ["99<4>"]]
+    assert [r["couplers"] for r in rows[1:4]] == [["99(2)"], ["99(3)"], ["99(4)"]]
     assert [(r["taps"], r["tap_severity"]) for r in rows[4:6]] == [(["/26/"], [""]), (["<21>"], [""])]
     box = rows[6]["amp_info"]
     assert (box["type"], box["cascade"], box["homes_down"]) == ("FM332", 1, 0)
@@ -147,12 +147,12 @@ def test_bh1ghzmid_keyed_as_on_the_screenshot(server):
 
 def test_humb1ghzmid_keyed_as_on_the_screenshot(server):
     # coupler 92 has no part number and tap row 21 no part at all: Lode draws
-    # both, 92<2> green and <21> yellow, and the levels go on through them
+    # both, 92(2) green and <21> yellow, and the levels go on through them
     s = _keyed(server, "HUMB1GHzMid", "92")
     assert s["labels"] == ["1002", "102", "85", "5"] and s["extra_labels"] == ["550", "870"]
     assert _lines(s) == HUMB
     rows = [r for r in s["rows"] if r["branch"] == 1 and not r["end"]]
-    assert [r["couplers"] for r in rows[1:4]] == [["92<2>"], ["92<3>"], ["92<4>"]]
+    assert [r["couplers"] for r in rows[1:4]] == [["92(2)"], ["92(3)"], ["92(4)"]]
     assert [(r["taps"], r["tap_severity"]) for r in rows[4:6]] == [(["/26/"], [""]),
                                                                    (["<21>"], ["yellow"])]
 

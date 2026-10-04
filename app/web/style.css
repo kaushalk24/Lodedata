@@ -166,6 +166,8 @@ td.xport.yellow{color:var(--yellow)!important}
 td.xport.red{color:var(--red)!important}
 table.grid td.xtext{text-align:left;white-space:pre;overflow:visible}
 td.xtext .xblock{color:#11f6de}
+/* an active with no forward EQ: its pad line's lead-in in reverse (LG001 2.11, 30a) */
+td.xtext .xblock.xnoeq{background:#00e1e1;color:#000}
 td.xtext .xname{color:#7f7f00}
 td.xtext .xsupply{color:var(--white)}
 table.grid td.xhousing{color:var(--white)!important;text-align:left}

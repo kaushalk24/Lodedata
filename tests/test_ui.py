@@ -169,7 +169,7 @@ def test_typing_a_negative_coupler_swaps_the_legs_and_makes_a_branch(page):
     page.keyboard.press("Enter")
     page.wait_for_timeout(1000)
     cell = page.inner_text(f'#grid tbody tr:nth-child(1) td[data-c="{cplr}"]').strip()
-    assert cell.startswith("8-<"), cell      # a new branch has no footage yet
+    assert cell.startswith("8-("), cell      # a new branch has no footage yet
     assert "Branch 1 of 2" in page.inner_text("#stBranch")
     assert "through leg to this branch" in page.inner_text("#stMsg")
     assert not page.errors
@@ -233,8 +233,8 @@ def test_expanded_display_draws_the_amplifier_and_its_block(page):
     _type(page, "/")
     page.wait_for_timeout(300)
     text = page.eval_on_selector_all("#grid tbody td.xtext", "els => els.map(e => e.textContent)")
-    assert "[           AL00429]  <      SPB-2   \u00a6  SEQ-750-5   >" in text
-    assert "<                 A>  <      SPB-1   \u00a6   MEQ-42-2   >" in text
+    assert "[           AL00429]  (      SPB-2   \u00a6  SEQ-750-5   )" in text
+    assert "(                 A)  (      SPB-1   \u00a6   MEQ-42-2   )" in text
     assert "      [   74  2994  385  459  3379  6.85  8.45 51.67]" in text
     assert "       2-1-0 0-1-0   16 385" in text
     marks = page.eval_on_selector_all("#grid tbody td.xhousing", "els => els.map(e => e.textContent)")
@@ -271,7 +271,7 @@ def test_double_clicking_a_tap_in_select_tap_replaces_the_slots_tap(page):
     page.wait_for_timeout(800)
     assert page.evaluate("document.getElementById('modal').hidden")
     row = page.evaluate("S.scr.rows.find(r => r.branch === 6 && r.node === 8)")
-    assert row["taps"] == ["<44>"]
+    assert row["taps"] == ["{44}"]
     assert not page.errors
 
 
@@ -387,7 +387,7 @@ def test_insert_adds_zero_footage_lines_above_and_below(page):
     assert len(rows) == before + 3
     assert [r["ftg"] for r in rows[:8]] == [476, 155, 134, 0, 0, 121, 0, 156]
     assert [r["cab"] for r in rows[3:7]] == [410, 410, 410, 410]
-    assert rows[5]["couplers"] == ["12<6>"]
+    assert rows[5]["couplers"] == ["12{6}"]
     # the cursor stayed on the coupler's line
     assert page.evaluate("curRow().node") == 6
     # branch 6 still hangs from it, and nothing downstream moved
@@ -624,7 +624,7 @@ def test_clearing_and_retyping_a_coupler(page):
     # the branches after 44 move up: 45 (from 5.9) is now 44
     branches = page.evaluate("S.scr.branches.map(b => [b.number, b.parent_branch, b.parent_node])")
     assert [b[0] for b in branches] == list(range(1, 45)) and branches[-1] == [44, 5, 9]
-    assert _row(page, 5, 9)["couplers"] == ["1<44>"]
+    assert _row(page, 5, 9)["couplers"] == ["1(44)"]
     _goto(page, 4, 26, "cplr0")                   # 8[22] (and 23 under it): a DC-12 over it
     _type(page, "0")
     _type(page, "12")
@@ -873,7 +873,7 @@ def test_project_settings_set_all_files_and_errors_loading_project(page):
 
 def test_a_ntw_opens_without_a_spec_and_takes_one_later(server):
     """As the program does (recording 1): AL004 alone opens with levels
-    0.00, high low Rh Rl, amp 70 and couplers 0<2> 0[3]..., the Spec File
+    0.00, high low Rh Rl, amp 70 and couplers 0(2) 0[3]..., the Spec File
     Mismatch box naming WV750-2026; attaching WV750-2026 afterwards reads it
     by position, levels and all, and saving changes nothing."""
     import requests
@@ -890,7 +890,7 @@ def test_a_ntw_opens_without_a_spec_and_takes_one_later(server):
     b1 = [x for x in scr["rows"] if x["branch"] == 1 and not x["end"]]
     assert all(v == 0 for x in b1 for v in x["levels"])
     assert b1[0]["amp"] == "70" and b1[0]["amp_label"] == "AL004"
-    assert [x["couplers"] for x in b1[1:]] == [["0<2>"], ["0[3]"], ["0[4]"], ["0[5]"]]
+    assert [x["couplers"] for x in b1[1:]] == [["0(2)"], ["0[3]"], ["0[4]"], ["0[5]"]]
     # saved as it is, it is the file it was
     assert requests.post(f"{base}/ntw").content == src
     specs = [("files", (f.name, f.read_bytes())) for f in sorted(pair.glob("WV750-2026.*"))]
@@ -899,7 +899,7 @@ def test_a_ntw_opens_without_a_spec_and_takes_one_later(server):
     scr = requests.get(f"{base}/screen").json()
     assert scr["labels"] == ["750", "54", "40", "5"]
     b1 = [x for x in scr["rows"] if x["branch"] == 1 and not x["end"]]
-    assert b1[1]["levels"] == [49.0, 38.0, 17.0, 17.0] and b1[1]["couplers"] == ["570<2>"]
+    assert b1[1]["levels"] == [49.0, 38.0, 17.0, 17.0] and b1[1]["couplers"] == ["570(2)"]
     assert requests.post(f"{base}/ntw").content == src
 
 
@@ -942,15 +942,15 @@ def test_delete_refuses_a_power_stop_and_asks_before_a_branch(page):
 
 
 def test_zero_on_a_coupler_keeps_a_branch_with_lines_on_it(page):
-    """0 Alter, 0: the coupler comes off and its branch stays, "- <6>", fed
+    """0 Alter, 0: the coupler comes off and its branch stays, "- {6}", fed
     by nothing; 0 again leaves it.  A branch with nothing on it goes."""
     _open_al004(page)
     _goto(page, 4, 4, "cplr0")
     _key(page, "0", "0", "Enter", wait=1200)
-    assert _row(page, 4, 4)["couplers"] == ["- <6>"]
+    assert _row(page, 4, 4)["couplers"] == ["- {6}"]
     assert _row(page, 6, 1)["levels"] == [0, 0, 0, 0]
     _key(page, "0", "0", "Enter", wait=1200)
-    assert _row(page, 4, 4)["couplers"] == ["- <6>"]
+    assert _row(page, 4, 4)["couplers"] == ["- {6}"]
     branches = page.evaluate("S.scr.branches.length")
     _goto(page, 4, 9, "cplr0")                               # a new coupler: an empty branch
     _key(page, "0", "1", "0", "0", "Enter", wait=1200)
@@ -974,13 +974,40 @@ def test_plus_on_the_power_stop_column_toggles_it(page):
     assert not page.errors
 
 
+def test_double_clicking_either_bracket_of_a_splitter_enters_its_branch(page):
+    """AL004 4.14's 3-<11>{12} is one cell: double-clicking <11> goes into
+    branch 11, {12} into 12; the wheel turned up on the branch's first line
+    comes back to 4.14 with the cursor on ftg (the user, 4 Oct)."""
+    _open_al004(page)
+
+    def dblclick(bracket):
+        _goto(page, 4, 14, "cplr0")
+        box = page.evaluate("""(b) => {
+          const td = document.querySelector('#grid tbody tr.onrow td.cur');
+          const node = td.firstChild, at = node.textContent.indexOf(b);
+          const r = document.createRange(); r.setStart(node, at + 1); r.setEnd(node, at + 2);
+          const q = r.getBoundingClientRect(); return [q.x + q.width / 2, q.y + q.height / 2];
+        }""", bracket)
+        page.mouse.dblclick(*box)
+        page.wait_for_timeout(800)
+        return page.evaluate("S.branch")
+    assert _row(page, 4, 14)["couplers"] == ["3-<11>{12}"]
+    assert dblclick("<11>") == 11
+    assert dblclick("{12}") == 12
+    page.mouse.move(400, 400)
+    page.mouse.wheel(0, -100)
+    page.wait_for_timeout(800)
+    assert page.evaluate("[S.branch, curRow().node, columns()[S.col].key]") == [4, 14, "ftg"]
+    assert not page.errors
+
+
 def test_two_branches_at_a_line_delete_and_zero(page):
-    """AL004 4.14, 3-<11><12> (the user): Delete asks "Branches 11, 12, begin
+    """AL004 4.14, 3-<11>{12} (the user): Delete asks "Branches 11, 12, begin
     at this node ... these branches"; 0 on the splitter takes it off both
-    branches, - <11> and - <12>, and keeps them."""
+    branches, - <11> and - {12}, and keeps them (28 Sep 18:01)."""
     _open_al004(page)
     _goto(page, 4, 14, "cplr0")
-    assert _row(page, 4, 14)["couplers"] == ["3-<11><12>"]
+    assert _row(page, 4, 14)["couplers"] == ["3-<11>{12}"]
     _key(page, "Delete")
     assert page.inner_text(".msgbox .mbtext").replace("\n", " ") == (
         "Branches 11, 12, begin at this node. Deleting this node will delete these branches "
@@ -988,7 +1015,7 @@ def test_two_branches_at_a_line_delete_and_zero(page):
     page.click("#mbCancel")
     page.wait_for_timeout(400)
     _key(page, "0", "0", "Enter", wait=1200)
-    assert _row(page, 4, 14)["couplers"] == ["- <11>", "- <12>"]
+    assert _row(page, 4, 14)["couplers"] == ["- <11>", "- {12}"]
     assert page.evaluate("S.scr.branches.length") == 45
     # Delete on - <11> asks the same and takes the line with both (the user)
     _key(page, "Delete")

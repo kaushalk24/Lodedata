@@ -151,10 +151,10 @@ def test_swapping_the_legs_moves_the_loss_between_the_paths():
 
 
 def test_the_screen_shows_the_leg_designation():
-    # a new branch has no footage yet, so it is drawn <2>, as AL004 draws its
-    # empty branches (16<19>, 3[21]<24>)
-    assert build(_design_with_dc(THROUGH_DOWNSTREAM)).rows[0].couplers[0] == "8<2>"
-    assert build(_design_with_dc(THROUGH_FIRST)).rows[0].couplers[0] == "8-<2>"
+    # a new branch has no footage yet, so it is drawn (2), as AL004 draws its
+    # empty branches (16(19), 3[21](24)) and the keyed BH1GHzMid its 99(2)
+    assert build(_design_with_dc(THROUGH_DOWNSTREAM)).rows[0].couplers[0] == "8(2)"
+    assert build(_design_with_dc(THROUGH_FIRST)).rows[0].couplers[0] == "8-(2)"
 
 
 def test_a_branch_with_mileage_footage_is_drawn_square():

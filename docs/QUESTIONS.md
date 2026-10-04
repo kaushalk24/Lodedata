@@ -1,10 +1,48 @@
 # Questions for the user
 
-Updated 3 Oct, evening. Part A is what is still open from the morning's
-list (its numbers kept); part B the new questions today's answers raised —
-for after part A, as you asked. Each says what to do in Lode Data, what to
-send, what it settles and what the app does now. A screenshot means the whole
-Lode window, info box showing. Where answers came from: `EVIDENCE.md`.
+Updated 4 Oct. Part A is what is still open from the list of 3 Oct (its
+numbers kept), part B the questions the answers of 3 Oct raised, part C the
+ones the answers of 4 Oct raised — in that order, as you asked. Each says
+what to do in Lode Data, what to send, what it settles and what the app does
+now. A screenshot means the whole Lode window, info box showing. Where
+answers came from: `EVIDENCE.md`.
+
+## Answered 4 Oct (25–33)
+
+25. **Two-branch coupler** — double-clicking either bracket of 4.14's
+    `3-<11>{12}` goes into that branch; the wheel turned up on its first line
+    comes back to 4.14 with the cursor on ftg; Show Tips is on again after a
+    restart. The app now enters the second branch from the second bracket
+    (it entered the first); the rest it did already.
+26. **`{n}` and `(n)`** — Lode draws four brackets, told apart only by the
+    glyph: `<` pointed, `(` with a flat middle, `{` with a notch. `(n)` a
+    branch with no footage (4.17's `1(18)`), `{n}` one along the parent's span
+    behind (4.4's `12{6}`), `<n>` one along the span ahead (4.14's `<11>`),
+    `[n]` the rest. Every bracket on every screenshot since 26 Sep was read
+    again, glyph by glyph: all now as the app draws them, and 9.1 is
+    `108<10>` with 9.2's power stop (29b) — the power stop does not count.
+    6-port slots (the LEQ\RC pads, 6.8's `{43}`) are `{n}` too, and the
+    expanded display's supply and pad/EQ lines are in round brackets.
+27. **Several taps on one line** — 27a–27d (/23/ /11/ / 4/ on 8.1): every
+    figure, each tap's box and the `/` lines were the app's already. With no
+    network having a tap that feeds a branch among several, that part is
+    dropped.
+29. **The block on a 0-ft line** — none on a 0-ft line after a coupler (9.2,
+    10.4, 14.5, 20.18, 25.2, 29.3, 29.7, 36.2, 37.2). New: a block on the last
+    line of a cable — 5.25 (406, then 414) and 5.27 (414, then 515), its node
+    box the short one. The app now draws those; all 28 blocks on 29a–32b
+    match figure for figure.
+30. **The third count** — still 0 for every active keyed (KERMIT750's
+    FM901e-B, FM902B, FM902T, FML332 and FML1G7J on LG001): it is not any of
+    them, so it stays 0 in the app. 30a–30e showed more: with "Allow Over
+    Equalization" unticked and no EQ that fits, Lode picks no forward EQ
+    (`VOID` or nothing in the box, `<NO FWD EQ>` with a reverse-cyan lead-in
+    in `/`), and an internal coupler above its active at the same place
+    (2.33's MB-JMP over 2.35's FM902T) is red. The app now does all three;
+    every figure on 30a–30e matches.
+31. **5.29** — the white `(1)` under the node, as the app draws it.
+32. **The cyan `(1)`** — the tap's place on the line: `(1)` `(2)` `(3)` on
+    27d, each row that tap's port levels. As the app draws it.
 
 ## Answered 3 Oct (the morning's 1–24)
 
@@ -54,52 +92,27 @@ Lode window, info box showing. Where answers came from: `EVIDENCE.md`.
 24. **"ntw map AL004"** — a file named in the first sessions; you don't know
     it, so dropped.
 
-## Part A — still open from the morning's list
+## Part A — still open from the list of 3 Oct
 
 22. **WVBeck750 (yes / no).** You sent it on 29 Sep. May it go into the test
     samples? 34 tests use it.
 
-### Priority 4 — couplers, branches and taps on the Design screen
+### Explained again (25–33)
 
-No answer to 25–28 is recorded anywhere in the docs or in this session's
-history (it starts 29 Sep); if you answered them in an earlier chat,
-please send the answers again.
-
-25. **Two-branch coupler.** *Do:* AL004 + WV750, line 4.14 (`3-<11><12>`):
-    press `.` then `←`, and `.` then `→`; double-click the second bracket
-    `<12>`. *Send:* a note of where each takes the cursor. Also: after the
-    mouse wheel brings you back from a branch, is the cursor on the coupler
-    cell or on ftg (the app: ftg)? After closing and reopening Lode, is
-    View → Show Tips still off if you turned it off (the app: back on)?
-26. **`{n}` and `(n)`.** The manual lists `{n}` (backfeed) and `(n)` (no
-    footage); every no-footage and backward branch seen is drawn `<n>`.
-    *Send:* any screenshot where Lode draws `{n}` or `(n)`, if you ever
-    see one.
-27. **Several taps on one line feeding a branch.** *Send:* a screenshot of
-    a line with two or more taps where one feeds a branch, cursor on that
-    tap (box showing). *Settles:* which tap feeds it and where the
-    "Branch:" line sits in its box.
-28. **0 on a tap that feeds a branch.** *Do:* on a copy (Save As), put the
-    cursor on such a tap and key 0. *Send:* before and after screenshots.
-    *App now:* the branch stays, fed by nothing (starts at 0.00).
-
-### Priority 5 — the expanded display (`/`)
-
-29. **The block on a 0-ft first line.** *Do:* AL004 + WV750, `/` on, at any
-    of 5.25, 9.2, 10.4, 14.5, 20.18, 25.2, 29.3, 29.7, 36.2, 37.2. *Send:*
-    screenshots. *Settles:* whether the cyan block is drawn for a branch's
-    first line or for a 0-ft line after a coupler.
-30. **The third count in `2-2-0`.** *Do:* `/` on a line below one of WV750's
-    FM901e-B, FM901e-T, FM902B, FM902T, FML332 or FML1G7J. *Send:*
-    screenshot. *Settles:* what the third number counts (0 everywhere so
-    far).
-31. **The housing marker at AL004 5.29.** *Do:* `/` at 5.29 (5.29 and 5.30
-    are one location, the first line carrying nothing). *Send:* screenshot.
-32. **The cyan `(1)` under ftg.** *Do:* `/` on a line with two or more
-    taps. *Send:* screenshot. *Settles:* what it counts.
-33. **The three-option dialog** from your early videos (possibly "NETWORK
-    MODIFIED": 3 Restore, 7 Save, 9 Switch). *Send:* a screenshot if it
-    appears again, and what brought it up.
+28. **Taking off a tap that feeds a branch.** In the older AL004 (with
+    WVEXT862) the tap on 11.16 is drawn `117+` and the one on 11.18 `104+`:
+    each feeds a branch (43, 44) straight from its port, with no coupler.
+    *Do:* open the older AL004 with WVEXT862, File → Save Network As…
+    TAP_A.ntw; put the cursor on 11.16's `117+`, press 0 (Alter), key 0 and
+    Enter to take the tap off. *Send:* a screenshot before and after, and
+    any box that appears. *Settles:* what becomes of branch 43 — deleted
+    with the tap, kept with nothing feeding it, or the tap refused. *App
+    now:* kept, fed by nothing (0.00).
+33. **The NETWORK MODIFIED menu.** The manual says Num Lock opens a
+    "NETWORK MODIFIED" menu (3 Restore, 7 Save, 9 Switch). *Do:* on a copy of
+    AL004, change one ftg, then press Num Lock. *Send:* a screenshot of what
+    appears (nothing is fine too). *Settles:* whether the menu exists in your
+    version and what it offers (the app has none).
 
 ### Priority 6 — what Lode writes when saving
 
@@ -134,7 +147,7 @@ please send the answers again.
     and user ids from file headers (removed from the current files).
     Rewrite the branch's history to remove them?
 
-## Part B — new questions from today's answers (after part A)
+## Part B — questions the answers of 3 Oct raised (after part A)
 
 N1. **88 on AL004 4.2.** On 28 Sep, 88 (FML1G7J ALC LE) keyed on 4.2 kept
     0 / SCS6 / 0 / 0, where every other active keyed today was picked at
@@ -149,8 +162,11 @@ N2. **H043A's Test list.** *Do:* open H043A_MID with BH1GHzMid, press 5.
 N3. **H043B's PCD.** *Do:* open H043B_MID, cursor on 1.1's cplr cell.
     *Send:* screenshot of branch 1 lines 1.1–1.8 with the box. *Settles:*
     which network and line it names, and the levels on 1.1 and 1.2 (the app:
-    0.00, nothing feeding the first line). *App now:* draws `<24>`.
-N4. **H043A's PCD.** The same on H043A_MID's 1.1.
+    0.00, nothing feeding the first line); also 1.3's bracket — a coupler on
+    a 0-ft line of no cable with 234 ft ahead on 119, branch 2 starting 234
+    ft (the app: `99[2]`, as S3's 7b). *App now:* draws `(24)`.
+N4. **H043A's PCD.** The same on H043A_MID's 1.1; its 1.3 is a 0-ft line on
+    19 with a power stop on 1.4 and 625 ft on 19 ahead (the app: `99<2>`).
 N5. **Underground housings.** *Do:* H043B_MID, press `/`, go to 1.6, 1.13,
     2.9, 3.7, 13.1 and 7.1. *Send:* a screenshot at each. *Settles:* which
     housing each place takes: Lode's file counts 82 / 11 / 4 / 2 of housings
@@ -184,6 +200,34 @@ N12. **"Not enough taps at node 1.2."** (1c: 2 homes, no tap). *Do:* AL004
      line. *Settles:* the line's wording, colour and place in the list, and
      that it is homes against all the line's tap ports (the rule hc turns
      red by). *App now:* hc red, no Test line.
+
+## Part C — new questions from 4 Oct (after part B)
+
+C1. **LG001 11.5.** *Do:* LG001 with WV750-2026 (its own), go to 11.5 (the
+    LE `11` with coupler 2 to branch 16, 0 ft on cable 100; 11.6 0 ft, 11.7
+    200 ft on 104; branch 16 starts 200 ft). *Send:* a screenshot of 11.3–11.8.
+    *Settles:* whether the span ahead counts when it is on another cable than
+    the 0-ft coupler line (the app: `2[16]`; it drew `2<16>` before today).
+C2. **When the pad and EQ labels lose their spaces.** On 29a (03:34)
+    5.23 read `SPB-  10¦  SEQ-750-   6` / `MEQ-42-   2`; on 32a (03:59)
+    `MEQ-42-2`. *Do:* close Lode, open it, AL004 with WV750-2026, press `/`,
+    go to 5.23: screenshot. Then put the cursor on 5.23's amp cell (its box
+    showing), move down a line: screenshot again. *Settles:* whether showing
+    the box is what trims them (the app always shows them trimmed).
+C3. **A branch's 0-ft first line.** *Do:* AL004 with WV750-2026, `/`, the top
+    of branch 5 (5.1, 0 ft with nothing on it, 5.2 on the same cable).
+    *Send:* screenshot. *Settles:* whether a branch's first line gets the
+    block for being first (the app: yes) — 22.1, the only one seen, is also
+    the last line on its cable.
+C4. **No EQ on the return, and on the older files.** *Do:* the older AL004
+    with WVEXT862, `/`, go to 43.1 (WIFI OMNI; both EQs VOID in its box).
+    *Send:* screenshot. *Settles:* the return line with no EQ, and the forward
+    one on a file opened rather than keyed (the app: `<NO FWD EQ>` and
+    `VOID`).
+C5. **A 6-port slot in a coupler's preview.** *Do:* AL004, cursor on 4.4's
+    `12{6}` (its preview lists branch 6, with 6.8's `{43}`). *Send:*
+    screenshot. *Settles:* how the preview box draws a 6-port slot (the
+    app: `<43>`; 2-, 4- and 8-port are `(17)` `[8]` `{15}` there).
 
 ---
 

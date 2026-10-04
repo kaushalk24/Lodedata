@@ -700,7 +700,19 @@ A spec saved from the editor after the Design screen has shown a pad or EQ
 writes that label trimmed (`"  16"` → `"16"`) — on AL004, exactly 34.6's
 four, the ones that first showed with their spaces (`SPB-  16`) and trimmed
 after reopening — evidently the program trims a label in its own memory
-once it has used it. The replica always shows them trimmed.
+once it has used it. The replica always shows them trimmed. On 4 Oct a fresh
+Lode showed every label with its spaces (`SPB-  10¦  SEQ-750-   6`, 29a–29j),
+and half an hour later some trimmed (`SEQ-750-7`, `MEQ-42-2`, 32a/32b): what
+trims them is asked (QUESTIONS C2).
+
+**No forward EQ.** With "Allow Over Equalization" unticked and no EQ in the
+bank that fits (none leaves no more tilt than wanted), the program picks
+none: 255, the bank's row 0. KERMIT750's FM901e-B, FM902B and FM902T keyed
+on LG001's 2.11, 2.21 and 2.35 (30a–30c) take 11–11.5 dB of tilt where each
+wants less than none; their boxes read `Forward Eq: VOID` (bank 2) or
+nothing (bank 5, whose row 0 has no label), the expanded display
+`(      NPB-13  ¦<NO FWD EQ>   )` with its lead-in `  (      ` in reverse
+cyan. The pad is then picked with no EQ loss (13, Flag, Flag).
 
 WV750's banks: 1 the LEs and bridgers (`SPB-`/`SEQ-750-`/`MEQ-42-`), 2 the
 FM901e and FML1G7J pads (`NPB-`), 3 the WiFi units, 4 the nodes (`NODE-`),
@@ -839,11 +851,33 @@ that starts the branch), +131 non-zero when this branch takes the through leg
 (`3-<11><12>`). End record: the last node's next id, then the last node's id.
 Both checked on all 45 AL004 branches.
 
-**No branch type is stored.** `<n>` against `[n]` (forwardfeed/backfeed against
-normal) is not in the branch record, the coupler's node, the branch's nodes,
-the end record, or any per-branch byte, bit or list anywhere in the file:
-AL004's branches 2 `<2>` and 3 `[3]` have byte-identical branch records and
-coupler nodes apart from ids. The program derives it — see open question 1.
+**No branch type is stored.** The bracket around a branch number is not in
+the branch record, the coupler's node, the branch's nodes, the end record, or
+any per-branch byte, bit or list anywhere in the file: AL004's branches 2
+`(2)` and 3 `[3]` have byte-identical branch records and coupler nodes apart
+from ids, and no byte of the 45 branch records follows the four kinds. The
+program derives it from the spans (4 Oct, every bracket on the user's
+screenshots read glyph by glyph — Lode's font draws `<` pointed, `(` with a
+flat middle and `{` with a notch, all three easily taken for `<`):
+
+* `(n)` — the branch has no footage (AL004 1.2's `570(2)`, 4.17's `1(18)`,
+  4.25's `3[21](24)`, the keyed BH1GHzMid's `99(2)`).
+* `{n}` — a backfeed: its first span is as long as the parent's nearest span
+  behind the coupler, the coupler's own line's first (4.4's `12{6}` on 121,
+  4.14's `{12}` on 4.13's 99, 9.12's `100{13}`). Wins when both match: S3's
+  1.2, 100 ft between two 100s, is `100{2}`.
+* `<n>` — a forwardfeed: as long as the nearest span ahead (4.14's `3-<11>`
+  on 4.16's 105, 9.1's `108<10>` past 9.2's power stop).
+* `[n]` — anything else.
+
+The walk to the nearest span passes 0-ft lines and power stops. From a
+coupler on a 0-ft line, the span found counts only on that line's cable
+(the cable file index, not the series): the older AL004's 4.14 (410) is
+`3[11]{12}` because 4.16's 105 is on 100, and S3 with its coupler moved to a
+0-ft line with no cable reads `100[2]` though 1.3's 100 is branch 2's; SN001
+18.1 (442, then 142) is `108<19>`. From a line with its own span the cable
+does not matter (SN001 24.17's `63<29>`, 442 on to 40). The preview box
+draws every branch `[n]`.
 
 Everything above was checked against AL004's screens: all 29 footages, cables,
 house counts, taps, couplers, both amplifiers and their names on branch 4;

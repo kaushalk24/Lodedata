@@ -301,7 +301,7 @@ def test_branches_6_and_7_as_lode_shows_them():
     assert [rows[k].amp for k in ((6, 3), (6, 9), (7, 3), (7, 6))] == ["Q5", "EQ", "Q5", "EQ"]
     assert rows[(6, 9)].amp_name == rows[(7, 6)].amp_name == "LEQ-PEA-8"
     assert [rows[k].taps for k in ((6, 7), (6, 9), (6, 10), (7, 6), (7, 7))] == \
-        [["/14/"], ["<43>"], ["/ 8/"], ["<42>"], ["/ 8/"]]
+        [["/14/"], ["{43}"], ["/ 8/"], ["{42}"], ["/ 8/"]]
     assert rows[(6, 7)].tap_severity == ["yellow"] and rows[(6, 10)].tap_severity == ["red"]
     ends = {b: [r for r in scr.rows if r.branch == b and r.end][0] for b in (6, 7)}
     assert [as_shown(v) for v in ends[6].port_levels] == [19.19, 13.51, 46.73, 44.45]
@@ -310,20 +310,21 @@ def test_branches_6_and_7_as_lode_shows_them():
 
 
 def test_the_couplers_are_drawn_as_lode_draws_them():
-    # branch 4 (the user's screenshot of 4.13) and branch 11 (4.14's):
-    # 11.1 starts 105 ft on 410 cable, mileage, so 4.14 is 3[11]<12> here
+    # branch 4 (SHINSTON3 1c) and branch 11 (28 Sep 18:17), read glyph by
+    # glyph: 4.14 is 3[11]{12} here -- 11's 105 is 4.16's span, but 4.16 is
+    # on 100 and 4.14, a 0-ft line, on 410
     d, _ = design_from_ntw(NTW.read_bytes(), SPEC)
     scr = build(d)
     cpl = lambda b: [c for r in scr.rows if r.branch == b and not r.end for c in r.couplers]
-    assert cpl(4) == ["12<6>", "100[9]", "3[11]<12>"]
-    assert cpl(11) == ["2[19]", "1<21>", "16<22>", "100[23]", "3[24]<27>", "8[25]"]
-    assert cpl(6) == ["100[7]"] and cpl(7) == ["112<8>"]
-    # set A (5a-5c, 3g): 16.4 8<17> -- 17 runs 169 ft along 16.3's span,
-    # past the power stop on the coupler's own line; 9.14 2<14> on 404
+    assert cpl(4) == ["12{6}", "100[9]", "3[11]{12}"]
+    assert cpl(11) == ["2[19]", "1(21)", "16(22)", "100[23]", "3[24](27)", "8[25]"]
+    assert cpl(6) == ["100[7]"] and cpl(7) == ["112(8)"]
+    # set A (5a-5c, 3g): 16.4 8{17} -- 17 runs 169 ft along 16.3's span,
+    # past the power stop on the coupler's own line; 9.14 2{14} on 404
     # cable, mileage, as long as 9.14's own span
-    assert cpl(16) == ["8<17>"] and cpl(25) == ["2[26]"]
-    assert cpl(9) == ["108<10>", "100<13>", "2<14>", "2[15]"]
-    assert cpl(5) == ["12[28]", "100<39>", "100<32>", "2[37]", "12<38>"]
+    assert cpl(16) == ["8{17}"] and cpl(25) == ["2[26]"]
+    assert cpl(9) == ["108<10>", "100{13}", "2{14}", "2[15]"]
+    assert cpl(5) == ["12[28]", "100{39}", "100{32}", "2[37]", "12(38)"]
 
 
 def test_the_550_column_is_lodes():

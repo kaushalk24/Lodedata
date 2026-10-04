@@ -193,15 +193,22 @@ function expandedLines(r, cols) {
       segs.map(([t, cls]) => `<span class="${cls}">${esc(t)}</span>`).join('') + '</td>' : '<td></td>') + '</tr>';
   // lines 2-3: an amplifier's name and supply, then its pad and EQ parts,
   // forward then return; lines 4-5: the cyan block, which starts six
-  // characters to the right of the name (columns as 4.24, 22.3, 34.3 show)
+  // characters to the right of the name (columns as 4.24, 22.3, 34.3 show).
+  // The name is in square brackets, the supply and the parts in round ones
+  // (told from < by their glyphs: 5.23, 9.3, 14.3, 29.5 on the 4 Oct set)
   const text = [null, null, null, null];
   const a = r.amp_info;
   if (a && a.name !== undefined) {
     const [fp, rp, fe, re] = a.parts || ['', '', '', ''];
+    // no forward EQ: "<NO FWD EQ>" right after the bar, and the line's
+    // lead-in in reverse cyan (LG001 2.11, 2.21, 2.35 on KERMIT750, 30a-30c)
+    const noEq = fe.startsWith('<');
+    const feText = noEq ? fe.padEnd(14) : '  ' + fe.padEnd(12);
     text[0] = [['[' + (r.amp_label || '').padStart(18) + ']', 'xname'],
-               ['  <      ' + fp.padEnd(8) + '\u00a6  ' + fe.padEnd(12) + '>', 'xblock']];
-    text[1] = [['<' + (a.supply || '').padStart(18) + '>', 'xsupply'],
-               ['  <      ' + rp.padEnd(8) + '\u00a6   ' + re.padEnd(11) + '>', 'xblock']];
+               ['  (      ', 'xblock' + (noEq ? ' xnoeq' : '')],
+               [fp.padEnd(8) + '\u00a6' + feText + ')', 'xblock']];
+    text[1] = [['(' + (a.supply || '').padStart(18) + ')', 'xsupply'],
+               ['  (      ' + rp.padEnd(8) + '\u00a6   ' + re.padEnd(11) + ')', 'xblock']];
   }
   if (r.block && r.block.distances) {
     const [one, two] = blockText(r.block);
@@ -324,11 +331,20 @@ function renderGrid() {
   renderInfo();
 }
 
-// a coupler's tip: "<double-click or [.][LT] or [.][RT] to enter branch>"
+// a coupler's tip: "<double-click or [.][LT] or [.][RT] to enter branch>".
+// One splitter feeding two branches is one cell, 3-<11>{12}: double-clicking
+// the second bracket goes into the second branch (the user, 4 Oct)
 $('#grid tbody').ondblclick = ev => {
   const td = ev.target.closest('td[data-r]');
   const c = td && columns()[+td.dataset.c];
-  if (!c || !/^cplr\d$/.test(c.key) || !(curRow().couplers || [])[+c.key.slice(4)]) return;
+  const text = c && /^cplr\d$/.test(c.key) && (curRow().couplers || [])[+c.key.slice(4)];
+  if (!text) return;
+  let at = -1;
+  const pos = document.caretPositionFromPoint ? document.caretPositionFromPoint(ev.clientX, ev.clientY)
+    : document.caretRangeFromPoint && document.caretRangeFromPoint(ev.clientX, ev.clientY);
+  if (pos && td.contains(pos.offsetNode || pos.startContainer)) at = pos.offset ?? pos.startOffset;
+  const second = [...text.matchAll(/[\[<({](\d+)[\]>)}]/g)][1];
+  if (second && at >= second.index) { gotoBranch(+second[1]); return; }
   enterBranch(+c.key.slice(4));
 };
 

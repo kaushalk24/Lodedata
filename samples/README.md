@@ -9,7 +9,9 @@ Put real Lode Data files here to run the checks against them. They come in
       partest/          the Parameters test copies (paratest.par, s1-s8, v1-v10,
                         act.atv)
       KERMIT750/        KERMIT750-2026.par .atv .tap .cpr .cbl
-      designs/          AL002.ntw AL003.ntw AL005.ntw (the older designs)
+      designs/          AL002.ntw AL003.ntw AL005.ntw (the older designs),
+                        LG001.ntw (WV750-2026's; opened with KERMIT750 in
+                        tests/test_lg001.py)
       keyed/            BLANK_test.ntw (Lode's empty network), S1-S3.ntw (keyed
                         from it, one step each)
       app-saved/        NEW_T1.ntw, AL004_NOTES.ntw, SN001_NOTES.ntw -- files the

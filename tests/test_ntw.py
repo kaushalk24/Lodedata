@@ -293,16 +293,16 @@ def test_the_return_window_and_max_crossover_are_the_parameters():
 
 
 def test_branch_6_colours_before_and_after_the_pad_change(screen):
-    # as imported (<43>): the pad is over its 54 window, / 8/ is 1.73 above
+    # as imported ({43}): the pad is over its 54 window, / 8/ is 1.73 above
     # max at 40 and crossed over; the end line shows 750/54 yellow, 40 red
     rows = {r.node: r for r in screen.rows if r.branch == 6}
-    assert rows[8].taps == ["<43>"] and rows[8].tap_severity == ["yellow"]
+    assert rows[8].taps == ["{43}"] and rows[8].tap_severity == ["yellow"]
     assert rows[8].tap_port_severity == [["", "yellow", "", ""]]
     assert rows[9].tap_severity == ["red"]
     assert rows[10].end and rows[10].port_severity == ["yellow", "yellow", "red", ""]
-    # with PAD 10 (<40>) the return comes down 3 dB: / 8/ is only crossed over
+    # with PAD 10 ({40}) the return comes down 3 dB: / 8/ is only crossed over
     rows = {r.node: r for r in _with_pad_10().rows if r.branch == 6}
-    assert rows[8].taps == ["<40>"] and rows[8].tap_severity == ["yellow"]
+    assert rows[8].taps == ["{40}"] and rows[8].tap_severity == ["yellow"]
     assert [as_shown(v) for v in rows[10].port_levels] == [21.63, 24.81, 43.73, 41.45]
     assert rows[9].tap_severity == ["yellow"]
     assert rows[10].port_severity == ["yellow", "yellow", "", ""]
@@ -527,7 +527,7 @@ def test_in_line_q_device_and_the_pad_after_it(screen):
     # LEQ\RC PAD 13; the info box on that pad reads 26.54 26.82 39.23 36.85
     rows = {r.node: r for r in screen.rows if r.branch == 6 and not r.end}
     assert rows[2].amp == "Q5" and rows[8].amp == "Q2"
-    assert rows[8].taps == ["<43>"]
+    assert rows[8].taps == ["{43}"]
     assert [as_shown(v) for v in rows[8].tap_levels[0]] == [26.54, 26.82, 39.23, 36.85]
     end = next(r for r in screen.rows if r.branch == 6 and r.end)
     assert [as_shown(v) for v in end.port_levels] == [21.63, 24.81, 46.73, 44.45]
@@ -623,6 +623,94 @@ def test_expanded_display_lines(screen):
             assert tuple(as_shown(r.out_levels[f]) for f in screen.frequencies) == want, (branch, n)
     for key, want in PORT_LEVELS.items():
         assert tuple(as_shown(v) for v in rows[key].tap_levels[0]) == want, key
+
+
+# The user's expanded display of 4 Oct (29a-29j, 31, 32a, 32b): every block,
+# figure for figure, and the lines drawn without one.  5.25 and 5.27 are the
+# last lines on their cables (406 then 414, 414 then 515): a block, and the
+# short node box (31's 5.27).
+BLOCKS_4_OCT = {
+    (5, 21): ([346, 4663, 346, 346, 4663], [5.16, 5.16, 69.34], [2, 0, 0], [0, 3, 0], 6, 346),
+    (5, 23): ([806, 5123, 460, 806, 5123], [6.85, 12.01, 76.19], [2, 1, 0], [0, 1, 0], 3, 460),
+    (5, 24): ([0, 5123, 0, 0, 5123], [0.00, 0.00, 76.19], [2, 1, 0], [0, 0, 0], 3, 0),
+    (5, 25): ([0, 5123, 0, 0, 5123], [0.00, 0.00, 76.19], [2, 1, 0], [0, 0, 0], 2, 0),
+    (5, 27): ([623, 5746, 623, 623, 5746], [11.53, 11.53, 87.72], [2, 1, 0], [0, 0, 0], 1, 623),
+    (5, 30): ([623, 5746, 981, 981, 6104], [18.15, 18.15, 94.34], [2, 1, 0], [0, 0, 0], 1, 358),
+    (9, 1): ([0, 2027, 0, 0, 2027], [0.00, 0.00, 30.00], [1, 0, 0], [4, 2, 0], 54, 0),
+    (10, 1): ([300, 2327, 300, 300, 2327], [6.48, 6.48, 36.48], [1, 0, 0], [1, 2, 0], 45, 300),
+    (10, 3): ([614, 2641, 314, 614, 2641], [6.78, 13.26, 43.26], [2, 0, 0], [1, 1, 0], 25, 314),
+    (14, 3): ([594, 2621, 294, 594, 2621], [5.44, 11.92, 41.92], [1, 1, 0], [0, 1, 0], 17, 294),
+    (14, 4): ([0, 2621, 0, 0, 2621], [0.00, 0.00, 41.92], [1, 1, 0], [0, 0, 0], 17, 0),
+    (14, 7): ([301, 2922, 301, 301, 2922], [6.50, 6.50, 48.42], [1, 1, 0], [0, 0, 0], 4, 301),
+    (20, 17): ([591, 4786, 591, 591, 4786], [12.77, 12.77, 83.52], [3, 2, 0], [1, 0, 0], 3, 591),
+    (20, 19): ([124, 4910, 124, 124, 4910], [2.68, 2.68, 86.20], [3, 2, 0], [0, 0, 0], 1, 124),
+    (25, 1): ([1421, 1421, 0, 1421, 1421], [0.00, 21.03, 21.03], [1, 0, 0], [1, 4, 0], 17, 0),
+    (25, 5): ([583, 2004, 583, 583, 2004], [8.69, 8.69, 29.72], [1, 1, 0], [0, 1, 0], 4, 583),
+    (29, 1): ([0, 4317, 0, 0, 4317], [0.00, 0.00, 64.18], [2, 0, 0], [0, 1, 0], 12, 0),
+    (29, 2): ([184, 4501, 184, 184, 4501], [2.74, 2.74, 66.92], [2, 0, 0], [0, 1, 0], 10, 184),
+    (29, 5): ([756, 5073, 572, 756, 5073], [8.52, 11.26, 75.45], [2, 1, 0], [0, 1, 0], 8, 572),
+    (29, 6): ([0, 5073, 0, 0, 5073], [0.00, 0.00, 75.45], [2, 1, 0], [0, 0, 0], 8, 0),
+    (29, 9): ([182, 5255, 182, 182, 5255], [2.71, 2.71, 78.16], [2, 1, 0], [0, 0, 0], 6, 182),
+    (29, 10): ([310, 5383, 128, 310, 5383], [1.91, 4.62, 80.06], [2, 1, 0], [0, 0, 0], 4, 128),
+    (34, 3): ([889, 5206, 543, 889, 5206], [8.09, 13.25, 77.43], [2, 1, 0], [0, 2, 0], 3, 543),
+    (34, 6): ([728, 5934, 728, 728, 5934], [10.85, 10.85, 88.27], [2, 2, 0], [0, 1, 0], 2, 728),
+    (36, 1): ([0, 2134, 0, 0, 2134], [0.00, 0.00, 31.65], [1, 0, 0], [0, 1, 0], 10, 0),
+    (37, 1): ([425, 2559, 425, 425, 2559], [6.33, 6.33, 37.99], [1, 0, 0], [0, 1, 0], 5, 425),
+    (37, 3): ([762, 2896, 337, 762, 2896], [5.02, 11.35, 43.01], [1, 1, 0], [0, 1, 0], 4, 337),
+    (37, 4): ([0, 2896, 0, 0, 2896], [0.00, 0.00, 43.01], [1, 1, 0], [0, 0, 0], 4, 0),
+}
+NO_BLOCK_4_OCT = [(5, 20), (5, 22), (5, 26), (5, 28), (5, 29), (9, 2), (9, 3), (9, 4), (9, 5),
+                  (9, 6), (10, 2), (10, 4), (10, 5), (10, 6), (14, 2), (14, 5), (14, 6),
+                  (20, 15), (20, 16), (20, 18), (25, 2), (25, 3), (25, 4), (25, 6), (29, 3),
+                  (29, 4), (29, 7), (29, 8), (34, 4), (34, 5), (34, 7), (34, 8), (36, 2),
+                  (36, 3), (36, 4), (36, 5), (36, 6), (37, 2), (37, 5), (37, 6)]
+
+
+def test_the_expanded_display_of_4_oct(screen):
+    rows = {(r.branch, r.node): r for r in screen.rows if not r.end}
+    for key, (dist, loss, above, below, homes, ftg) in BLOCKS_4_OCT.items():
+        b = rows[key].block
+        got = ([round(v) for v in b["distances"]], [round(v, 2) for v in b["losses"]],
+               b["above"], b["below"], b["homes"], round(b["same_cable"]))
+        assert got == (dist, loss, above, below, homes, ftg), key
+    for key in NO_BLOCK_4_OCT:
+        assert not rows[key].block, key
+    assert not rows[(5, 25)].node_box and not rows[(5, 27)].node_box
+    assert rows[(5, 24)].node_box and rows[(29, 9)].node_box
+    # the white (1) under 5.29 and 34.8, the cyan (1) beside each tap's ports
+    assert rows[(5, 29)].housing == 1 and rows[(34, 8)].housing == 1
+    assert [as_shown(v) for v in rows[(36, 6)].tap_levels[0]] == [29.20, 24.29, 42.15, 41.28]
+    assert [as_shown(v) for v in rows[(37, 6)].tap_levels[0]] == [30.91, 27.42, 38.91, 37.18]
+    assert rows[(36, 6)].taps == ["{40}"] and rows[(37, 6)].taps == ["{40}"]
+
+
+def test_three_taps_on_one_line():
+    """The user's 27a-27d: /23/ /11/ / 4/ keyed on AL004's 8.1 (0 ft).  Each
+    tap's port is fed through the ones before it, the 4 dB terminating tap
+    passes nothing on, and the end line shows its ports."""
+    from hfc.plant import TapPlacement
+    design = design_from_ntw(NTW, SPEC)[0]
+    lib = design.library
+    by = {t.name: k for k, t in lib.taps.items()}
+    names = ("MGT-2223C-USP", "MGT-2211C-USP", "MGT-2204C-USP")
+    design.branch(8).nodes[0].taps = [TapPlacement(part_id=by[n], ports=lib.taps[by[n]].ports)
+                                      for n in names]
+    rows = [r for r in build(design).rows if r.branch == 8]
+    r, end = rows[0], rows[-1]
+    shown = lambda vs: [as_shown(v) for v in vs]
+    assert shown(r.levels.values()) == [36.60, 25.70, 33.30, 33.30]
+    assert r.taps == ["/23/", "/11/", "/ 4/"] and r.tap_severity == ["red", "", ""]
+    assert [shown(t) for t in r.tap_levels] == [[13.60, 2.80, 56.20, 54.40],
+                                                [25.00, 14.30, 44.70, 44.60],
+                                                [28.60, 20.60, 38.40, 38.40]]
+    assert r.tap_port_severity[0] == ["red"] * 4 and r.tap_port_severity[1:] == [[""] * 4] * 2
+    b = r.block
+    assert ([round(v) for v in b["distances"]], [round(v, 2) for v in b["losses"]], b["above"],
+            b["below"], b["homes"], round(b["same_cable"])) == \
+        ([0, 886, 0, 0, 886], [0.00, 0.00, 13.11], [1, 0, 0], [0, 0, 0], 0, 0)
+    assert shown(r.out_levels.values()) == [0.0] * 4
+    assert shown(end.levels.values()) == [0.0] * 4
+    assert shown(end.port_levels) == [28.60, 20.60, 38.40, 38.40]
 
 
 def test_underground_housing_marker(screen):
@@ -723,16 +811,18 @@ def test_coupler_column_matches_the_screen(screen):
     # the coupler column of branch 4 as the Design screen shows it, and the
     # first line of branch 9 as its preview box shows it
     got = [c for r in _rows(screen, 4) for c in r.couplers]
-    assert got == ["12<6>", "100[9]", "3-<11><12>", "2[17]", "1<18>", "16<19>",
-                   "100[20]", "3[21]<24>", "8[22]"]
-    assert _rows(screen, 9)[0].couplers == ["108[10]"]
+    assert got == ["12{6}", "100[9]", "3-<11>{12}", "2[17]", "1(18)", "16(19)",
+                   "100[20]", "3[21](24)", "8[22]"]
+    # the preview box draws every branch [n] (108[10] there); the Design
+    # screen 108<10> (29b)
+    assert _rows(screen, 9)[0].couplers == ["108<10>"]
     # 7 runs along 4's 156 from the bridger at 4.4, but only its parent
     # branch 6 counts, whose span there is 121
     assert _rows(screen, 6)[0].couplers == ["100[7]"]
-    # branch 5 (set A 5d): 1<45> on 406 cable, as long as 5.9's span ahead;
-    # 5.19 100<29> as predicted
+    # branch 5 (set A 5d, 29a, 32a): 5.9's 45 has no footage, 5.12's 36 and
+    # 5.19's 29 run back along 83 and 184
     assert [c for r in _rows(screen, 5) for c in r.couplers] == \
-        ["12[25]", "1<45>", "100<36>", "100<29>", "2[34]", "12<35>"]
+        ["12[25]", "1(45)", "100{36}", "100{29}", "2[34]", "12(35)"]
 
 
 def test_branch_1_matches_the_screen(screen):
@@ -744,16 +834,16 @@ def test_branch_1_matches_the_screen(screen):
     assert [r.amp for r in rows[:1]] == ["70"] and rows[0].amp_label == "AL004"
     assert [r.fixed for r in rows[:5]] == [False, True, True, True, True]
     assert rows[0].cab_name == "EX P3 500 A"          # cable 0, as its info box says
-    assert [c for r in rows for c in r.couplers] == ["570<2>", "570[3]", "570[4]", "570[5]"]
+    assert [c for r in rows for c in r.couplers] == ["570(2)", "570[3]", "570[4]", "570[5]"]
 
 
 def test_a_feed_stops_being_one_when_its_span_no_longer_matches():
     # The user changed 11.1 from 105 ft (4.16's span) to 106 in Lode Data:
-    # 4.14 then showed 3-[11]<12>, and branch 11 these numbers
+    # 4.14 then showed 3-[11]{12}, and branch 11 these numbers
     design = design_from_ntw(NTW, SPEC)[0]
     design.branch(11).nodes[0].ftg = 106
     scr = build(design)
-    assert [r for r in _rows(scr, 4) if r.node == 14][0].couplers == ["3-[11]<12>"]
+    assert [r for r in _rows(scr, 4) if r.node == 14][0].couplers == ["3-[11]{12}"]
     rows = [r for r in scr.rows if r.branch == 11]
     got = [tuple(as_shown(r.levels[f]) for f in scr.frequencies) for r in rows]
     assert got == [(41.21, 33.33, 25.59, 25.17), (36.97, 31.79, 27.01, 26.29),
@@ -764,20 +854,18 @@ def test_a_feed_stops_being_one_when_its_span_no_longer_matches():
     assert rows[-1].port_severity == [""] * 4
 
 
-def test_a_power_stop_ends_the_walk_to_the_parent_span(screen):
-    # 9.1's 108[10]: branch 10 starts 300 ft on 100 cable, as 9.3's span, but
-    # 9.2 (0 ft) between them holds a power stop.  The user took it off in
-    # Lode Data and 9.1 read 108<10>; the other couplers on the screen stayed
-    rows = _rows(screen, 9)
-    assert [r.couplers for r in rows if r.couplers] == \
-        [["108[10]"], ["100<13>"], ["100[40]"], ["1<43>"], ["100<41>"]]
+def test_a_power_stop_does_not_end_the_walk_to_the_parent_span(screen):
+    # 9.1's 108<10>: branch 10 starts 300 ft, as 9.3's span, past 9.2 (0 ft)
+    # and its power stop -- Lode draws it so with the stop (29b, 4 Oct) and
+    # without it (SHINSTON3 2); 9.12's 13 runs back along 361, 9.20's 43 and
+    # 9.21's 41 have no footage
+    want = [["108<10>"], ["100{13}"], ["100[40]"], ["1(43)"], ["100(41)"]]
+    assert [r.couplers for r in _rows(screen, 9) if r.couplers] == want
     design = design_from_ntw(NTW, SPEC)[0]
     design.branch(9).nodes[1].power_stop = False
-    rows = _rows(build(design), 9)
-    assert [r.couplers for r in rows if r.couplers] == \
-        [["108<10>"], ["100<13>"], ["100[40]"], ["1<43>"], ["100<41>"]]
-    assert [c for r in _rows(screen, 14) for c in r.couplers] == ["8<15>"]
-    assert [c for r in _rows(screen, 20) for c in r.couplers] == ["100<44>"]
+    assert [r.couplers for r in _rows(build(design), 9) if r.couplers] == want
+    assert [c for r in _rows(screen, 14) for c in r.couplers] == ["8{15}"]
+    assert [c for r in _rows(screen, 20) for c in r.couplers] == ["100(44)"]
 
 
 def test_branches_14_and_20_as_the_screen_and_boxes_show_them(screen):
@@ -835,18 +923,19 @@ def test_only_an_internal_coupler_away_from_an_active_is_red():
 
 def test_s3s_multi_out_100_ft_from_its_ripple_is_red():
     """The user's 7a: on S3, WV750's MULTI OUT (100, internal) on 1.2, 100 ft
-    from the Ripple on 1.1, is drawn red; 7b, moved to a 0-ft line under the
-    Ripple, green."""
+    from the Ripple on 1.1, is drawn red, 100{2} (branch 2's 100 ft as long as
+    1.2's own and 1.3's); 7b, moved to a 0-ft line of no cable under the
+    Ripple, green and 100[2]."""
     s3 = NTW.parents[1] / "keyed" / "S3.ntw"
     if not s3.exists():
         pytest.skip("S3.ntw not in samples")
     design = design_from_ntw(s3, SPEC)[0]
     rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
-    assert (rows[(1, 2)].couplers, rows[(1, 2)].coupler_severity) == (["100<2>"], ["red"])
+    assert (rows[(1, 2)].couplers, rows[(1, 2)].coupler_severity) == (["100{2}"], ["red"])
     nd = design.branch(1).nodes[1]
-    moved = type(nd)(couplers=nd.couplers, through_leg=nd.through_leg, cab=nd.cab, cab_part=nd.cab_part)
+    moved = type(nd)(couplers=nd.couplers, through_leg=nd.through_leg)
     nd.couplers = []
     design.branch(1).nodes.insert(1, moved)
     design.renumber(design.branch(1))
     rows = {(r.branch, r.node): r for r in build(design).rows if not r.end}
-    assert rows[(1, 2)].coupler_severity == [""]
+    assert (rows[(1, 2)].couplers, rows[(1, 2)].coupler_severity) == (["100[2]"], [""])

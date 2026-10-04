@@ -13,17 +13,18 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
   including the end-of-branch line, tap port outputs and the in-line Q2.
 * Tap colours: green in spec, yellow marginal, red out (System Levels + tap
   margin).
-* The coupler column, including `<n>` versus `[n]` (see 1 below).
+* The coupler column, including its four brackets (see 1 below).
 * The info boxes: tap port levels, coupler branch preview (start levels and
   the branch table), power supply information, amplifier definition, and the
   node box (address, cable; on an amplifier's node its distances and homes).
   The box is the program's tip: #ffffe1, black text, as wide as its text, in
   the bottom right; View → Show Tips turns it off and on. On a coupler it
-  previews one branch — 4.14's `3-[11]<12>` shows "Feeds Branch: 11" only —
-  and a double-click enters that branch, as its last line says. Still to
-  confirm: on a two-branch coupler, what `. ←` / `. →` do (the replica keeps
-  `. ←` = back to the parent, `. →` = into the first branch), and whether a
-  double-click on the second bracket enters the second branch.
+  previews one branch — 4.14's `3-[11]{12}` shows "Feeds Branch: 11" only —
+  and a double-click enters that branch, as its last line says; on a
+  two-branch coupler a double-click on the second bracket enters the second
+  branch (the user, 4 Oct). `. ←` / `. →` on one: not asked further (the
+  user works with the mouse); the replica keeps `. ←` = back to the parent,
+  `. →` = into the first branch.
 * Screen colours, measured from the screenshots: text #00bf00, the cab
   column #00ff00, amplifier names white, marginal #ffff00, out #ff0000.
 * Power currents on all 29 lines of branch 4.
@@ -31,49 +32,41 @@ completely, and every number on the Design-screen screenshots of branches 1, 4,
 ## Answered by the user
 
 * `/n/` 2-port, `[n]` 4-port, `<n>` 8-port taps on the Design screen (8-port
-  seen as `<15>` on 11.2).
-* `1<18>` is the power inserter; the supply sits inside branch 18.
+  seen as `<15>` on 11.2); a 6-port slot `{n}` (4 Oct).
+* `1(18)` is the power inserter; the supply sits inside branch 18.
 * Leg designations: `8[2]` downstream high leg, branch low leg; `8-` swaps
-  them; `3-<11><12>` puts the high leg on 11; `3=<11><12>` on 12. Keyed as
+  them; `3-<11>{12}` puts the high leg on 11; `3=<11>{12}` on 12. Keyed as
   `8-` (after the ID) as well as `-8`.
+* Navigation (4 Oct): double-clicking either bracket of `3-<11>{12}` goes
+  into that branch; turning the wheel up on its first line comes back to
+  the splitter's line with the cursor on ftg. View → Show Tips is on again
+  after Lode is restarted.
 
 ## Open, in the order to settle them
 
-1. **`<n>` versus `[n]` on couplers — closed.** Nothing in the file marks it
-   (file-formats 3.7); the program derives it from the spans. `<n>` when the
-   branch has no footage, or when its first span is as long as the **parent
-   branch's** nearest span behind or ahead of the coupler — the span
-   `BkFeed` (`.2`) / `FwdFd` (`..2`) copy. The walk to that span takes each
-   line's own span (the coupler's line first, going back) and ends at the
-   first line that has one or at a line with a power stop — but not at a
-   stop on the coupler's own line going back. The cable does not matter.
-   All 85 seen fit (AL004 29, the older AL004 28, SN001 28). Evidence:
-   * branch 1: `570<2> 570[3] 570[4] 570[5]` — 3 is all 1xx but branch 1 has
-     no spans;
-   * 11.1 changed 105 → 106 in Lode Data turned 4.14 into `3-[11]<12>`;
-   * 9.1's `108[10]`: 10.1 is 300 ft on 100, as 9.3's span, but 9.2 (0 ft)
-     between them holds a power stop; the user took it off and Lode Data
-     read `108<10>`. The branch's later mileage (10.7 on) does not matter:
-     SN001's 5, 9, 15, 18, 20, 28 and 35 have mileage and are `<`;
-   * SN001 1.15's `63<15>` on 1.14's 550 — a power stop on the line whose
-     span it is does not end the walk;
-   * branch 6: `100[7]`. 6.1 is bridger AL00415 at 4.4's pole and 100 its
-     internal DC-12; 7 runs as a second cable along branch 4's 156 (the user's
-     map confirms it), but only branch 6's own span, 121, is compared;
-   * set A: the older AL004's 16.4 `8<17>` — 17 runs 169 ft, 16.3's span,
-     behind 16.4 (0 ft) whose own power stop does not end the walk (the
-     rule before drew `8[17]`; AL002's 16.10 and AL003's 29.5 are the same
-     case); its 9.14 `2<14>` — 14 runs 149 ft on 404, mileage, as long as
-     9.14's own span (the first rule, from day one, wanted non-mileage
-     cable; nothing seen needed it); 9.1 `108<10>`, 5.19 `100<32>` and
-     AL004's 5.19 `100<29>` as predicted, and AL004's 5.9 `1<45>`.
-
-   Not seen: `{n}` (backfeed) — 6 and 12 run backward and are drawn `<` —
-   or `(n)`, the manual's "no footage": Lode draws AL004's no-footage
-   branches 2, 18, 19 and 24 as `<n>`.
-2. **8-port tap brackets — closed.** The Design screen draws an 8-port tap
-   `<n>` (11.2: `<15>`), like the 6-port-slot pad `<43>`; the preview box
-   draws 2/4/8-port as `(17)` `[8]` `{15}`. Both already reproduced.
+1. **The bracket around a branch number — closed (4 Oct).** Lode's font
+   draws `<` pointed, `(` with a flat middle and `{` with a notch; at the
+   screenshots' size all three pass for `<`, and every "`<n>`" read before
+   4 Oct was one of the three. Read glyph by glyph on every screenshot since
+   26 Sep (85 couplers on AL004, the older AL004, SN001, LG001, S3, the keyed
+   BH/HUMB): `(n)` no footage; `{n}` first span as long as the parent's
+   nearest span behind (the coupler's own line's first; it wins when both
+   match — S3's 1.2, `100{2}`); `<n>` as long as the nearest span ahead;
+   `[n]` otherwise. The walk passes 0-ft lines and power stops — 9.1 is
+   `108<10>` with 9.2's stop on (29b) as off (SHINSTON3 2); the `108[10]`
+   behind the old power-stop rule was branch 9's preview box, which draws
+   every branch `[n]`. From a coupler on a 0-ft line the span found counts
+   only on that line's cable file index: the older AL004's 4.14 (410) is
+   `3[11]{12}` (4.16's 105 on 100, SHINSTON3 1c), S3's coupler moved to a
+   0-ft line with no cable `100[2]` (7b), SN001 18.1 (442 → 142) `108<19>`.
+   Still to see: a 0-ft coupler line whose span ahead is on another cable
+   and same length on a file the app has (QUESTIONS N3, C1).
+2. **Tap brackets — closed.** The Design screen draws 2-port `/n/`, 4-port
+   `[n]`, 8-port `<n>` (11.2's `<15>`, pointed) and a 6-port slot `{n}` (the
+   LEQ\RC pads, 6.8's `{43}`, 36.6's `{40}`, as the manual says); the
+   preview box draws 2/4/8-port as `(17)` `[8]` `{15}`. The expanded
+   display's amplifier lines: the name in `[ ]`, the supply and the pad /
+   EQ parts in `( )`.
 3. **Power volts — closed.** Each span's resistance is whole milliohms,
    truncated (feet × µΩ/ft, integer-divided by 1000). All 29 volts and 29
    currents on branch 4 now match exactly, and AL00415 reads 86.78 V 0.79 A

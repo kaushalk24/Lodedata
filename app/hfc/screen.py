@@ -256,53 +256,56 @@ def build(design: Design) -> Screen:
 
     starts, feeders = {}, {}      # per branch: levels out of its coupler, coupler name
 
-    # Nothing in the file marks a branch <n> or [n]; the program works it out
-    # from the spans.  A branch is drawn <n> when it has no footage, or when
-    # its first span is as long as the parent branch's nearest span behind or
-    # ahead of the coupler -- the span BkFeed (.2) or FwdFd (..2) copies.
-    # The walk to that span takes each line's own span, the coupler's line
-    # first going back, and ends at the first line that has one or at a line
-    # with a power stop -- but not at the coupler's own line's stop going
-    # back: the older AL004's 16.4 is 8<17> (17 runs 169 ft, 16.3's span,
-    # past 16.4's stop; set A 5a).  The cable does not matter: its 9.14 is
-    # 2<14> on 404, mileage (5b).  All 85 seen fit (AL004, the older AL004,
-    # SN001_MID):
-    #   AL004 4.4 12<6> starts on 4's 121 behind, 4.14 3-<11><12> on the 99
-    #   behind and the 105 ahead, past 4.15's coupler (0 ft); 11.1 made 106
-    #   ft turns it 3-[11]<12> (the user, in Lode Data);
-    #   AL004 9.1 108[10]: 9.2 (0 ft) holds a power stop before 9.3's 300 --
-    #   taken off, Lode Data reads 108<10> (the user's test);
-    #   SN001 1.15 63<15> on 1.14's 550, a power stop on the line whose span
-    #   it is; 5.3 212[8] and 28.1 102[34] match nothing;
-    #   only the parent counts: AL004's 7 runs along 4's 156 from 6.1 (0 ft
-    #   at 4.4), yet it is 100[7] -- 6's own span is 121.
-    def fed(b: Branch) -> bool:
+    # Nothing in the file marks a branch's bracket; the program works it out
+    # from the spans, in four kinds (the manual's, told apart glyph by glyph
+    # on the user's screenshots of 4 Oct, 26a-32b):
+    #   (n) the branch has no footage: AL004 1.2's 570(2), 4.17's 1(18),
+    #       4.25's 3[21](24), 5.24's 12(35), 20.17's 100(44);
+    #   {n} a backfeed, its first span as long as the parent's nearest span
+    #       behind the coupler, its own line's first: 4.4's 12{6} on 4's 121,
+    #       4.14's {12} on 4.13's 99, 9.12's 100{13}, 14.4's 8{15};
+    #   <n> a forwardfeed, as long as the parent's nearest span ahead: 4.14's
+    #       3-<11> on 4.16's 105 (106 ft turns it [11]), 9.1's 108<10>;
+    #   [n] anything else.
+    # The walk passes 0-ft lines, a power stop's too (9.2's, 29b).  From a
+    # coupler on a 0-ft line the span found counts only on that line's cable:
+    # the older AL004's 4.14 (410) is 3[11]{12}, 4.16's 105 being on 100
+    # (SHINSTON3 1c), and S3 with its coupler moved to a 0-ft line of no
+    # cable reads 100[2] though 1.3's 100 is branch 2's (7b).  The cable ID's
+    # series does not matter (SN001 18.1's 108<19>, 442 on to 142), nor does
+    # the cable after a line with a span of its own (24.17's 63<29>, 442 on
+    # to 40), a power stop (16.4's 8{17} past 16.4's own; SN001 1.15's
+    # 63{15}), or the branch's own cable (the older 9.14's 2{14} on 404).
+    # A span as long both ways is a backfeed: S3's 1.2, 100 ft between two
+    # 100s, is 100{2} (7a).
+    def branch_kind(b: Branch) -> str:
         first = next((n for n in b.nodes if n.ftg), None)
         if first is None:
-            return True
+            return "()"
         parent = design.branch(b.parent_branch)
-        if parent is None:
-            return False
+        if parent is None or not 0 < b.parent_node <= len(parent.nodes):
+            return "[]"
+        k = b.parent_node               # parent.nodes[:k] runs up to the coupler's line
+        own = parent.nodes[k - 1]
 
-        def nearest(lines, own=None) -> float:
+        def nearest(lines) -> float:
             for n in lines:
                 if n.ftg:
-                    return n.ftg
-                if n.power_stop and n is not own:
-                    return 0.0
+                    return 0.0 if not own.ftg and n.cab % 100 != own.cab % 100 else n.ftg
             return 0.0
-        k = b.parent_node               # parent.nodes[:k] runs up to the coupler's line
-        behind = list(reversed(parent.nodes[:k]))
-        return first.ftg in (nearest(behind, behind[0] if behind else None),
-                             nearest(parent.nodes[k:]))
+        if first.ftg == nearest(reversed(parent.nodes[:k])):
+            return "{}"
+        if first.ftg == nearest(parent.nodes[k:]):
+            return "<>"
+        return "[]"
 
     def branch_style(cp) -> str:
         if cp.style != BRANCH_NORMAL:
             return BRANCH_BRACKETS.get(cp.style, "[]")
         b = design.branch(cp.branch)
         if b is None:
-            return "<>"
-        return "<>" if fed(b) else "[]"
+            return "()"
+        return branch_kind(b)
 
     def walk(branch: Branch, incoming: dict, depth: int, cum_ft: float,
              gutter_open: bool):
@@ -585,18 +588,16 @@ def build(design: Design) -> Screen:
 
 
 def _at_an_active(design: Design, branch: Branch, idx: int) -> bool:
-    """Whether a line is at the same place as an active: the lines from the
-    last one with footage up to it and the 0-ft lines after it -- a
-    branch's 0-ft first line is where its coupler is (AL004's 7.1, 112<8>,
-    at bridger 6.1's place)."""
+    """Whether a line is at an active's place, after it: the lines from the
+    last one with footage up to it.  A branch's 0-ft first line is where its
+    coupler is (AL004's 7.1, 112(8), at bridger 6.1's place).  An active
+    below it at the same place does not count: KERMIT750's MB-JMP on LG001's
+    2.33 (240 ft) is red with the FM902T keyed on 2.35, 0 ft on (30c)."""
     nodes = branch.nodes
     start = idx
     while start > 0 and not nodes[start].ftg:
         start -= 1
-    end = idx
-    while end + 1 < len(nodes) and not nodes[end + 1].ftg:
-        end += 1
-    if any(n.amp for n in nodes[start:end + 1]):
+    if any(n.amp for n in nodes[start:idx + 1]):
         return True
     parent = design.branch(branch.parent_branch) if branch.parent_branch else None
     if start == 0 and not nodes[0].ftg and parent and 0 < branch.parent_node <= len(parent.nodes):
@@ -668,6 +669,9 @@ def _active_kind(part) -> str:
     return ""
 
 
+NO_EQ = 255                     # a pad or EQ slot holding none: the bank's VOID row
+
+
 def choose_pads_eqs(part, levels: dict, p) -> list:
     """The pads and EQs the program picks for an active, as stored values:
     forward pad, return pad, forward EQ, return EQ.
@@ -704,11 +708,16 @@ def choose_pads_eqs(part, levels: dict, p) -> list:
         # not 7 (6.06); 12.29 / 11.30 at 1a takes 2 (0.98), as the 48
         # actives of H043A_MID and H043B_MID have it.  WV750 has it ticked:
         # the nearest, all 27 of AL004's
-        rows = [v for v in range(len(feq)) if feq[v][1] - feq[v][0] <= need + slack] or None
+        rows = [v for v in range(len(feq)) if feq[v][1] - feq[v][0] <= need + slack]
         rrows = [v for v in range(len(req)) if req[v][1] - req[v][0] <= rh - rl + slack] or None
-    fe = nearest(feq, need, rows)
+    # and with none that fits, no forward EQ at all (255, the bank's VOID
+    # row): KERMIT750's FM901e-B, FM902B and FM902T keyed on LG001's 2.11,
+    # 2.21 and 2.35 (30a-30c), 11-11.5 dB of tilt arriving where the active
+    # wants less than none -- "VOID" (or the blank row-0 label) in the box,
+    # <NO FWD EQ> in the expanded display
+    fe = NO_EQ if rows == [] else nearest(feq, need, rows)
     re_ = nearest(req, rh - rl, rrows)
-    f_loss = feq[fe] if feq else [0.0, 0.0]
+    f_loss = feq[fe] if feq and fe != NO_EQ else [0.0, 0.0]
     r_loss = req[re_] if req else [0.0, 0.0]
     fp = largest(fpad, lambda db: hi - db - f_loss[0] >= part.in_forward_high - slack
                  and lo - db - f_loss[1] >= part.in_forward_low - slack)
@@ -843,10 +852,17 @@ def _amp_info(design: Design, scr: Screen) -> None:
 
     for (b, n), r in rows.items():
         nd = node(b, n)
-        last = n == len(design.branch(b).nodes)
+        nodes = design.branch(b).nodes
+        last = n == len(nodes)
         # a branch's first node shows it at 22.1 (0 ft); whether that is for
         # being first or for the 0 ft is not yet known, so only both
-        block = bool(has_amp(nd) or splits(nd) or last or (n == 1 and not nd.ftg))
+        box = bool(has_amp(nd) or splits(nd) or last or (n == 1 and not nd.ftg))
+        # and so does the last line on a cable: the next line on another one
+        # (its series aside: 22.2's 505 on to 405 has none).  AL004's 5.25
+        # (406, then 414) and 5.27 (414, then 515), on the 4 Oct set (31,
+        # 32a); their node box stays the short one (31's 5.27)
+        ends_cable = not last and nodes[n].cab % 100 != nd.cab % 100
+        block = box or ends_cable
         if not (has_amp(nd) or block):
             continue
         d = dict.fromkeys(("aerial_prev", "aerial_start", "total_split",
@@ -882,7 +898,7 @@ def _amp_info(design: Design, scr: Screen) -> None:
         # drawn: a coupler line (SN001_MID's 1.2: all 0, 227 homes; AL004's
         # 9.1), a branch's last line (28.16: 739 9856 739 739 9856, 2 homes)
         # and its 0-ft first line (4.1), not 8.1 (334 ft, bare)
-        r.node_box = block
+        r.node_box = box
         if block:
             r.block = {
                 "distances": [d[k] for k in ("aerial_prev", "aerial_start", "total_split",
@@ -905,8 +921,10 @@ def _amp_info(design: Design, scr: Screen) -> None:
         for c, v in enumerate((stored + [0, 0, 0, 0])[:4]):
             column = part.pad_eq[c] if part and len(part.pad_eq) == 4 else ["", []]
             prefix, labels = column[:2]
-            # 255 is row 0, "VOID" (the older AL004's WIFI OMNIs, both EQs)
-            if v == 255 and len(column) > 3 and column[3]:
+            # 255 is row 0, "VOID" (the older AL004's WIFI OMNIs, both EQs),
+            # blank where the bank's row 0 has no label (KERMIT750's FM902B
+            # and FM902T, bank 5: "Forward Eq:" and nothing, 30b and 30c)
+            if v == NO_EQ and len(column) > 3:
                 label = column[3]
             elif part and len(part.pad_eq) == 4 and not labels:
                 # the bank has nothing in that column: Lode leaves it blank
@@ -915,6 +933,11 @@ def _amp_info(design: Design, scr: Screen) -> None:
             else:
                 label = labels[v].strip() if 0 <= v < len(labels) else str(v)
             shown_as.append((label, prefix + label))
+        if stored[2:3] == [NO_EQ] and part and part.needs_rf_input:
+            # no forward EQ: <NO FWD EQ> in the expanded display (30a-30c).
+            # A fibre-fed node's (SN001's Ripple-2, AL005's NC4000) is not
+            # seen yet, so left as it was
+            shown_as[2] = (shown_as[2][0], "<NO FWD EQ>")
         (fp, fp_part), (rp, rp_part), (fe, fe_part), (re_, re_part) = shown_as
         # Cascade Position: the actives from the network's start down to this
         # one, itself included, but those Custom Cascading excludes: WV750's

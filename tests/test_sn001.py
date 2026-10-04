@@ -193,8 +193,8 @@ def test_the_design_screen_is_lodes(sn001):
     # the Configuration Table slot each line keeps: 63U, 11U (and 5.8's 11M)
     assert [rows[k].amp for k in ((1, 1), (1, 15), (1, 22), (1, 27), (2, 12), (5, 8))] == \
         ["61", "63U", "63U", "11U", "63U", "11M"]
-    assert [rows[(1, k)].couplers for k in (2, 3, 4, 22)] == [["61[2]"], ["61[13]"], ["61<14>"], ["63[36]"]]
-    assert rows[(2, 39)].couplers == ["60<4>"] and rows[(2, 25)].couplers == ["63<40>"]
+    assert [rows[(1, k)].couplers for k in (2, 3, 4, 22)] == [["61[2]"], ["61[13]"], ["61(14)"], ["63[36]"]]
+    assert rows[(2, 39)].couplers == ["60(4)"] and rows[(2, 25)].couplers == ["63<40>"]
     assert [rows[(1, k)].power_stop for k in (5, 14)] == [True, True]
     assert rows[(1, 29)].taps == ["[20]"]
     end = next(r for r in scr.rows if r.branch == 1 and r.end)
@@ -353,10 +353,10 @@ def test_notes_are_written_a_row_to_each_tilde_0():
     assert export_ntw(again, data)[0] == data
 
 
-# Every coupler on the user's screenshots of SN001: < where the branch has no
-# footage or starts on 1xx cable along its parent's span behind or ahead
-SN001_BRACKETS = {3: "<", 4: "<", 5: "<", 9: "<", 14: "<", 15: "<", 16: "<", 18: "<", 19: "<",
-                  20: "<", 27: "<", 28: "<", 29: "<", 35: "<", 40: "<", 41: "<",
+# Every coupler on the user's screenshots of SN001, its bracket read glyph by
+# glyph: ( no footage, { along the parent's span behind, < along the span ahead
+SN001_BRACKETS = {3: "{", 4: "(", 5: "<", 9: "{", 14: "(", 15: "{", 16: "<", 18: "{", 19: "<",
+                  20: "{", 27: "(", 28: "<", 29: "<", 35: "{", 40: "<", 41: "(",
                   2: "[", 7: "[", 8: "[", 13: "[", 21: "[", 24: "[", 25: "[", 31: "[", 33: "[",
                   34: "[", 36: "[", 39: "["}
 
@@ -367,12 +367,12 @@ def test_every_coupler_bracket_is_lodes(sn001):
     drawn = {}
     for r in scr.rows:
         for c in r.couplers:
-            for m in re.finditer(r"([\[<])(\d+)[\]>]", c):
+            for m in re.finditer(r"([\[<({])(\d+)[\]>)}]", c):
                 drawn[int(m.group(2))] = m.group(1)
     assert {b: drawn.get(b) for b in SN001_BRACKETS} == SN001_BRACKETS
     rows = {(r.branch, r.node): r for r in scr.rows if not r.end}
     assert [rows[k].couplers for k in ((8, 3), (15, 10), (18, 9), (24, 7), (28, 9))] == \
-        [["9<9>"], ["63<18>"], ["63<20>"], ["63<28>"], ["63<35>"]]
+        [["9{9}"], ["63{18}"], ["63{20}"], ["63<28>"], ["63{35}"]]
 
 
 def test_a_branch_s_last_line_has_the_distances(sn001):
